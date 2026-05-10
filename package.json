@@ -8,11 +8,14 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "lint": "turbo lint"
+    "lint": "turbo lint",
+    "vercel-build": "npm run build -w @foretrace/shared && npm run build -w @foretrace/web"
+  },
+  "dependencies": {
+    "vite": "^8.0.10"
   },
   "devDependencies": {
-    "turbo": "^2.5.4",
-    "vite": "^8.0.10"
+    "turbo": "^2.5.4"
   },
   "packageManager": "npm@10.9.2",
   "engines": {
