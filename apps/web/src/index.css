@@ -1,0 +1,122 @@
+@import 'tailwindcss';
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans:
+    'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji';
+
+  --color-accent-50: oklch(97.5% 0.027 173);
+  --color-accent-100: oklch(94% 0.06 173);
+  --color-accent-200: oklch(88.5% 0.089 173);
+  --color-accent-300: oklch(82% 0.11 173);
+  --color-accent-400: oklch(71% 0.12 173);
+  --color-accent-500: oklch(61% 0.12 173);
+  --color-accent-600: oklch(52% 0.11 173);
+  --color-accent-700: oklch(43% 0.09 173);
+  --color-accent-800: oklch(37% 0.075 173);
+  --color-accent-900: oklch(31% 0.06 173);
+  --color-accent-950: oklch(24% 0.042 173);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Do not use @apply dark: variants on ::selection — Tailwind can emit invalid
+   * `::selection:where()` rules that break stylesheet parsing in some browsers.
+   */
+  html ::selection {
+    background-color: rgba(13, 148, 136, 0.22);
+    color: #134e4a;
+  }
+
+  html.dark ::selection {
+    background-color: rgba(45, 212, 191, 0.28);
+    color: #f0fdfa;
+  }
+
+  .ft-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(161, 161, 170, 0.75) transparent;
+  }
+
+  .ft-scrollbar::-webkit-scrollbar {
+    width: 7px;
+  }
+
+  .ft-scrollbar::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: rgba(161, 161, 170, 0.45);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  html.dark .ft-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(82, 82, 91, 0.55);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .animate-rise {
+    animation: ft-rise 0.58s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  .ft-backdrop {
+    animation: ft-backdrop-in 0.26s ease-out both;
+  }
+
+  .mobile-nav-panel {
+    animation: ft-slide-in 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes ft-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes ft-backdrop-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes ft-slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-rise,
+    .ft-backdrop,
+    .mobile-nav-panel {
+      animation: none !important;
+    }
+
+    .animate-rise,
+    .mobile-nav-panel {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
+}

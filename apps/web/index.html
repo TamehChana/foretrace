@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Foretrace — early signals, explainable risk, better delivery." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <title>Foretrace</title>
+  </head>
+  <body>
+    <div id="root">
+      <p
+        id="foretrace-shell-loading"
+        style="margin: 0; padding: 1.25rem; font-family: system-ui, sans-serif; color: #3f3f46"
+      >
+        Loading Foretrace…
+      </p>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function () {
+        var warned = false;
+        window.addEventListener('error', function (ev) {
+          if (warned) return;
+          warned = true;
+          var shell = document.getElementById('foretrace-shell-loading');
+          if (!shell) return;
+          shell.textContent =
+            'JavaScript error: ' + (ev.message || (ev.error && ev.error.message) || 'unknown') +
+            ' — open DevTools → Console for details.';
+          shell.style.color = '#b45309';
+        });
+        window.addEventListener(
+          'unhandledrejection',
+          function (ev) {
+            if (warned) return;
+            warned = true;
+            var shell = document.getElementById('foretrace-shell-loading');
+            if (!shell) return;
+            var r = ev.reason;
+            shell.textContent =
+              'Unhandled error: ' + (r && r.message ? r.message : String(r)) +
+              ' — see Console.';
+            shell.style.color = '#b45309';
+          },
+          { passive: true },
+        );
+        setTimeout(function () {
+          var shell = document.getElementById('foretrace-shell-loading');
+          if (!shell || !shell.isConnected) return;
+          shell.textContent =
+            'Still loading… If this stays forever, JavaScript did not boot. Use `npm run dev` and open ' +
+            'http://localhost:5173 (not a file:/// path). Check Network tab: main.tsx must return 200.';
+          shell.style.color = '#71717a';
+        }, 10000);
+      })();
+    </script>
+  </body>
+</html>
