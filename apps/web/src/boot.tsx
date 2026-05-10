@@ -7,6 +7,7 @@ import { CreateOrganizationModal } from './components/organizations/CreateOrgani
 import { RootErrorBoundary } from './RootErrorBoundary.tsx';
 import { AuthSessionProvider } from './providers/AuthSessionProvider.tsx';
 import { ThemeProvider } from './providers/ThemeProvider.tsx';
+import { ToastProvider } from './providers/ToastProvider.tsx';
 import './index.css';
 
 function showBootError(el: HTMLElement, err: unknown): void {
@@ -28,11 +29,13 @@ export function boot(el: HTMLElement): void {
         <ThemeProvider>
           <BrowserRouter>
             <AuthSessionProvider>
-              <RootErrorBoundary>
-                <App />
-              </RootErrorBoundary>
-              <AuthModal />
-              <CreateOrganizationModal />
+              <ToastProvider>
+                <RootErrorBoundary>
+                  <App />
+                </RootErrorBoundary>
+                <AuthModal />
+                <CreateOrganizationModal />
+              </ToastProvider>
             </AuthSessionProvider>
           </BrowserRouter>
         </ThemeProvider>

@@ -2,13 +2,19 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../api-fetch';
 import { useAuthSession } from '../providers/AuthSessionProvider';
 
+export type OrgListItem = {
+  id: string;
+  name: string;
+  slug: string | null;
+};
+
 export type OrganizationsState =
   | { status: 'loading' }
   | { status: 'signed_out' }
-  | { status: 'ok'; count: number }
+  | { status: 'ok'; items: OrgListItem[] }
   | { status: 'error'; message: string };
 
-function parseEnvelope(data: unknown): number {
+function parseEnvelope(data: unknown): OrgListItem[] {
   if (!data || typeof data !== 'object' || !('data' in data)) {
     throw new Error('Invalid response shape');
   }
@@ -16,7 +22,26 @@ function parseEnvelope(data: unknown): number {
   if (!Array.isArray(envelope.data)) {
     throw new Error('Invalid response shape');
   }
-  return envelope.data.length;
+  return envelope.data.map((row) => {
+    if (
+      !row ||
+      typeof row !== 'object' ||
+      !('id' in row && 'name' in row && 'slug' in row)
+    ) {
+      throw new Error('Invalid organization row');
+    }
+    const o = row as OrgListItem;
+    return {
+      id: o.id,
+      name: typeof o.name === 'string' ? o.name : String(o.name),
+      slug:
+        typeof o.slug === 'string'
+          ? o.slug
+          : o.slug === null
+            ? null
+            : (o.slug as string | null),
+    };
+  });
 }
 
 export function useOrganizations(): OrganizationsState {
@@ -48,7 +73,10 @@ export function useOrganizations(): OrganizationsState {
           throw new Error(`HTTP ${res.status}`);
         }
         const json: unknown = await res.json();
-        return { unauthorized: false as const, count: parseEnvelope(json) };
+        return {
+          unauthorized: false as const,
+          items: parseEnvelope(json),
+        };
       })
       .then((result) => {
         if (cancelled) {
@@ -58,7 +86,7 @@ export function useOrganizations(): OrganizationsState {
           setState({ status: 'signed_out' });
           return;
         }
-        setState({ status: 'ok', count: result.count });
+        setState({ status: 'ok', items: result.items });
       })
       .catch((err: unknown) => {
         if (!cancelled) {

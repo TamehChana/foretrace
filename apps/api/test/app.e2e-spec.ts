@@ -75,6 +75,26 @@ describe('AppController (e2e)', () => {
       .expect(401);
   });
 
+  const sampleOrgUuid = '00000000-0000-4000-8000-000000000000';
+
+  it('GET /organizations/:organizationId/projects without session returns 401', () => {
+    return request(httpServer())
+      .get(`/organizations/${sampleOrgUuid}/projects`)
+      .expect(401);
+  });
+
+  it('GET /organizations/:organizationId/projects/:projectId/tasks without session returns 401', () => {
+    return request(httpServer())
+      .get(`/organizations/${sampleOrgUuid}/projects/${sampleOrgUuid}/tasks`)
+      .expect(401);
+  });
+
+  it('GET nested projects/tasks rejects invalid project UUID with 400', () => {
+    return request(httpServer())
+      .get(`/organizations/${sampleOrgUuid}/projects/not-uuid/tasks`)
+      .expect(400);
+  });
+
   afterEach(async () => {
     await app.close();
   });

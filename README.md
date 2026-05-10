@@ -51,21 +51,39 @@ This repo ships a root [`.npmrc`](.npmrc) so **`npm`** uses **`E:\foretrace\.npm
 
 ## Database (PostgreSQL + Prisma)
 
-Prerequisite: **PostgreSQL 16** at the connection string you put in **`DATABASE_URL`**. The app and Prisma do not depend on Docker.
+Prerequisite: a **`DATABASE_URL`** that Prisma can reach. Nest loads **`.env`** at the repo root and **`apps/api/.env`**; keep both in sync for local commands.
 
-1. Copy [`.env.example`](.env.example) to `.env` at the **repository root** (or `apps/api/.env`; `ConfigModule` loads `.env` and `../../.env`). Edit **`DATABASE_URL`** if your user, password, host, port, or database name differ from the example.
+### Option A — Render PostgreSQL (no local server)
 
-2. Run Postgres — **without Docker** (typical path if you skipped Docker Desktop):
+This repo’s [`render.yaml`](render.yaml) provisions Postgres on **Render**. You can point **local development** at that same database:
+
+1. In the [Render Dashboard](https://dashboard.render.com), open your **PostgreSQL** instance → **Connections**.
+2. Copy the **External Database URL** (needed when connecting from your PC, not from another Render service).
+3. Put it in **`.env`** and **`apps/api/.env`** as **`DATABASE_URL=`** on **one line** (quote the value if it contains `&`). Render’s URL usually includes SSL; use it as-is.
+
+Then run migrations from your machine: **`npm run db:migrate:deploy -w @foretrace/api`**.
+
+Treat that URL like a password: **never commit it**. Prefer a **separate** Render Postgres for development if you want isolation from production data.
+
+The deployed **web service** on Render already receives **`DATABASE_URL`** from the database via the blueprint (`fromDatabase` in [`render.yaml`](render.yaml)); you only need to paste the external URL locally if you want your laptop to use Render’s DB.
+
+### Option B — PostgreSQL on your machine (pgAdmin / local install)
+
+1. Copy [`.env.example`](.env.example) to **`.env`** and **`apps/api/.env`**. Set **`DATABASE_URL`** to your local user, password, host, port, and database name.
+
+2. If you use **local** Postgres, create the user and database (no Docker):
 
    - Install PostgreSQL from the official [Windows download](https://www.postgresql.org/download/windows/) or your package manager, **version 16** if possible so it matches the compose image and team defaults.
-   - Create a matching role and database (same values as [`.env.example`](.env.example)), from **`psql`** connected as a superuser (e.g. the `postgres` role):
+   - **pgAdmin 4:** You use it to manage **PostgreSQL** (pgAdmin alone is not the server—PostgreSQL must be installed and reachable, usually `localhost:5432`). Connect to your server → **Login/Group Roles** → **Create** → **Login/Group Role…** (e.g. name `foretrace`, set a password) → **Databases** → **Create** → **Database…** (name `foretrace`, owner **foretrace**). Put that user/password/db/host/port into **`DATABASE_URL`**.
+
+   - **Or SQL** (`psql` as superuser, e.g. `postgres`):
 
      ```sql
      CREATE USER foretrace WITH PASSWORD 'foretrace';
      CREATE DATABASE foretrace OWNER foretrace;
      ```
 
-   - Use the default port **`5432`** on **`localhost`**, or change **`DATABASE_URL`** to match your install.
+   - Use port **`5432`** on **`localhost`** unless your install differs; then mirror that in **`DATABASE_URL`**.
 
    **Optional — Docker:** if you use Docker Desktop and want the bundled database only:
 
@@ -89,7 +107,7 @@ Prerequisite: **PostgreSQL 16** at the connection string you put in **`DATABASE_
 
 4. Optional: browse data with Prisma Studio: `npm run db:studio -w @foretrace/api`
 
-Quick check: `psql "postgresql://foretrace:foretrace@localhost:5432/foretrace" -c "SELECT 1"` should succeed once the server and DB exist.
+Quick check (local DB): `psql "<your-DATABASE_URL>" -c "SELECT 1"`. For Render, use the same **External** URL as in `.env`.
 
 Models live in [`apps/api/prisma/schema.prisma`](apps/api/prisma/schema.prisma) (orgs, memberships with `Role`, projects, tasks with priorities/status).
 

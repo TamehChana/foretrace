@@ -17,12 +17,17 @@ import { AuthenticatedGuard } from '../auth/guards/authenticated.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 
 import { CreateOrganizationDto } from './dto/create-organization.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
 import { OrganizationUuidParamGuard } from './organization-uuid-param.guard';
+import { MembershipsService } from './memberships.service';
 import { OrganizationsService } from './organizations.service';
 
 @Controller('organizations')
 export class OrganizationsController {
-  constructor(private readonly organizationsService: OrganizationsService) {}
+  constructor(
+    private readonly organizationsService: OrganizationsService,
+    private readonly membershipsService: MembershipsService,
+  ) {}
 
   @Get()
   @UseGuards(AuthenticatedGuard)
@@ -67,6 +72,39 @@ export class OrganizationsController {
       message:
         'Alert and delivery policy APIs will live here; this route verifies ADMIN/PM membership.',
     };
+  }
+
+  @Get(':organizationId/members/me')
+  @UseGuards(OrganizationUuidParamGuard, AuthenticatedGuard, RolesGuard)
+  @Roles()
+  async membersMe(
+    @Param('organizationId') organizationId: string,
+    @Req() req: Request,
+  ): Promise<{ data: { role: Role } }> {
+    const role = await this.membershipsService.assertMember(
+      req.user!.id,
+      organizationId,
+    );
+    return { data: { role } };
+  }
+
+  @Post(':organizationId/members')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(OrganizationUuidParamGuard, AuthenticatedGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async inviteMember(
+    @Param('organizationId') organizationId: string,
+    @Body() dto: InviteMemberDto,
+    @Req() req: Request,
+  ): Promise<{
+    data: Awaited<ReturnType<MembershipsService['inviteByEmail']>>;
+  }> {
+    const data = await this.membershipsService.inviteByEmail(
+      organizationId,
+      dto,
+      req.user!.id,
+    );
+    return { data };
   }
 
   /** Any org member; `RolesGuard` reads `organizationId` from this path segment. */

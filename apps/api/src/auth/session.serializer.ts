@@ -13,7 +13,7 @@ export class SessionSerializer extends PassportSerializer {
     user: Express.User,
     done: (err: Error | null, id?: string) => void,
   ): void {
-    done(undefined, user.id);
+    done(null, user.id);
   }
 
   deserializeUser(
