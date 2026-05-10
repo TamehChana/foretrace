@@ -8,6 +8,12 @@ const webDir = path.dirname(fileURLToPath(import.meta.url));
 
 /** Bundle shared TS sources as ESM. Workspace `dist/` is CommonJS and breaks browser `import { API_NAME }`. */
 export default defineConfig({
+  // Default root is process.cwd(); npm -w may use monorepo root on CI, breaking outDir location.
+  root: webDir,
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
   resolve: {
     alias: {
       '@foretrace/shared': path.resolve(webDir, '../../packages/shared/src/index.ts'),
