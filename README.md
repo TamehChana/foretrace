@@ -136,6 +136,7 @@ Requires DB migrations applied (`GitHubConnection`, `GitHubWebhookEvent`, `GitHu
 2. **GitHub** → repository **Settings → Webhooks → Add webhook**: paste **`webhookUrl`**, Content type **`application/json`**, secret = **`webhookSecret`**; GitHub ships **`sha256`** signatures which the API verifies.
 3. **`GET`** the same **`.../projects/:projectId/github`** path returns connection metadata and recent stored events (**no secret**). **`DELETE`** removes the connection and history.
 4. **Map collaborators (optional)** — `POST …/github/user-links` body `{ "githubLogin": "octocat", "userId": "<uuid>" }` (user must belong to that organization). Listed with **`GET …/github/user-links`**.
+5. **Web:** expand a project on **Projects** (`/projects`): the **GitHub** panel links a repo (PM/ADMIN), shows one-time webhook URL/secret with copy buttons, recent deliveries, disconnect, and user mapping (PM/ADMIN edit; all members can read).
 
 ### Vercel (frontend)
 

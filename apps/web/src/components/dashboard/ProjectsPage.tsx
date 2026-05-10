@@ -23,6 +23,7 @@ import { type OrgTaskRow, useOrgTasks } from '../../hooks/use-org-tasks';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 import { useToast } from '../../providers/ToastProvider';
 import { PageHeader } from '../ui/PageHeader';
+import { ProjectGitHubPanel } from './ProjectGitHubPanel';
 import { Skeleton } from '../ui/Skeleton';
 
 export function ProjectsPage() {
@@ -606,6 +607,15 @@ export function ProjectsPage() {
                               Add
                             </button>
                           </form>
+                          {organizationId ? (
+                            <ProjectGitHubPanel
+                              organizationId={organizationId}
+                              projectId={p.id}
+                              canManage={canManageProjects}
+                              refreshKey={dataBump}
+                              onRefresh={bumpData}
+                            />
+                          ) : null}
                         </div>
                       ) : null}
                     </li>
