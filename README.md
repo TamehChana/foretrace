@@ -126,21 +126,35 @@ Intended split: **Nest + PostgreSQL on [Render](https://render.com/)**, **Vite s
 
 If Prisma cannot connect, confirm the Render **`DATABASE_URL`** matches what Prisma expects (Render’s string usually includes SSL; Prisma 6 + PostgreSQL is fine with the default connection string).
 
+Optional **`API_PUBLIC_URL`** (see [`.env.example`](.env.example)) should match your public HTTPS API origin so automated responses can show the exact **`POST /webhooks/github`** URL when linking a repo.
+
+### GitHub webhooks (API)
+
+Requires DB migrations applied (`GitHubConnection`, `GitHubWebhookEvent`, `GitHubUserLink` tables).
+
+1. **Link a repo (ADMIN / PM)** — `POST /organizations/:organizationId/projects/:projectId/github` with `{ "repositoryFullName": "owner/repo" }`. Save the **`webhookSecret`** from the JSON response (**shown once**). The response **`webhookUrl`** is `API_PUBLIC_URL` or `http://localhost:3000`, plus **`/webhooks/github`** (same endpoint for every repository).
+2. **GitHub** → repository **Settings → Webhooks → Add webhook**: paste **`webhookUrl`**, Content type **`application/json`**, secret = **`webhookSecret`**; GitHub ships **`sha256`** signatures which the API verifies.
+3. **`GET`** the same **`.../projects/:projectId/github`** path returns connection metadata and recent stored events (**no secret**). **`DELETE`** removes the connection and history.
+4. **Map collaborators (optional)** — `POST …/github/user-links` body `{ "githubLogin": "octocat", "userId": "<uuid>" }` (user must belong to that organization). Listed with **`GET …/github/user-links`**.
+
 ### Vercel (frontend)
 
 1. In [vercel.com](https://vercel.com) → **Add New…** → **Project** → **Import** the **same GitHub repo** as Render (`TamehChana/foretrace` or yours).
-2. **Root Directory** → **repository root** (**`./`**, default). Use the root [`vercel.json`](vercel.json): **`outputDirectory`** is **`apps/web/dist`**, install uses **`npm run vercel-build`**, build uses workspace **`npm run build -w …`**. (Optional: [`apps/web/vercel.json`](apps/web/vercel.json) is for teams that set **Root Directory → `apps/web`** and want **`outputDirectory: dist`** relative to that folder.)
-3. Leave **Framework Preset** to auto-detect **Vite**. In **Project Settings → Build & Development**, **do not** set **Output Directory** to **`web`** or **`dist`** at the repo root unless you also emit static files there — that causes *No Output Directory named "web"* / *"dist"*. Prefer **empty** so `vercel.json` applies, or set **`apps/web/dist`** explicitly when Root is **`./`**.
-4. **Environment Variables** (set before or after first deploy; redeploy after adding):
+2. **Root Directory** → **repository root** (**`.`**). The root [`vercel.json`](vercel.json) runs **`npm ci --include=dev`**, pins Vite on **`@foretrace/web`**, then uses a small deploy script (**[`scripts/vercel-deploy-web.mjs`](scripts/vercel-deploy-web.mjs)**) so **build paths do not depend on the shell cwd**. Static output is synced to **`dist/`** at the repo root (**`outputDirectory`: `dist`**). Prefer leaving **Output Directory** in the dashboard **empty** so settings match `vercel.json`.
+   - Alternate layout: **Root Directory → `apps/web`** with [`apps/web/vercel.json`](apps/web/vercel.json) (builds via **`cd ../..`**; output **`dist`** under the web app). If Root was mistakenly **`apps/api`**, [`apps/api/vercel.json`](apps/api/vercel.json) targets **`../../dist`** so the synced bundle is still found.
+3. Leave **Framework Preset** to auto-detect **Vite** (or **Other** if you prefer; the important values are the install/build commands in `vercel.json`).
+4. **Environment Variables** (redeploy after adding or changing):
    - **`VITE_API_URL`** = your Render API URL **with no trailing slash**, e.g. `https://foretrace-api.onrender.com`.
-5. **Deploy**. Open the `.vercel.app` URL → sign in/register should hit the Render API via `apiUrl()`.
-6. **Render:** open **`foretrace-api`** → **Environment** → **`CORS_ORIGINS`**: append your Vercel production URL (`https://…vercel.app`) and any preview origins you need, comma-separated, **no spaces** — e.g. `http://localhost:5173,https://your-app.vercel.app` — then redeploy or wait for autosave redeploy.
+5. **Deploy**. Open the `.vercel.app` URL → register/sign-in should reach the Render API via `apiUrl()`.
+6. **Render:** open **`foretrace-api`** → **Environment** → **`CORS_ORIGINS`**: include your Vercel production URL (`https://…vercel.app`) and any preview origins you need, comma-separated, **no spaces** — e.g. `http://localhost:5173,https://your-app.vercel.app` — then redeploy or wait for autosave redeploy.
 
 Local dev stays unchanged: use **`apps/web/.env`** with **`VITE_API_URL`** for hosted API, or omit it and use the Vite proxy to **`localhost:3000`**. See [`apps/web/.env.example`](apps/web/.env.example).
 
 ## Next implementation steps
 
-Session **authentication** with email/password is in place; extend **organization-scoped RBAC** guards (beyond “signed in”) and add REST handlers for projects and tasks aligned with SRS §13 and §6.
+**Done in API:** sessions, organizations, projects/tasks CRUD, and **GitHub webhook ingestion + per-repo connection + login→user mapping** (see SRS §13 item **5** — aggregates are coarse counters for PR/issue events; tighten as needed).
+
+**Next product slices:** richer aggregates + feature jobs, **`packages/cli`** + terminal ingest (**§13 item 6**), risk engine, email alerts, and dashboard depth per [`docs/PROJECT_SRS.md`](docs/PROJECT_SRS.md).
 
 ## RBAC (organization scope)
 

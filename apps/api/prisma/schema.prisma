@@ -36,9 +36,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships  Membership[]
-  tasksCreated Task[]     @relation("TaskCreator")
-  tasksOwned   Task[]     @relation("TaskAssignee")
+  memberships      Membership[]
+  tasksCreated     Task[]           @relation("TaskCreator")
+  tasksOwned       Task[]           @relation("TaskAssignee")
+  githubUserLinks GitHubUserLink[]
 }
 
 model Organization {
@@ -76,10 +77,64 @@ model Project {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tasks        Task[]
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks            Task[]
+  githubConnection GitHubConnection?
 
   @@index([organizationId])
+}
+
+/// Links a GitHub repository to a project (one connection per project in v1).
+model GitHubConnection {
+  id                   String    @id @default(uuid()) @db.Uuid
+  projectId            String    @unique @db.Uuid
+  /// Normalized lowercase `owner/name` — matched against webhook payload.repository.full_name
+  repositoryFullName   String
+  webhookSecret        String
+  lastEventAt          DateTime?
+  lastPushAt           DateTime?
+  openPullRequestCount Int       @default(0)
+  openIssueCount       Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  project    Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  events     GitHubWebhookEvent[]
+  userLinks  GitHubUserLink[]
+
+  @@unique([repositoryFullName])
+}
+
+/// Idempotent store of webhook deliveries (GitHub may retry identical payloads).
+model GitHubWebhookEvent {
+  id               String   @id @default(uuid()) @db.Uuid
+  connectionId     String   @db.Uuid
+  githubDeliveryId String   @unique
+  eventType        String
+  action           String?
+  actorLogin       String?
+  payload          Json
+  createdAt        DateTime @default(now())
+
+  connection GitHubConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, createdAt(sort: Desc)])
+}
+
+/// Maps a GitHub login to an app User within a repo connection’s project context.
+model GitHubUserLink {
+  id           String   @id @default(uuid()) @db.Uuid
+  connectionId String   @db.Uuid
+  githubLogin  String
+  userId       String   @db.Uuid
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  connection GitHubConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, githubLogin])
+  @@index([userId])
 }
 
 model Task {

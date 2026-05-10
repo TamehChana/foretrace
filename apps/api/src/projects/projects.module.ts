@@ -20,5 +20,6 @@ import { TasksService } from './tasks.service';
     ProjectUuidParamGuard,
     TaskUuidParamGuard,
   ],
+  exports: [ProjectsService],
 })
 export class ProjectsModule {}

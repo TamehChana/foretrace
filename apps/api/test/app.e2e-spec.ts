@@ -95,6 +95,14 @@ describe('AppController (e2e)', () => {
       .expect(400);
   });
 
+  it('POST /webhooks/github without delivery headers returns 400', () => {
+    return request(httpServer())
+      .post('/webhooks/github')
+      .set('Content-Type', 'application/json')
+      .send('{}')
+      .expect(400);
+  });
+
   afterEach(async () => {
     await app.close();
   });
