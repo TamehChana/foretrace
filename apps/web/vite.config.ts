@@ -11,7 +11,8 @@ export default defineConfig({
   // Default root is process.cwd(); npm -w may use monorepo root on CI, breaking outDir location.
   root: webDir,
   build: {
-    outDir: 'dist',
+    // Absolute so output never follows an unexpected cwd; avoids root ./dist vs apps/web/dist.
+    outDir: path.resolve(webDir, 'dist'),
     emptyOutDir: true,
   },
   resolve: {
