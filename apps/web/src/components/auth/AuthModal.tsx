@@ -20,6 +20,7 @@ export function AuthModal() {
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -35,6 +36,10 @@ export function AuthModal() {
   async function submit(e: FormEvent): Promise<void> {
     e.preventDefault();
     setError(null);
+    if (mode === 'register' && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     setPending(true);
     try {
       const path = mode === 'signin' ? '/auth/login' : '/auth/register';
@@ -79,6 +84,7 @@ export function AuthModal() {
 
       await refresh();
       setPassword('');
+      setConfirmPassword('');
       closeAuthModal();
     } catch {
       setError('Network error.');
@@ -114,6 +120,7 @@ export function AuthModal() {
             aria-pressed={mode === 'signin'}
             onClick={() => {
               setMode('signin');
+              setConfirmPassword('');
               resetTransient();
             }}
             className={`flex-1 rounded-lg py-2 transition-colors ${mode === 'signin' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-50' : 'text-zinc-500 dark:text-zinc-400'}`}
@@ -125,6 +132,7 @@ export function AuthModal() {
             aria-pressed={mode === 'register'}
             onClick={() => {
               setMode('register');
+              setConfirmPassword('');
               resetTransient();
             }}
             className={`flex-1 rounded-lg py-2 transition-colors ${mode === 'register' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-50' : 'text-zinc-500 dark:text-zinc-400'}`}
@@ -175,6 +183,22 @@ export function AuthModal() {
               autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
             />
           </label>
+          {mode === 'register' ? (
+            <label className="block text-[13px] font-medium text-zinc-700 dark:text-zinc-300">
+              Confirm password
+              <input
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                minLength={8}
+                className="mt-1 block w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-inner outline-none focus:border-accent-400 focus:ring-2 focus:ring-accent-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                placeholder="Re-enter password"
+                autoComplete="new-password"
+                aria-invalid={confirmPassword.length > 0 && password !== confirmPassword}
+              />
+            </label>
+          ) : null}
 
           {error ? (
             <p className="text-[13px] font-medium text-rose-600 dark:text-rose-400" role="alert">
