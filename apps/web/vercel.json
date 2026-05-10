@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "cd ../.. && npm ci && npm install vite@8.0.11 --no-save --workspace=@foretrace/web",
+  "installCommand": "cd ../.. && npm ci --include=dev && npm install vite@8.0.11 --no-save --workspace=@foretrace/web",
   "buildCommand": "cd ../.. && npm run build -w @foretrace/shared && npm run build -w @foretrace/web",
   "outputDirectory": "dist",
   "rewrites": [

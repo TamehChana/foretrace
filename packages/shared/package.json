@@ -5,15 +5,13 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "build": "node run-tsc.cjs -p tsconfig.json",
+    "dev": "node run-tsc.cjs -p tsconfig.json --watch --preserveWatchOutput",
+    "lint": "node run-tsc.cjs -p tsconfig.json --noEmit",
     "vercel-build": "node -e \"process.exit(0)\""
   },
   "dependencies": {
+    "typescript": "^5.7.3",
     "zod": "^3.24.4"
-  },
-  "devDependencies": {
-    "typescript": "^5.7.3"
   }
 }

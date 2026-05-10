@@ -1,43 +1,38 @@
 #!/usr/bin/env node
 /**
- * Runs the Vite CLI: prefer local workspace install, fall back to pinned npx
- * (Vercel sometimes omits hoisted tool packages after npm ci — see apps/web/vercel.json install.)
+ * Runs the Vite CLI via Node resolution (works when hoisted above apps/web).
+ * Avoids relying on PATH (tsc/vite shims), npx, or git in the outer shell.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
-/** Keep in sync with resolved version in package-lock (root or apps/web). */
-const PINNED_VITE = 'vite@8.0.11';
+const require = createRequire(import.meta.url);
 
-const appsWebRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-
-function findViteBin() {
-  let dir = appsWebRoot;
-  for (;;) {
-    const bin = join(dir, 'node_modules', 'vite', 'bin', 'vite.js');
-    if (existsSync(bin)) return bin;
-    const parent = dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
+function resolveViteBin() {
+  try {
+    const pkgRoot = dirname(require.resolve('vite/package.json'));
+    return join(pkgRoot, 'bin', 'vite.js');
+  } catch {
+    return null;
   }
 }
 
 const args = process.argv.slice(2);
-const viteBin = findViteBin();
+const viteBin = resolveViteBin();
 
-let r;
-if (viteBin) {
-  r = spawnSync(process.execPath, [viteBin, ...args], {
-    stdio: 'inherit',
-    shell: false
-  });
-} else {
-  console.warn(`[run-vite] local vite missing; using npx ${PINNED_VITE}`);
-  r = spawnSync('npx', ['--yes', PINNED_VITE, ...args], {
-    stdio: 'inherit',
-    shell: true
-  });
+if (!viteBin) {
+  console.error(
+    '[run-vite] vite is not installed. Run npm ci at the repo root (see vercel.json installCommand).'
+  );
+  process.exit(1);
 }
+
+const r = spawnSync(process.execPath, [viteBin, ...args], {
+  cwd: join(dirname(fileURLToPath(import.meta.url)), '..'),
+  stdio: 'inherit',
+  shell: false,
+});
+
 process.exit(r.status === null ? 1 : r.status);
