@@ -5,9 +5,11 @@
  */
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
-const require = createRequire(import.meta.url);
+const webRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(join(webRoot, 'package.json'));
 const vitePkg = require.resolve('vite/package.json');
 const viteBin = join(dirname(vitePkg), 'bin', 'vite.js');
 const args = process.argv.slice(2);
