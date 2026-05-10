@@ -119,9 +119,11 @@ Intended split: **Nest + PostgreSQL on [Render](https://render.com/)**, **Vite s
 
 1. Push this repo to GitHub (or connect your host). In Render, use **Blueprint** / **Infrastructure as Code** and point at [`render.yaml`](render.yaml), or create resources manually to match it.
 2. The blueprint provisions **PostgreSQL 16** and a **Node web service** that runs `turbo build` for `@foretrace/api`, runs **`prisma migrate deploy`** on each deploy, and starts `node dist/main` with Render’s **`PORT`**.
-3. In the web service **Environment** tab, set **`SESSION_SECRET`** (long random string; never commit) and **`CORS_ORIGINS`** to your Vercel site origin(s), comma-separated, for example:
-   - `https://your-project.vercel.app`
-   - Add preview URLs if you need them (each preview has its own origin unless you use a single custom domain).
+3. In the web service **Environment** tab, set **`SESSION_SECRET`** (long random string; never commit) and **`CORS_ORIGINS`** to your Vercel **production** browser origin exactly (HTTPS, **no trailing slash**), comma-separated if you use several domains, for example **`https://foretrace-xxxx.vercel.app`** or your custom domain.
+
+   **Vercel preview deploys** each get a different `https://…vercel.app` URL. Until you add each URL to **`CORS_ORIGINS`**, the browser blocks `/health`, `/auth/*`, etc. (**“No Access-Control-Allow-Origin” / preflight failures**).
+
+   Faster for preview-heavy workflows: set **`CORS_ALLOW_VERCEL_PREVIEW=1`** on Render to allow any **`https://*.vercel.app`** origin (wide; avoid for strict production hardening). After changing env vars, redeploy the API service.
 4. Note the public API URL (e.g. `https://foretrace-api.onrender.com`). The web app will call this via **`VITE_API_URL`**.
 
 If Prisma cannot connect, confirm the Render **`DATABASE_URL`** matches what Prisma expects (Render’s string usually includes SSL; Prisma 6 + PostgreSQL is fine with the default connection string).
@@ -147,7 +149,7 @@ Requires DB migrations applied (`GitHubConnection`, `GitHubWebhookEvent`, `GitHu
 4. **Environment Variables** (redeploy after adding or changing):
    - **`VITE_API_URL`** = your Render API URL **with no trailing slash**, e.g. `https://foretrace-api.onrender.com`.
 5. **Deploy**. Open the `.vercel.app` URL → register/sign-in should reach the Render API via `apiUrl()`.
-6. **Render:** open **`foretrace-api`** → **Environment** → **`CORS_ORIGINS`**: include your Vercel production URL (`https://…vercel.app`) and any preview origins you need, comma-separated, **no spaces** — e.g. `http://localhost:5173,https://your-app.vercel.app` — then redeploy or wait for autosave redeploy.
+6. **Render:** **`CORS_ORIGINS`** must list every frontend origin that uses **`credentials`** (sessions). Example: **`https://foretrace-abc.vercel.app,https://foretrace-def.vercel.app`** for two previews plus production — **no spaces after commas.** Or **`CORS_ALLOW_VERCEL_PREVIEW=1`** to admit all **`https://*.vercel.app`**. Then redeploy the API service.
 
 Local dev stays unchanged: use **`apps/web/.env`** with **`VITE_API_URL`** for hosted API, or omit it and use the Vite proxy to **`localhost:3000`**. See [`apps/web/.env.example`](apps/web/.env.example).
 

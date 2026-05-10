@@ -5,15 +5,66 @@ import type { Application } from 'express';
 import passport from 'passport';
 import session from 'express-session';
 
-function corsOrigins(): string[] {
+/**
+ * Allowed browser origins besides localhost (from `CORS_ORIGINS`). Every Vercel
+ * deployment preview has a unique `*.vercel.app` URL; list each production URL,
+ * **or** set `CORS_ALLOW_VERCEL_PREVIEW=1` during development-style preview testing.
+ */
+function corsExplicitAllowlist(): Set<string> {
   const local = ['http://localhost:5173', 'http://127.0.0.1:5173'];
-  const env = process.env.CORS_ORIGINS?.split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
-  if (!env?.length) {
-    return local;
+  const fromEnv =
+    process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) ??
+    [];
+  return new Set([...local, ...fromEnv]);
+}
+
+function isTruthyEnv(value: string | undefined): boolean {
+  const v = value?.trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
+function allowsVercelPreviewHost(config: ConfigService): boolean {
+  return (
+    isTruthyEnv(config.get<string>('CORS_ALLOW_VERCEL_PREVIEW')) ||
+    isTruthyEnv(process.env.CORS_ALLOW_VERCEL_PREVIEW)
+  );
+}
+
+function isHttpsVercelPreviewOrigin(origin: string): boolean {
+  try {
+    const u = new URL(origin);
+    return u.protocol === 'https:' && u.hostname.endsWith('.vercel.app');
+  } catch {
+    return false;
   }
-  return [...local, ...env];
+}
+
+function corsOriginVerifier(config: ConfigService) {
+  const allowlist = corsExplicitAllowlist();
+  const vercelPreviews = allowsVercelPreviewHost(config);
+
+  return (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void,
+  ): void => {
+    if (
+      typeof origin !== 'string' ||
+      origin.length === 0 ||
+      origin === 'null'
+    ) {
+      callback(null, true);
+      return;
+    }
+    if (allowlist.has(origin)) {
+      callback(null, true);
+      return;
+    }
+    if (vercelPreviews && isHttpsVercelPreviewOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(null, false);
+  };
 }
 
 export function configureApp(app: INestApplication): void {
@@ -60,7 +111,7 @@ export function configureApp(app: INestApplication): void {
   );
 
   app.enableCors({
-    origin: corsOrigins(),
+    origin: corsOriginVerifier(config),
     credentials: true,
   });
 }
