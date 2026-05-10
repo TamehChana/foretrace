@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "preview": "vite preview",
-    "lint": "tsc && tsc -p tsconfig.node.json"
+    "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
     "@foretrace/shared": "*",
