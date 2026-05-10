@@ -10,7 +10,7 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "sync-web-dist-root": "node scripts/sync-web-dist-root.mjs",
-    "build:vercel": "npm run build -w @foretrace/shared && npm run build -w @foretrace/web && node scripts/sync-web-dist-root.mjs",
+    "build:vercel": "node scripts/vercel-deploy-web.mjs",
     "vercel-build": "npm ci --include=dev && npm install vite@8.0.11 --no-save --workspace=@foretrace/web"
   },
   "dependencies": {

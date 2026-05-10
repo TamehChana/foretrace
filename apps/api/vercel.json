@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "cd ../.. && npm ci --include=dev && npm install vite@8.0.11 --no-save --workspace=@foretrace/web",
+  "buildCommand": "node ../../scripts/vercel-deploy-web.mjs",
+  "outputDirectory": "../../dist",
+  "rewrites": [
+    {
+      "source": "/((?!assets/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

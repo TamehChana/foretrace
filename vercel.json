@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "installCommand": "npm ci --include=dev && npm install vite@8.0.11 --no-save --workspace=@foretrace/web",
-  "buildCommand": "npm run build -w @foretrace/shared && npm run build -w @foretrace/web && node scripts/sync-web-dist-root.mjs",
+  "buildCommand": "d=\"$PWD\"; while [ \"$d\" != \"/\" ]; do test -f \"$d/scripts/vercel-deploy-web.mjs\" && exec node \"$d/scripts/vercel-deploy-web.mjs\"; d=$(dirname \"$d\"); done; echo 'foretrace: scripts/vercel-deploy-web.mjs not found' >&2; exit 1",
   "outputDirectory": "dist",
   "rewrites": [
     {
