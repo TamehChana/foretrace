@@ -9,7 +9,8 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "vercel-build": "npm run build -w @foretrace/shared && npm run build -w @foretrace/web"
+    "vercel-build": "npm run build -w @foretrace/shared && npm run build -w @foretrace/web",
+    "stage-vercel-dist": "node scripts/stage-vercel-dist.mjs"
   },
   "dependencies": {
     "vite": "^8.0.10"
