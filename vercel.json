@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm run vercel-build",
+  "buildCommand": "cd \"$(git rev-parse --show-toplevel)\" && npm run build -w @foretrace/shared && npm run build -w @foretrace/web",
+  "outputDirectory": "apps/web/dist",
+  "rewrites": [
+    {
+      "source": "/((?!assets/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

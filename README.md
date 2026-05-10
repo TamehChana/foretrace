@@ -129,8 +129,8 @@ If Prisma cannot connect, confirm the Render **`DATABASE_URL`** matches what Pri
 ### Vercel (frontend)
 
 1. In [vercel.com](https://vercel.com) → **Add New…** → **Project** → **Import** the **same GitHub repo** as Render (`TamehChana/foretrace` or yours).
-2. **Root Directory** → set to **`apps/web`** (required). Frontend config lives at [`apps/web/vercel.json`](apps/web/vercel.json). Install/build **`cd ../..`** to the monorepo root so **`npm ci`** and **`npm run build -w @foretrace/shared`** still see the workspace lockfile and packages.
-3. Leave **Framework Preset** to auto-detect (Vite) or **Vite**. **Output Directory** stays **`dist`** (relative to `apps/web` → **`apps/web/dist`**). Do **not** override with repo-root paths like **`apps/web/dist`** in the dashboard when Root is already **`apps/web`**.
+2. **Root Directory** → **repository root** (**`./`**, default). Use the root [`vercel.json`](vercel.json): **`outputDirectory`** is **`apps/web/dist`**, install uses **`npm run vercel-build`**, build uses workspace **`npm run build -w …`**. (Optional: [`apps/web/vercel.json`](apps/web/vercel.json) is for teams that set **Root Directory → `apps/web`** and want **`outputDirectory: dist`** relative to that folder.)
+3. Leave **Framework Preset** to auto-detect **Vite**. In **Project Settings → Build & Development**, **do not** set **Output Directory** to **`web`** or **`dist`** at the repo root unless you also emit static files there — that causes *No Output Directory named "web"* / *"dist"*. Prefer **empty** so `vercel.json` applies, or set **`apps/web/dist`** explicitly when Root is **`./`**.
 4. **Environment Variables** (set before or after first deploy; redeploy after adding):
    - **`VITE_API_URL`** = your Render API URL **with no trailing slash**, e.g. `https://foretrace-api.onrender.com`.
 5. **Deploy**. Open the `.vercel.app` URL → sign in/register should hit the Render API via `apiUrl()`.
