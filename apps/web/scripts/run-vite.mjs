@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Runs the Vite CLI: prefer local workspace install, fall back to pinned npx
- * (Vercel sometimes omits hoisted tool packages after npm ci — see vercel.json install).
+ * (Vercel sometimes omits hoisted tool packages after npm ci — see apps/web/vercel.json install.)
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
