@@ -130,11 +130,12 @@ If Prisma cannot connect, confirm the Render **`DATABASE_URL`** matches what Pri
 
 1. In [vercel.com](https://vercel.com) → **Add New…** → **Project** → **Import** the **same GitHub repo** as Render (`TamehChana/foretrace` or yours).
 2. **Root Directory** → leave **`./`** (repository root). Do **not** set `apps/web` only, or `npm ci` won’t install workspace **`@foretrace/shared`**.
-3. Framework / build settings are read from [`vercel.json`](vercel.json): **Install** `npm ci`, **Build** `npx turbo build --filter=@foretrace/web`, **Output** `apps/web/dist`.
-4. **Environment Variables** (set before or after first deploy; redeploy after adding):
+3. Framework / build settings come from [`vercel.json`](vercel.json) (install includes a Vite workaround for CI; build runs **`npm run build -w @foretrace/shared`** then **`@foretrace/web`**). **Output Directory** there is **`apps/web/dist`**.
+4. In the project **Settings → Build & Development**, set **Output Directory** to **`apps/web/dist`** *or* leave it empty so `vercel.json` applies. Do **not** pin **Output** to plain **`dist`** unless you also emit files at the repo root — that mismatch causes *No Output Directory named "dist"* failures.
+5. **Environment Variables** (set before or after first deploy; redeploy after adding):
    - **`VITE_API_URL`** = your Render API URL **with no trailing slash**, e.g. `https://foretrace-api.onrender.com`.
-5. **Deploy**. Open the `.vercel.app` URL → sign in/register should hit the Render API via `apiUrl()`.
-6. **Render:** open **`foretrace-api`** → **Environment** → **`CORS_ORIGINS`**: append your Vercel production URL (`https://…vercel.app`) and any preview origins you need, comma-separated, **no spaces** — e.g. `http://localhost:5173,https://your-app.vercel.app` — then redeploy or wait for autosave redeploy.
+6. **Deploy**. Open the `.vercel.app` URL → sign in/register should hit the Render API via `apiUrl()`.
+7. **Render:** open **`foretrace-api`** → **Environment** → **`CORS_ORIGINS`**: append your Vercel production URL (`https://…vercel.app`) and any preview origins you need, comma-separated, **no spaces** — e.g. `http://localhost:5173,https://your-app.vercel.app` — then redeploy or wait for autosave redeploy.
 
 Local dev stays unchanged: use **`apps/web/.env`** with **`VITE_API_URL`** for hosted API, or omit it and use the Vite proxy to **`localhost:3000`**. See [`apps/web/.env.example`](apps/web/.env.example).
 
