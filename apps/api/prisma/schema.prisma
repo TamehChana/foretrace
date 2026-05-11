@@ -28,6 +28,29 @@ enum TaskStatus {
   CANCELLED
 }
 
+enum TerminalIncidentCategory {
+  BUILD
+  TEST
+  RUNTIME
+  DEPENDENCY
+  DB
+  API
+  DOCKER
+  UNKNOWN
+}
+
+/// Project-level delivery risk (SRS §8 v0 — rule fusion on signal snapshot).
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertKind {
+  RISK_EVALUATION
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -39,7 +62,8 @@ model User {
   memberships      Membership[]
   tasksCreated     Task[]           @relation("TaskCreator")
   tasksOwned       Task[]           @relation("TaskAssignee")
-  githubUserLinks GitHubUserLink[]
+  githubUserLinks  GitHubUserLink[]
+  cliIngestTokens CliIngestToken[]
 }
 
 model Organization {
@@ -49,8 +73,14 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships Membership[]
-  projects    Project[]
+  memberships              Membership[]
+  projects                 Project[]
+  cliIngestTokens         CliIngestToken[]
+  terminalIngestBatches   TerminalIngestBatch[]
+  terminalIncidents        TerminalIncident[]
+  projectSignalSnapshots   ProjectSignalSnapshot[]
+  projectRiskEvaluations   ProjectRiskEvaluation[]
+  alerts                   Alert[]
 }
 
 model Membership {
@@ -77,9 +107,15 @@ model Project {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tasks            Task[]
-  githubConnection GitHubConnection?
+  organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks                Task[]
+  githubConnection     GitHubConnection?
+  cliIngestTokens      CliIngestToken[]
+  terminalIngestBatches TerminalIngestBatch[]
+  terminalIncidents    TerminalIncident[]
+  signalSnapshot       ProjectSignalSnapshot?
+  riskEvaluation       ProjectRiskEvaluation?
+  alerts               Alert[]
 
   @@index([organizationId])
 }
@@ -151,11 +187,137 @@ model Task {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignee  User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  createdBy User    @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  project               Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee              User?                @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy              User                 @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  terminalIngestBatches  TerminalIngestBatch[]
+  terminalIncidents      TerminalIncident[]
 
   @@index([projectId])
   @@index([assigneeId])
   @@index([deadline])
+}
+
+/// Project-scoped secret for the Foretrace CLI (`Authorization: Bearer ft_ck_...`). Only a SHA-256 digest is stored.
+model CliIngestToken {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  projectId      String    @db.Uuid
+  /// Only the digest of the raw bearer token is persisted.
+  secretDigest   String    @unique
+  name           String?
+  createdById    String    @db.Uuid
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  batches TerminalIngestBatch[]
+
+  @@index([projectId])
+  @@index([organizationId])
+}
+
+/// One POST from the CLI (or other client) carrying many log lines.
+model TerminalIngestBatch {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  projectId      String   @db.Uuid
+  cliTokenId     String   @db.Uuid
+  taskId         String?  @db.Uuid
+  lineCount      Int
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  token        CliIngestToken @relation(fields: [cliTokenId], references: [id], onDelete: Cascade)
+  task         Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  incidents TerminalIncident[]
+
+  @@index([projectId, createdAt(sort: Desc)])
+}
+
+/// Coarse terminal signal (build/test noise) with fingerprint dedupe per project.
+model TerminalIncident {
+  id               String                   @id @default(uuid()) @db.Uuid
+  organizationId   String                   @db.Uuid
+  projectId        String                   @db.Uuid
+  taskId           String?                  @db.Uuid
+  batchId          String?                  @db.Uuid
+  category         TerminalIncidentCategory
+  fingerprint      String
+  /// Redacted excerpt (truncated)
+  excerpt          String                   @db.Text
+  firstSeenAt      DateTime                 @default(now())
+  lastSeenAt       DateTime                 @updatedAt
+  occurrenceCount  Int                      @default(1)
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task         Task?               @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  batch        TerminalIngestBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, fingerprint])
+  @@index([projectId, lastSeenAt(sort: Desc)])
+}
+
+/// Rolled-up signals for dashboard / future risk engine (SRS §7 slice).
+model ProjectSignalSnapshot {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  projectId      String   @unique @db.Uuid
+  /// Rolling window length used for this snapshot (hours).
+  windowHours    Int      @default(24)
+  /// Structured metrics (GitHub, terminal, tasks).
+  payload        Json
+  computedAt     DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([computedAt(sort: Desc)])
+}
+
+/// Latest persisted project risk (v0: one row per project, recomputed on demand).
+model ProjectRiskEvaluation {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  projectId      String    @unique @db.Uuid
+  level          RiskLevel
+  score          Int
+  /// Machine-readable reasons: `[{ "code": "TASKS_OVERDUE", "detail": "…" }]`
+  reasons        Json
+  evaluatedAt    DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([evaluatedAt(sort: Desc)])
+}
+
+/// In-app notification (v0: risk elevation / worsening).
+model Alert {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  projectId      String    @db.Uuid
+  kind           AlertKind @default(RISK_EVALUATION)
+  summary        String    @db.VarChar(500)
+  payload        Json?
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, readAt, createdAt(sort: Desc)])
+  @@index([projectId, createdAt(sort: Desc)])
 }

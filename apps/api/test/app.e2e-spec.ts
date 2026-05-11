@@ -103,6 +103,16 @@ describe('AppController (e2e)', () => {
       .expect(400);
   });
 
+  it('POST /organizations/:organizationId/projects/:projectId/terminal/batches without Bearer returns 401', () => {
+    return request(httpServer())
+      .post(
+        `/organizations/${sampleOrgUuid}/projects/${sampleOrgUuid}/terminal/batches`,
+      )
+      .set('Content-Type', 'application/json')
+      .send({ lines: ['test error line'] })
+      .expect(401);
+  });
+
   afterEach(async () => {
     await app.close();
   });

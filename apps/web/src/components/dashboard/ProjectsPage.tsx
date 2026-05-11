@@ -23,7 +23,11 @@ import { type OrgTaskRow, useOrgTasks } from '../../hooks/use-org-tasks';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 import { useToast } from '../../providers/ToastProvider';
 import { PageHeader } from '../ui/PageHeader';
+import { ProjectCliTokensPanel } from './ProjectCliTokensPanel';
+import { ProjectRiskPanel } from './ProjectRiskPanel';
+import { ProjectTerminalIncidentsPanel } from './ProjectTerminalIncidentsPanel';
 import { ProjectGitHubPanel } from './ProjectGitHubPanel';
+import { ProjectSignalsPanel } from './ProjectSignalsPanel';
 import { Skeleton } from '../ui/Skeleton';
 
 export function ProjectsPage() {
@@ -96,6 +100,10 @@ export function ProjectsPage() {
   const [taskSubmitting, setTaskSubmitting] = useState(false);
 
   const role = memberRole.status === 'ok' ? memberRole.role : null;
+  const cliPanelRole =
+    role === 'ADMIN' || role === 'PM' || role === 'DEVELOPER'
+      ? (role as 'ADMIN' | 'PM' | 'DEVELOPER')
+      : null;
   const canManageProjects = role === 'ADMIN' || role === 'PM';
   const canInvite = role === 'ADMIN';
   const currentUserId =
@@ -608,13 +616,47 @@ export function ProjectsPage() {
                             </button>
                           </form>
                           {organizationId ? (
-                            <ProjectGitHubPanel
-                              organizationId={organizationId}
-                              projectId={p.id}
-                              canManage={canManageProjects}
-                              refreshKey={dataBump}
-                              onRefresh={bumpData}
-                            />
+                            <>
+                              <ProjectSignalsPanel
+                                organizationId={organizationId}
+                                projectId={p.id}
+                                canManage={canManageProjects}
+                                refreshKey={dataBump}
+                              />
+                              <ProjectRiskPanel
+                                organizationId={organizationId}
+                                projectId={p.id}
+                                canManage={canManageProjects}
+                                refreshKey={dataBump}
+                                onEvaluated={bumpData}
+                              />
+                              <ProjectGitHubPanel
+                                organizationId={organizationId}
+                                projectId={p.id}
+                                canManage={canManageProjects}
+                                refreshKey={dataBump}
+                                onRefresh={bumpData}
+                              />
+                              <ProjectCliTokensPanel
+                                organizationId={organizationId}
+                                projectId={p.id}
+                                refreshKey={dataBump}
+                                memberRoleStatus={memberRole.status}
+                                memberRoleError={
+                                  memberRole.status === 'error'
+                                    ? memberRole.message
+                                    : undefined
+                                }
+                                role={cliPanelRole}
+                                currentUserId={currentUserId}
+                                onRefresh={bumpData}
+                              />
+                              <ProjectTerminalIncidentsPanel
+                                organizationId={organizationId}
+                                projectId={p.id}
+                                refreshKey={dataBump}
+                              />
+                            </>
                           ) : null}
                         </div>
                       ) : null}

@@ -9,12 +9,14 @@ Foretrace is an AI-assisted **software project monitoring** web application: it 
 ## Documentation
 
 - **[Software requirements & architecture reference](docs/PROJECT_SRS.md)** — actors, workflows, stack, roadmap (SRS-style).
+- **[`.env.example`](.env.example)** — required variables for API, optional CLI/smoke; keep in sync with **`apps/api/.env`** and (for `VITE_*` only) **`apps/web/.env.example`**.
 
 ## Monorepo layout
 
 | Path | Package | Role |
 |------|---------|------|
 | `packages/shared` | `@foretrace/shared` | Zod contracts and shared TypeScript APIs |
+| `packages/cli` | `@foretrace/cli` | Terminal log ingest CLI (`foretrace ingest`) |
 | `apps/web` | `@foretrace/web` | React + Vite SPA (Tailwind CSS v4, Lucide) |
 | `apps/api` | `@foretrace/api` | NestJS HTTP API |
 
@@ -24,12 +26,14 @@ Foretrace is an AI-assisted **software project monitoring** web application: it 
 - `npm run dev` — Turbo starts shared `tsc --watch`, Nest `start:dev`, and Vite (`^build` runs once first)
 - `npm run build` — production builds for all packages
 - `npm run lint` — typecheck/lint pipelines per package
+- `npm run smoke:terminal-ingest` — end-to-end script: login → mint CLI token → sample `POST …/terminal/batches` (requires `FORETRACE_*` in `.env`; see [`.env.example`](.env.example))
+- `npm run terminal:ingest` — pipe stdin to the API via built `@foretrace/cli` (build CLI first: `npm run build -w @foretrace/cli`)
 
 **Ports:** API `http://localhost:3000`, web `http://localhost:5173` (Vite dev server proxies `GET /health`, auth routes under `/auth`, and `GET /organizations` to the API with cookies).
 
 The API **starts without `DATABASE_URL`** so you can iterate on the UI; Prisma connects on first query once you copy [`.env.example`](.env.example) and run Postgres.
 
-Current JSON endpoints include **`GET /health`**, session-based **`/auth/*`** (register, login, logout, `me`), and **`GET /organizations`** (requires a signed-in user; returns orgs the user belongs to via `Membership`).
+Current JSON endpoints include **`GET /health`**, session-based **`/auth/*`** (register, login, logout, `me`), **`GET /organizations`**, nested **projects/tasks**, **GitHub** link + webhooks, **CLI ingest tokens** (`…/cli-tokens` mint/list/revoke, session auth), **project signals** (`…/signals`, `…/signals/refresh`), **project risk v0** (`…/risk`, `…/risk/evaluate`), **organization alerts** (`GET …/organizations/:id/alerts`, `POST …/alerts/:alertId/read`), **terminal incidents** (`GET …/terminal/incidents?limit=`, session auth), and **terminal batches** (`POST …/terminal/batches`, Bearer `ft_ck_…` only — see [Terminal ingest](#terminal-ingest-foretracecli--api)).
 
 Set **`SESSION_SECRET`** (32+ random characters) for production; see [`.env.example`](.env.example). In production, session cookies use **`SameSite=None`** and **`Secure`** so the Vercel-hosted SPA can call the Render API with `credentials: 'include'`.
 
@@ -111,9 +115,11 @@ Quick check (local DB): `psql "<your-DATABASE_URL>" -c "SELECT 1"`. For Render, 
 
 Models live in [`apps/api/prisma/schema.prisma`](apps/api/prisma/schema.prisma) (orgs, memberships with `Role`, projects, tasks with priorities/status).
 
+**Windows:** If `prisma generate` or `npm run build -w @foretrace/api` fails with `EPERM` while renaming `query_engine-windows.dll.node`, something is locking that file (a running **`node`** process such as `npm run dev`, the editor indexing `node_modules`, or real-time antivirus). Stop the dev server and other API shells, add a Defender exclusion for this repo’s **`node_modules\.prisma`**, or run the command from **WSL**. Linux and CI are unaffected.
+
 ## Deployment (Render API + Vercel frontend)
 
-Intended split: **Nest + PostgreSQL on [Render](https://render.com/)**, **Vite static app on [Vercel](https://vercel.com/)** (monorepo root stays the Git project for both).
+Intended split: **Nest + PostgreSQL on [Render](https://render.com/)**, **Vite static app on [Vercel](https://vercel.com/)** (monorepo root stays the Git project for both). The browser **never** needs `VITE_API_URL` to point at the same host as the SPA: set **`VITE_API_URL`** on the Vercel **frontend** project to your **`https://…onrender.com`** API URL, and set **`CORS_ORIGINS`** on **Render** to your **`https://…vercel.app`** SPA origin.
 
 ### Render (backend)
 
@@ -128,7 +134,7 @@ Intended split: **Nest + PostgreSQL on [Render](https://render.com/)**, **Vite s
 
 If Prisma cannot connect, confirm the Render **`DATABASE_URL`** matches what Prisma expects (Render’s string usually includes SSL; Prisma 6 + PostgreSQL is fine with the default connection string).
 
-Optional **`API_PUBLIC_URL`** (see [`.env.example`](.env.example)) should match your public HTTPS API origin so automated responses can show the exact **`POST /webhooks/github`** URL when linking a repo.
+**`API_PUBLIC_URL`** on Render should match the public **`https://…onrender.com`** service URL (no trailing slash) so GitHub connection responses show the correct **`POST /webhooks/github`** URL. It must **not** be the Vercel SPA URL unless the API is actually served from there.
 
 ### GitHub webhooks (API)
 
@@ -139,6 +145,38 @@ Requires DB migrations applied (`GitHubConnection`, `GitHubWebhookEvent`, `GitHu
 3. **`GET`** the same **`.../projects/:projectId/github`** path returns connection metadata and recent stored events (**no secret**). **`DELETE`** removes the connection and history.
 4. **Map collaborators (optional)** — `POST …/github/user-links` body `{ "githubLogin": "octocat", "userId": "<uuid>" }` (user must belong to that organization). Listed with **`GET …/github/user-links`**.
 5. **Web:** expand a project on **Projects** (`/projects`): the **GitHub** panel links a repo (PM/ADMIN), shows one-time webhook URL/secret with copy buttons, recent deliveries, disconnect, and user mapping (PM/ADMIN edit; all members can read).
+
+### Terminal ingest (`@foretrace/cli` + API)
+
+Requires DB migrations applied (`CliIngestToken`, `TerminalIngestBatch`, `TerminalIncident` tables).
+
+1. **Mint CLI token (session auth required):**
+   - `POST /organizations/:organizationId/projects/:projectId/cli-tokens`
+   - Store the returned plaintext token securely; DB stores only SHA-256 digest.
+2. **Set CLI env vars** (see [`.env.example`](.env.example)): `FORETRACE_API_URL`, `FORETRACE_TOKEN`, `FORETRACE_ORGANIZATION_ID`, `FORETRACE_PROJECT_ID`, optional `FORETRACE_TASK_ID`.
+3. **Build CLI once** (after changes): `npm run build -w @foretrace/cli`
+4. **Pipe command output to CLI:**
+
+   ```bash
+   npm run build 2>&1 | npm run terminal:ingest
+   ```
+
+5. CLI posts to `POST /organizations/:organizationId/projects/:projectId/terminal/batches` with `Authorization: Bearer ft_ck_...`.
+6. API redacts obvious secret patterns, stores batch metadata, classifies likely signal lines, and upserts project-scoped incident fingerprints.
+
+**Automatic-ish local capture (no pipe every time):**
+
+- **`foretrace run -- <command>`** — runs the command, **streams** stdout/stderr to your terminal, then **POSTs** captured lines (default: only when the command exits **non-zero**; set **`FORETRACE_INGEST_ON=always`** to always send when there is output). Same `FORETRACE_*` env vars as `ingest`.
+- **One-time shell snippet** — `foretrace hook print-zsh` or `foretrace hook print-bash` prints a small **`ftx`** wrapper you paste into `~/.zshrc` / `~/.bashrc`; then use **`ftx npm run build`** instead of typing the full pipe. (Optional global `alias npm=…` is **not** recommended; use `ftx` or `package.json` scripts.)
+- **Fully automatic CI logs** — copy [`.github/workflows/foretrace-ci-ingest.example.yml`](.github/workflows/foretrace-ci-ingest.example.yml) into an active workflow, add the listed **GitHub Actions secrets**, and adjust the build step; every push can upload **`tee`**’d logs to Foretrace **without** anyone running the CLI on a laptop.
+
+**Smoke script (login → mint token → ingest one batch):** set `FORETRACE_API_URL`, `FORETRACE_EMAIL`, `FORETRACE_PASSWORD`, `FORETRACE_ORGANIZATION_ID`, `FORETRACE_PROJECT_ID` in `.env` (repo root), then:
+
+```bash
+npm run smoke:terminal-ingest
+```
+
+The script loads `.env` from the repo root if variables are not already exported. If `Set-Cookie` is not returned to your client (unusual when calling the API host directly), copy the `foretrace.sid` cookie from the browser after sign-in and set **`FORETRACE_COOKIE`** instead of email/password.
 
 ### Vercel (frontend)
 
@@ -151,13 +189,20 @@ Requires DB migrations applied (`GitHubConnection`, `GitHubWebhookEvent`, `GitHu
 5. **Deploy**. Open the `.vercel.app` URL → register/sign-in should reach the Render API via `apiUrl()`.
 6. **Render:** **`CORS_ORIGINS`** must list every frontend origin that uses **`credentials`** (sessions). Example: **`https://foretrace-abc.vercel.app,https://foretrace-def.vercel.app`** for two previews plus production — **no spaces after commas.** Or **`CORS_ALLOW_VERCEL_PREVIEW=1`** to admit all **`https://*.vercel.app`**. Then redeploy the API service.
 
-Local dev stays unchanged: use **`apps/web/.env`** with **`VITE_API_URL`** for hosted API, or omit it and use the Vite proxy to **`localhost:3000`**. See [`apps/web/.env.example`](apps/web/.env.example).
+Local dev stays unchanged: use **`apps/web/.env`** with **`VITE_API_URL`** pointing at your **Render** API when you want prod-style cross-origin behavior, or omit it and use the Vite proxy to **`localhost:3000`**. See [`apps/web/.env.example`](apps/web/.env.example).
+
+### CORS quick reference (Render API + Vercel SPA)
+
+| Symptom | Check |
+|--------|--------|
+| `No 'Access-Control-Allow-Origin'` from **`…vercel.app`** to **`…onrender.com`** | **`CORS_ORIGINS`** on **Render** must list the **exact** SPA origin (HTTPS, no trailing slash). |
+| Requests still hit the wrong host | **`VITE_API_URL`** on the **Vercel** frontend project must be the **Render** API URL; **redeploy** after changing (value is baked in at build time). |
 
 ## Next implementation steps
 
-**Done in API:** sessions, organizations, projects/tasks CRUD, and **GitHub webhook ingestion + per-repo connection + login→user mapping** (see SRS §13 item **5** — aggregates are coarse counters for PR/issue events; tighten as needed).
+**Done in API:** sessions, organizations, projects/tasks CRUD, **GitHub webhook ingestion + per-repo connection + user mapping** (SRS §13 item **5**), **terminal ingest v1** (SRS §13 item **6**): Prisma models, **`POST …/terminal/batches`** (Bearer CLI token), redaction + coarse classification + **`TerminalIncident`** fingerprints, **`GET …/terminal/incidents`** (session) + web **Terminal incidents** table, **`@foretrace/cli`** + [`scripts/terminal-ingest-smoke.mjs`](scripts/terminal-ingest-smoke.mjs), and **per-project signal snapshots** (SRS §13 item **7** slice): persisted **`ProjectSignalSnapshot`** (24h window JSON), **`GET/POST …/projects/:projectId/signals`** (refresh: **ADMIN**/**PM**), dashboard **Project signals** panel, plus **automatic snapshot refresh** after each successful GitHub webhook delivery and terminal batch ingest (per-project **60s** cooldown to limit load). **CLI ingest tokens:** mint/list/revoke in the **Projects** dashboard (expanded project) as well as **`…/cli-tokens`** HTTP API. **Project risk v0** (SRS §13 item **8** slice): persisted **`ProjectRiskEvaluation`** (level, score, structured reasons JSON), **`GET/POST …/projects/:projectId/risk/evaluate`** (**ADMIN**/**PM**), dashboard **Delivery risk** panel (evaluate refreshes signals then scores). **Alerts v0** (SRS §13 item **9** slice): Prisma **`Alert`** (risk evaluation kind), created when evaluate yields **Medium+** and risk **worsened** or first hit at that tier; **`GET/POST …/organizations/:id/alerts`** list + mark read; web **`/alerts`** inbox and header bell link.
 
-**Next product slices:** richer aggregates + feature jobs, **`packages/cli`** + terminal ingest (**§13 item 6**), risk engine, email alerts, and dashboard depth per [`docs/PROJECT_SRS.md`](docs/PROJECT_SRS.md).
+**Next product slices:** risk **history** (append-only evaluations), **email** + alert digests, terminal incident **drill-down** (task timeline / batch link), async queue for terminal batches (if needed at scale), scheduled jobs, and dashboard depth per [`docs/PROJECT_SRS.md`](docs/PROJECT_SRS.md).
 
 ## RBAC (organization scope)
 

@@ -1,0 +1,69 @@
+# Copy to foretrace-ci-ingest.yml (or merge into your CI) after adding repo Secrets:
+#   FORETRACE_API_URL   e.g. https://foretrace-api.onrender.com
+#   FORETRACE_TOKEN     ft_ck_… (mint via POST …/cli-tokens; store as encrypted secret)
+#   FORETRACE_ORGANIZATION_ID
+#   FORETRACE_PROJECT_ID
+#
+# Sends the last CI log file to Foretrace after build/test (automatic, no local pipes).
+
+name: Foretrace CI log ingest
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build-and-ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install and build (example)
+        run: |
+          npm ci
+          npm run build -w @foretrace/web 2>&1 | tee foretrace-ci.log || true
+
+      - name: Upload log to Foretrace
+        if: always()
+        env:
+          FORETRACE_API_URL: ${{ secrets.FORETRACE_API_URL }}
+          FORETRACE_TOKEN: ${{ secrets.FORETRACE_TOKEN }}
+          FORETRACE_ORGANIZATION_ID: ${{ secrets.FORETRACE_ORGANIZATION_ID }}
+          FORETRACE_PROJECT_ID: ${{ secrets.FORETRACE_PROJECT_ID }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          (async () => {
+            const path = 'foretrace-ci.log';
+            if (!fs.existsSync(path)) return;
+            const raw = fs.readFileSync(path, 'utf8');
+            const lines = raw.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.length > 0).slice(0, 320);
+            if (lines.length === 0) return;
+            const base = process.env.FORETRACE_API_URL.replace(/\/+$/, '');
+            const org = process.env.FORETRACE_ORGANIZATION_ID;
+            const proj = process.env.FORETRACE_PROJECT_ID;
+            const url = `${base}/organizations/${encodeURIComponent(org)}/projects/${encodeURIComponent(proj)}/terminal/batches`;
+            const body = JSON.stringify({
+              lines,
+              client: { host: 'github-actions', cwd: process.env.GITHUB_WORKFLOW || 'ci' },
+            });
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${process.env.FORETRACE_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+              body,
+            });
+            const t = await res.text();
+            if (!res.ok) {
+              console.error('Foretrace ingest failed:', res.status, t);
+              process.exit(1);
+            }
+            console.log('Foretrace ingest ok:', t.slice(0, 500));
+          })().catch((e) => {
+            console.error(e);
+            process.exit(1);
+          });
+          NODE

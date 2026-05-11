@@ -6,6 +6,15 @@ declare global {
       email: string;
       displayName: string | null;
     }
+
+    interface Request {
+      /** Set by `CliIngestAuthGuard` for `POST …/terminal/batches`. */
+      cliIngestContext?: {
+        tokenId: string;
+        organizationId: string;
+        projectId: string;
+      };
+    }
   }
 }
 

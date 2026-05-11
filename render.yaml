@@ -1,6 +1,7 @@
 # Blueprint: https://render.com/docs/blueprint-spec.md
-# After provision, set CORS_ORIGINS on the web service to your Vercel deployment URL(s),
-# comma-separated (e.g. https://my-app.vercel.app,https://preview-xxx.vercel.app).
+# After provision, set CORS_ORIGINS on this API service to your **Vercel SPA** origin(s)
+# (the URL users open in the browser), comma-separated, no trailing slashes — NOT this API's onrender.com URL.
+# Example: https://foretrace-api.vercel.app
 
 databases:
   - name: foretrace-db

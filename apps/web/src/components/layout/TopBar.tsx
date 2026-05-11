@@ -1,5 +1,5 @@
 import { Bell, Loader2, LogOut, Menu, Search } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 import { MOBILE_NAV_OPEN_BUTTON_ID, useLayoutShell } from './layout-context';
 import { ThemeToggle } from './ThemeToggle';
@@ -72,15 +72,23 @@ export function TopBar() {
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
-        <button
-          type="button"
-          disabled
-          title="Notifications · coming soon"
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-zinc-400 cursor-not-allowed dark:text-zinc-600"
-          aria-label="Notifications (coming soon)"
-        >
-          <Bell size={18} strokeWidth={2} aria-hidden />
-        </button>
+        {signedInUser ? (
+          <Link
+            to="/alerts"
+            title="Alerts inbox"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            aria-label="Alerts inbox"
+          >
+            <Bell size={18} strokeWidth={2} aria-hidden />
+          </Link>
+        ) : (
+          <span
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-zinc-400 dark:text-zinc-600"
+            aria-hidden
+          >
+            <Bell size={18} strokeWidth={2} aria-hidden />
+          </span>
+        )}
         <ThemeToggle />
         {!sessionLoading && signedInUser ? (
           <button

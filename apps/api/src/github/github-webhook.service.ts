@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { ProjectSignalsService } from '../projects/project-signals.service';
 import {
   extractAction,
   extractActorLogin,
@@ -25,7 +26,10 @@ export type GithubIngestInput = {
 export class GithubWebhookService {
   private readonly log = new Logger(GithubWebhookService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectSignals: ProjectSignalsService,
+  ) {}
 
   async ingest(input: GithubIngestInput): Promise<void> {
     const { deliveryId, eventType, signature256, rawBody } = input;
@@ -47,6 +51,7 @@ export class GithubWebhookService {
 
     const connection = await this.prisma.gitHubConnection.findUnique({
       where: { repositoryFullName: repo },
+      include: { project: { select: { organizationId: true } } },
     });
     if (!connection) {
       this.log.warn(
@@ -85,6 +90,10 @@ export class GithubWebhookService {
           data: { lastEventAt: now, ...aggregatePatch },
         });
       });
+      this.projectSignals.scheduleRefreshSnapshot(
+        connection.projectId,
+        connection.project.organizationId,
+      );
     } catch (e) {
       if (
         e instanceof Prisma.PrismaClientKnownRequestError &&

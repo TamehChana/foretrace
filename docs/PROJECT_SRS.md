@@ -124,7 +124,7 @@ It **evaluates risk** at **task**, **developer**, and **project** levels, **expl
 | Auth & RBAC | Sessions, roles, permissions |
 | Project & Task | CRUD, assignments, deadlines, progress |
 | GitHub Ingestion | Webhook receiver, normalization, deduplication |
-| Terminal Ingestion | Authenticated ingest API + queue processing |
+| Terminal Ingestion | Authenticated ingest API + redaction + incident materialization (**v1:** synchronous; **later:** optional queue if volume requires) |
 | Feature Aggregation | Roll windows (e.g. 24h / 7d), per entity metrics |
 | Risk Engine | Fusion scoring, reasons, recommendations |
 | Alerts & Notifications | Thresholds, dedupe/cooldown, email jobs |
@@ -393,10 +393,10 @@ The product UI is **custom-built in React**. Reuse **design systems and chart li
 3. Auth + RBAC + baseline web layout  
 4. Project/task CRUD (PM core)  
 5. GitHub webhook ingestion + aggregates + user mapping  
-6. CLI + ingest API + redaction + incidents  
-7. Feature aggregation jobs  
-8. Risk engine + evaluation history  
-9. Alerts + email queue + in-app alert center  
+6. CLI + ingest API + redaction + incidents — **v1 shipped:** `@foretrace/cli` + `POST …/terminal/batches` (Bearer project token), redaction + incident upserts; web **CLI ingest tokens** panel on project (mint/list/revoke); **`GET …/terminal/incidents`** + web **Terminal incidents** table on project. **Not yet:** async queue, richer incident drill-down (task timeline).  
+7. Feature aggregation jobs — **v1 slice shipped:** persisted **`ProjectSignalSnapshot`** per project (24h rollup: GitHub webhook counts, terminal incidents/batches, task tallies, open PR/issue counts); **GET/POST** project signals API; web **Project signals** panel with manual refresh (**PM**/**ADMIN**); automatic refresh after webhook + terminal ingest (per-project cooldown). **Not yet:** background job scheduler.  
+8. Risk engine + evaluation history — **v0 slice shipped:** **`ProjectRiskEvaluation`** per project (rule fusion on latest signal snapshot: **LOW**/**MEDIUM**/**HIGH**/**CRITICAL**, numeric score, machine-readable **reasons** array); **GET** + **POST …/risk/evaluate** (**PM**/**ADMIN**); web **Delivery risk** panel. **Not yet:** task/developer scoped evaluations, append-only history, threshold **Alert** records, email.  
+9. Alerts + email queue + in-app alert center — **v0 slice shipped:** **`Alert`** rows from risk evaluate (Medium+ and worsening / first Medium+); **`GET`** org alerts + **`POST …/alerts/:id/read`**; web **`/alerts`** inbox. **Not yet:** email queue, alert digests, non-risk alert kinds.  
 10. Dashboard + task/project drill-down + trends  
 11. Hardening, evaluation scenarios, thesis evaluation chapter  
 

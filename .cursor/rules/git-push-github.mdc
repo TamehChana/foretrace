@@ -1,0 +1,14 @@
+---
+description: Commit and push completed work to GitHub (origin)
+alwaysApply: true
+---
+
+# Git — push to GitHub
+
+After completing a substantive task (features, fixes, migrations, or doc updates the user cares to keep):
+
+1. Run `git status` and ensure **no secrets** are staged (never commit `.env`; `.env` is gitignored).
+2. **`git add`** the intended paths, **`git commit`** with a clear message, then **`git push origin`** (use the repo’s default branch, usually `main`).
+3. If **push fails** (auth, conflicts), fix or report and do not leave the user thinking changes are on GitHub when they are not.
+
+Do not skip push when the user expects the remote to stay in sync with local work.

@@ -3,6 +3,8 @@ dist/
 .turbo/
 coverage/
 *.log
+
+# Env files anywhere in the repo (root, apps/api, apps/web — never commit secrets).
 .env
 .env.local
 .env.*.local

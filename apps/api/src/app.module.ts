@@ -7,6 +7,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { GithubModule } from './github/github.module';
 import { ProjectsModule } from './projects/projects.module';
+import { TerminalIngestModule } from './terminal/terminal-ingest.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ProjectsModule } from './projects/projects.module';
     OrganizationsModule,
     ProjectsModule,
     GithubModule,
+    TerminalIngestModule,
   ],
   controllers: [AppController],
   providers: [AppService],
