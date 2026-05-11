@@ -147,6 +147,7 @@ export function ProjectSignalsPanel(props: {
             : ' Ask a PM or admin to refresh signals.'}
         </p>
       ) : state.status === 'ok' && state.snapshot !== null ? (
+        <>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[12px] sm:grid-cols-3">
           <div className="rounded-lg bg-zinc-50 px-2 py-1.5 dark:bg-zinc-900/80">
             <dt className="text-zinc-500">GitHub events (24h)</dt>
@@ -241,6 +242,21 @@ export function ProjectSignalsPanel(props: {
             </dd>
           </div>
         </dl>
+        <p className="mt-3 rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-400">
+          <strong className="font-medium text-zinc-800 dark:text-zinc-200">Why everything can stay at zero:</strong>{' '}
+          this rollup only counts what Foretrace has <em>stored</em> for this project in the last{' '}
+          <span className="font-mono">{state.snapshot.payload.windowHours}h</span>.{' '}
+          <strong className="font-medium text-zinc-800 dark:text-zinc-200">GitHub events</strong> need successful
+          webhook deliveries that create rows (see the GitHub panel’s recent events).{' '}
+          <strong className="font-medium text-zinc-800 dark:text-zinc-200">Open PRs/issues</strong> come from
+          connection counters updated by <span className="font-mono">pull_request</span> /{' '}
+          <span className="font-mono">issues</span> webhooks, not from the Actions feed alone.{' '}
+          <strong className="font-medium text-zinc-800 dark:text-zinc-200">Terminal</strong> counts need the CLI
+          posting batches. <strong className="font-medium text-zinc-800 dark:text-zinc-200">Tasks</strong> exclude{' '}
+          <span className="font-mono">DONE</span> / <span className="font-mono">CANCELLED</span>; overdue / due-in-7d
+          need active tasks with deadlines.
+        </p>
+        </>
       ) : null}
     </div>
   );
