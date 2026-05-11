@@ -74,9 +74,15 @@ export function ProjectTerminalIncidentsPanel(props: {
           <Terminal size={14} strokeWidth={2} aria-hidden />
           Terminal incidents
         </h3>
-        <p className="mt-1 text-[11px] text-zinc-500">
-          Redacted excerpts from CLI ingest (deduped by fingerprint). Most recent
-          first.
+        <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+          Each CLI ingest stores the <strong className="font-medium text-zinc-700 dark:text-zinc-300">full batch</strong> of
+          lines (redacted) on the server. This table only shows{' '}
+          <strong className="font-medium text-zinc-700 dark:text-zinc-300">incidents</strong>: lines that look like
+          build/test/runtime problems (e.g. “error”, “failed”, “exception”) so PMs see friction without re-reading entire
+          logs. <code className="rounded bg-zinc-100 px-0.5 dark:bg-zinc-800">foretrace run</code> defaults to sending
+          only when the wrapped command exits non-zero — set{' '}
+          <code className="rounded bg-zinc-100 px-0.5 dark:bg-zinc-800">FORETRACE_INGEST_ON=always</code> to send all
+          captured output.
         </p>
       </div>
 
