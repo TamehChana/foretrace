@@ -26,6 +26,7 @@ import { type OrgTaskRow, useOrgTasks } from '../../hooks/use-org-tasks';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 import { useToast } from '../../providers/ToastProvider';
 import { OrganizationIdCopyRow } from '../ui/OrganizationIdCopyRow';
+import { UserIdCopyRow } from '../ui/UserIdCopyRow';
 import { PageHeader } from '../ui/PageHeader';
 import { ProjectCliTokensPanel } from './ProjectCliTokensPanel';
 import { ProjectRiskPanel } from './ProjectRiskPanel';
@@ -378,6 +379,8 @@ export function ProjectsPage() {
           </div>
 
           <OrganizationIdCopyRow organizationId={organizationId} className="max-w-md" />
+
+          <UserIdCopyRow userId={currentUserId} className="max-w-md" />
 
           {canInvite && organizationId ? (
             <section className="rounded-2xl border border-zinc-200/80 bg-white/95 p-5 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/55">

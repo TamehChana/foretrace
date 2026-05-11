@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Building2, ClipboardCopy } from 'lucide-react';
 import type { OrgListItem, OrganizationsState } from '../../hooks/use-organizations';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
+import { UserIdCopyRow } from '../ui/UserIdCopyRow';
 import { useToast } from '../../providers/ToastProvider';
 import { Skeleton } from '../ui/Skeleton';
 
@@ -49,7 +50,9 @@ function OrgRow({ org }: { org: OrgListItem }) {
 }
 
 export function OrganizationsPanel({ state }: { state: OrganizationsState }) {
-  const { openAuthModal, openCreateOrganizationModal } = useAuthSession();
+  const { openAuthModal, openCreateOrganizationModal, snapshot } = useAuthSession();
+  const myUserId =
+    snapshot.status === 'ready' && snapshot.user ? snapshot.user.id : null;
 
   return (
     <section
@@ -121,6 +124,7 @@ export function OrganizationsPanel({ state }: { state: OrganizationsState }) {
                     <OrgRow key={org.id} org={org} />
                   ))}
                 </ul>
+                <UserIdCopyRow userId={myUserId} className="mt-1" />
               </div>
             )}
           </div>

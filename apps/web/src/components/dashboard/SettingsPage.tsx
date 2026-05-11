@@ -11,6 +11,7 @@ import { apiFetch } from '../../api-fetch';
 import { useOrganizations } from '../../hooks/use-organizations';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 import { OrganizationIdCopyRow } from '../ui/OrganizationIdCopyRow';
+import { UserIdCopyRow } from '../ui/UserIdCopyRow';
 import { PageHeader } from '../ui/PageHeader';
 import { Skeleton } from '../ui/Skeleton';
 
@@ -153,6 +154,10 @@ export function SettingsPage() {
             Create or join an organization to see audit entries scoped to that
             workspace.
           </p>
+          <UserIdCopyRow
+            userId={snapshot.status === 'ready' ? snapshot.user?.id : null}
+            className="mx-auto mt-6 max-w-md text-left"
+          />
         </div>
       ) : (
         <div className="mt-6 space-y-4">
@@ -179,6 +184,11 @@ export function SettingsPage() {
           ) : null}
 
           <OrganizationIdCopyRow organizationId={organizationId} className="max-w-md" />
+
+          <UserIdCopyRow
+            userId={snapshot.status === 'ready' ? snapshot.user?.id : null}
+            className="max-w-md"
+          />
 
           <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
             <ScrollText size={18} aria-hidden />
