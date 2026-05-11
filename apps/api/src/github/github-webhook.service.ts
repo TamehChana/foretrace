@@ -44,9 +44,12 @@ export class GithubWebhookService {
     const repo = repositoryFullNameFromPayload(payloadJson, eventType);
     if (!repo) {
       this.log.warn(
-        `GitHub webhook ${deliveryId}: event=${eventType} missing repository.full_name`,
+        `GitHub webhook ${deliveryId}: event=${eventType} could not resolve repository (missing full_name / owner+name in payload)`,
       );
-      throw new BadRequestException('Unsupported or missing repository');
+      throw new BadRequestException(
+        `Could not resolve repository from webhook (event: ${eventType}). ` +
+          'If this is a fork PR workflow, the payload may name the fork repo — link that repo or send fewer event types.',
+      );
     }
 
     const connection = await this.prisma.gitHubConnection.findUnique({

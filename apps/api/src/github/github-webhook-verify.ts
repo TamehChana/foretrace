@@ -27,6 +27,44 @@ export function normalizeRepositoryFullName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/**
+ * Resolves `owner/repo` from a GitHub REST-style repository object.
+ * Prefer `full_name`; some payloads only send `name` + `owner.login`.
+ */
+export function fullNameFromRepositoryLike(repo: unknown): string | null {
+  if (!repo || typeof repo !== 'object') {
+    return null;
+  }
+  const r = repo as Record<string, unknown>;
+  const fn = r.full_name;
+  if (typeof fn === 'string' && fn.trim().length > 0) {
+    return normalizeRepositoryFullName(fn);
+  }
+  const name = r.name;
+  const owner = r.owner;
+  if (
+    typeof name === 'string' &&
+    name.trim().length > 0 &&
+    owner &&
+    typeof owner === 'object'
+  ) {
+    const login = (owner as { login?: unknown }).login;
+    if (typeof login === 'string' && login.trim().length > 0) {
+      return normalizeRepositoryFullName(`${login.trim()}/${name.trim()}`);
+    }
+  }
+  return null;
+}
+
+function nestedRepo(body: Record<string, unknown>, key: string): unknown {
+  const v = body[key];
+  if (!v || typeof v !== 'object') {
+    return undefined;
+  }
+  const r = v as Record<string, unknown>;
+  return r.repository;
+}
+
 export function repositoryFullNameFromPayload(
   payload: unknown,
   eventType: string,
@@ -36,24 +74,28 @@ export function repositoryFullNameFromPayload(
   }
   const body = payload as Record<string, unknown>;
 
-  const fromRepoObj = (repo: unknown): string | null => {
-    if (!repo || typeof repo !== 'object') {
-      return null;
-    }
-    const fn = (repo as { full_name?: unknown }).full_name;
-    if (typeof fn === 'string' && fn.length > 0) {
-      return normalizeRepositoryFullName(fn);
-    }
-    return null;
-  };
+  const candidates: unknown[] = [
+    body.repository,
+    nestedRepo(body, 'workflow_run'),
+    nestedRepo(body, 'workflow_job'),
+    nestedRepo(body, 'check_suite'),
+    nestedRepo(body, 'check_run'),
+    nestedRepo(body, 'deployment'),
+    nestedRepo(body, 'deployment_status'),
+    nestedRepo(body, 'status'),
+    nestedRepo(body, 'issue_comment'),
+    nestedRepo(body, 'pull_request'),
+  ];
 
-  const direct = fromRepoObj(body.repository);
-  if (direct) {
-    return direct;
+  for (const c of candidates) {
+    const resolved = fullNameFromRepositoryLike(c);
+    if (resolved) {
+      return resolved;
+    }
   }
 
   if (eventType === 'fork' && body.forkee) {
-    return fromRepoObj(body.forkee);
+    return fullNameFromRepositoryLike(body.forkee);
   }
 
   return null;

@@ -561,9 +561,17 @@ export function ProjectGitHubPanel(props: {
           <h4 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
             Recent webhook events
           </h4>
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+            Only deliveries GitHub <strong className="font-medium text-zinc-600 dark:text-zinc-400">POSTs</strong> to this
+            project’s webhook URL are listed here (last 25 stored). In GitHub → Webhook → <strong className="font-medium text-zinc-600 dark:text-zinc-400">Recent Deliveries</strong>, a{' '}
+            <span className="text-rose-600 dark:text-rose-400">red</span> entry means Foretrace rejected the request (wrong
+            secret, repo not linked to this project, or payload missing a resolvable repository).{' '}
+            <strong className="font-medium text-zinc-600 dark:text-zinc-400">Fork PR</strong> workflows often send the{' '}
+            <em>fork</em> repo name — that repo must be the one linked in Foretrace, or reduce subscribed events to push / pull_request / issues.
+          </p>
           {conn.recentEvents.length === 0 ? (
             <p className="mt-2 text-[13px] text-zinc-500">
-              No deliveries yet — push commits after configuring GitHub webhook.
+              No deliveries stored yet — push or open a PR after GitHub shows successful (green) deliveries to this URL.
             </p>
           ) : (
             <RecentEventsTable events={conn.recentEvents} />
