@@ -18,7 +18,10 @@ import { readApiErrorMessage } from '../../api-error-message';
 import { apiFetch } from '../../api-fetch';
 import { useOrganizations } from '../../hooks/use-organizations';
 import { useOrgMemberRole } from '../../hooks/use-org-member-role';
-import { useOrgProjects } from '../../hooks/use-org-projects';
+import {
+  parseCreateProjectEnvelope,
+  useOrgProjects,
+} from '../../hooks/use-org-projects';
 import { type OrgTaskRow, useOrgTasks } from '../../hooks/use-org-tasks';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 import { useToast } from '../../providers/ToastProvider';
@@ -76,7 +79,10 @@ export function ProjectsPage() {
   }, [organizations, rawOrgParam, setSearchParams]);
 
   const memberRole = useOrgMemberRole(organizationId);
-  const projectsState = useOrgProjects(organizationId, dataBump);
+  const { projectsState, ingestCreatedProject } = useOrgProjects(
+    organizationId,
+    dataBump,
+  );
 
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(
     null,
@@ -146,6 +152,11 @@ export function ProjectsPage() {
       if (!res.ok) {
         showToast(await readApiErrorMessage(res), 'error');
         return;
+      }
+      const raw: unknown = await res.json().catch(() => null);
+      const created = parseCreateProjectEnvelope(raw);
+      if (created) {
+        ingestCreatedProject(created);
       }
       setNewProjectName('');
       bumpData();
