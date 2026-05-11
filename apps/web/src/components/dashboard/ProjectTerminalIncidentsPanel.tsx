@@ -79,10 +79,11 @@ export function ProjectTerminalIncidentsPanel(props: {
           lines (redacted) on the server. This table only shows{' '}
           <strong className="font-medium text-zinc-700 dark:text-zinc-300">incidents</strong>: lines that look like
           build/test/runtime problems (e.g. “error”, “failed”, “exception”) so PMs see friction without re-reading entire
-          logs. <code className="rounded bg-zinc-100 px-0.5 dark:bg-zinc-800">foretrace run</code> defaults to sending
-          only when the wrapped command exits non-zero — set{' '}
-          <code className="rounded bg-zinc-100 px-0.5 dark:bg-zinc-800">FORETRACE_INGEST_ON=always</code> to send all
-          captured output.
+          logs.{' '}
+          <code className="rounded bg-zinc-100 px-0.5 dark:bg-zinc-800">foretrace run</code> sends whenever there is
+          captured output for both successful and failed runs (set{' '}
+          <code className="rounded bg-zinc-100 px-0.5 dark:bg-zinc-800">FORETRACE_INGEST_ON=failure</code> to limit
+          ingests to non-zero exits only).
         </p>
       </div>
 

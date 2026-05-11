@@ -167,7 +167,7 @@ Requires DB migrations applied (`CliIngestToken`, `TerminalIngestBatch`, `Termin
 
 **Automatic-ish local capture (no pipe every time):**
 
-- **`foretrace run -- <command>`** — runs the command, **streams** stdout/stderr to your terminal, then **POSTs** captured lines (default: only when the command exits **non-zero**; set **`FORETRACE_INGEST_ON=always`** to always send when there is output). Same `FORETRACE_*` env vars as `ingest`.
+- **`foretrace run -- <command>`** — runs the command, **streams** stdout/stderr to your terminal, then **POSTs** captured lines when there is output (**default:** success and failure; set **`FORETRACE_INGEST_ON=failure`** to ingest only on non-zero exit). Same `FORETRACE_*` env vars as `ingest`.
 - **One-time shell snippet** — `foretrace hook print-zsh` or `foretrace hook print-bash` prints a small **`ftx`** wrapper you paste into `~/.zshrc` / `~/.bashrc`; then use **`ftx npm run build`** instead of typing the full pipe. (Optional global `alias npm=…` is **not** recommended; use `ftx` or `package.json` scripts.)
 - **Fully automatic CI logs** — workflow [`.github/workflows/foretrace-ci-ingest.example.yml`](.github/workflows/foretrace-ci-ingest.example.yml) runs on **main/master** pushes: **`npm ci`**, **`npm run build -w @foretrace/web`** (log via **`tee`**), then optional **`POST …/terminal/batches`**. If the four **`FORETRACE_*`** repository secrets are **not** set, the upload step is **skipped** (green CI); when they are set, a failed ingest fails the job so you notice misconfiguration.
 

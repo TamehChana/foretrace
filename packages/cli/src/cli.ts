@@ -187,8 +187,8 @@ Environment (ingest + run):
   FORETRACE_TASK_ID             Optional task UUID
 
 Environment (run only):
-  FORETRACE_INGEST_ON           "failure" (default) = ingest only if exit code ≠ 0
-                                "always" = ingest whenever there is output
+  FORETRACE_INGEST_ON           "always" (default) = ingest whenever there is captured output (success or failure)
+                                "failure" = ingest only if exit code ≠ 0 (less noise on green builds)
 
 Examples:
   npm run build 2>&1 | foretrace ingest
@@ -267,11 +267,12 @@ function runSpawn(
 async function runWrappedCommand(): Promise<void> {
   const env = readForetraceEnv();
   const { cmd, args } = parseRunArgv();
-  const when = (process.env.FORETRACE_INGEST_ON ?? 'failure').toLowerCase();
+  const whenRaw = (process.env.FORETRACE_INGEST_ON ?? 'always')
+    .toLowerCase()
+    .trim();
+  const mode = whenRaw === 'failure' ? 'failure' : 'always';
 
   const { code, combined } = await runSpawn(cmd, args, process.cwd());
-
-  const mode = when === 'always' ? 'always' : 'failure';
   const shouldIngest =
     mode === 'always' || (mode === 'failure' && code !== 0);
 
