@@ -45,7 +45,7 @@ export function OverviewPage({
               className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200/90 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 shadow-sm transition-[box-shadow,transform] hover:border-accent-300/60 hover:shadow-md active:scale-[0.99] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-accent-600/40"
             >
               <BookOpen size={14} strokeWidth={2.5} aria-hidden />
-              User guide
+              Full setup guide
             </Link>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">

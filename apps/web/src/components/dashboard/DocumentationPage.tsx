@@ -4,16 +4,17 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../ui/PageHeader';
 
 const STEPS = [
+  { id: 'before-you-start', label: 'Start here' },
   { id: 'step-1', label: '1 · Account' },
   { id: 'step-2', label: '2 · Organization' },
   { id: 'step-3', label: '3 · Project' },
   { id: 'step-4', label: '4 · Tasks' },
-  { id: 'step-5', label: '5 · GitHub (optional)' },
-  { id: 'step-6', label: '6 · Terminal (optional)' },
+  { id: 'step-5', label: '5 · GitHub' },
+  { id: 'step-6', label: '6 · CLI / terminal' },
   { id: 'step-7', label: '7 · Signals & risk' },
   { id: 'step-8', label: '8 · Alerts' },
   { id: 'step-9', label: '9 · Settings' },
-  { id: 'step-10', label: '10 · Keep going' },
+  { id: 'step-10', label: '10 · Every day' },
 ] as const;
 
 function WorkflowStep({
@@ -43,10 +44,26 @@ function WorkflowStep({
           <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             {title}
           </h2>
-          <div className="mt-4 space-y-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+          <div className="mt-4 space-y-4 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
             {children}
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function StartSection({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section
+      id={id}
+      className="scroll-mt-24 rounded-2xl border border-accent-200/60 bg-accent-500/[0.06] p-6 dark:border-accent-800/40 dark:bg-accent-500/[0.08]"
+    >
+      <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+        {title}
+      </h2>
+      <div className="mt-4 space-y-4 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+        {children}
       </div>
     </section>
   );
@@ -60,17 +77,42 @@ function Code({ children }: { children: string }) {
   );
 }
 
+function PreBlock({ children }: { children: string }) {
+  return (
+    <pre className="overflow-x-auto rounded-xl border border-zinc-300 bg-zinc-950 p-4 text-[11px] leading-relaxed text-zinc-100 shadow-inner dark:border-zinc-600">
+      {children}
+    </pre>
+  );
+}
+
+function Note({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-amber-200/90 bg-amber-50/95 px-4 py-3 text-sm text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/35 dark:text-amber-50">
+      <p className="font-semibold text-amber-900 dark:text-amber-100">{title}</p>
+      <div className="mt-2 space-y-2 leading-relaxed">{children}</div>
+    </div>
+  );
+}
+
+function Tip({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300">
+      {children}
+    </div>
+  );
+}
+
 export function DocumentationPage() {
   return (
-    <main className="pb-16">
+    <main className="pb-20">
       <PageHeader
         eyebrow="Help"
-        title="Step-by-step workflow"
+        title="Complete setup guide"
         description={
           <>
-            Walk through Foretrace from <strong className="font-medium text-zinc-800 dark:text-zinc-200">first sign-up</strong> to{' '}
-            <strong className="font-medium text-zinc-800 dark:text-zinc-200">ongoing delivery monitoring</strong>. Follow the steps in order; treat GitHub and
-            terminal ingest as optional branches until you need them.
+            This page explains <strong className="font-medium text-zinc-800 dark:text-zinc-200">every part</strong> of Foretrace in order: what to click, what to
+            type, and where each piece of information comes from. Read <strong className="font-medium text-zinc-800 dark:text-zinc-200">Start here</strong> first,
+            then follow the numbered steps. You can skip optional steps and come back later.
           </>
         }
         meta={
@@ -90,7 +132,7 @@ export function DocumentationPage() {
       >
         <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           <BookOpen size={14} strokeWidth={2} aria-hidden />
-          Jump to a step
+          Jump to a section
         </p>
         <ol className="mt-3 flex flex-wrap gap-x-3 gap-y-2 text-[13px] font-medium">
           {STEPS.map((s) => (
@@ -103,121 +145,339 @@ export function DocumentationPage() {
         </ol>
       </nav>
 
-      <article className="max-w-3xl">
-        <WorkflowStep step={1} id="step-1" title="Create your account and stay signed in">
+      <article className="max-w-3xl space-y-10">
+        <StartSection id="before-you-start" title="Start here — read this before anything else">
           <p>
-            Open the app and choose <strong className="font-medium text-zinc-800 dark:text-zinc-200">Sign in</strong> in the header. Register with your email
-            and a password, or log in if you already have an account. Foretrace keeps a session in this browser so you can refresh without signing in again.
+            <strong className="text-zinc-800 dark:text-zinc-200">What Foretrace is:</strong> a website in your browser (the “app”) that talks to a separate{' '}
+            <strong className="text-zinc-800 dark:text-zinc-200">server</strong> (the “API”) over the internet. Your projects, tasks, and alerts live on that
+            server inside a database. You never paste the database password into the app—only the people who deploy Foretrace configure that on the server.
           </p>
           <p>
-            On a shared computer, use <strong className="font-medium text-zinc-800 dark:text-zinc-200">Sign out</strong> when you leave. You need to be signed in for everything below except reading this page.
+            <strong className="text-zinc-800 dark:text-zinc-200">Three names you must know:</strong>
           </p>
-        </WorkflowStep>
-
-        <WorkflowStep step={2} id="step-2" title="Create or choose an organization">
-          <p>
-            All projects and data live inside an <strong className="font-medium text-zinc-800 dark:text-zinc-200">organization</strong> (your team workspace). From the{' '}
-            <strong className="font-medium text-zinc-800 dark:text-zinc-200">Overview</strong>, create a new organization or select one you belong to.
-          </p>
-          <p>
-            The app remembers the active org in the URL as <Code>?org=&lt;organization-id&gt;</Code>. If you belong to several orgs, use the organization selector on{' '}
-            <strong className="font-medium text-zinc-800 dark:text-zinc-200">Projects</strong>, <strong className="font-medium text-zinc-800 dark:text-zinc-200">Alerts</strong>, or{' '}
-            <strong className="font-medium text-zinc-800 dark:text-zinc-200">Settings</strong> before continuing—each step below uses whichever org is selected.
-          </p>
-        </WorkflowStep>
-
-        <WorkflowStep step={3} id="step-3" title="Create your first project">
-          <p>
-            Go to <strong className="font-medium text-zinc-800 dark:text-zinc-200">Projects</strong> in the sidebar. With the right organization selected, create a project with a clear name (for example the product or initiative you are tracking).
-          </p>
-          <p>
-            Expand the project row when you need to work inside it: tasks, GitHub, CLI tokens, signals, risk, and terminal incidents all live under that expanded view.
-          </p>
-        </WorkflowStep>
-
-        <WorkflowStep step={4} id="step-4" title="Add tasks so delivery work is visible">
-          <p>
-            Inside the expanded project, add <strong className="font-medium text-zinc-800 dark:text-zinc-200">tasks</strong> for real work items—titles, status, due dates as your team uses them. Foretrace uses active, overdue, and due-soon tasks when it builds the signal snapshot and risk score.
-          </p>
-          <p>
-            Archive or clean up tasks when work finishes so the picture stays accurate. You can invite members to the org (from Projects, depending on your role) so others can edit tasks and run evaluations too.
-          </p>
-        </WorkflowStep>
-
-        <WorkflowStep step={5} id="step-5" title="Optional: connect GitHub to the project">
-          <p>
-            If your team uses GitHub, an <strong className="font-medium text-zinc-800 dark:text-zinc-200">admin or PM</strong> can open the <strong className="font-medium text-zinc-800 dark:text-zinc-200">GitHub</strong> section for the project, enter <Code>owner/repo</Code>, and connect. Copy the one-time <strong className="font-medium text-zinc-800 dark:text-zinc-200">webhook secret</strong> and the webhook URL, then in GitHub add a repository webhook with JSON payloads and that secret so deliveries reach Foretrace.
-          </p>
-          <p>
-            Optionally add a <strong className="font-medium text-zinc-800 dark:text-zinc-200">personal access token</strong> if your policy allows REST enrichment (open PR/issue counts, branch status). Map GitHub usernames to Foretrace users when you want people-level alignment in the UI.
-          </p>
-          <p>
-            Skip this entire step if you are not ready to wire GitHub yet—you can add it later and the rest of the workflow still works.
-          </p>
-        </WorkflowStep>
-
-        <WorkflowStep step={6} id="step-6" title="Optional: stream terminal output with the CLI">
-          <p>
-            To capture build or script failures automatically, a <strong className="font-medium text-zinc-800 dark:text-zinc-200">PM, admin, or developer</strong> mints a <strong className="font-medium text-zinc-800 dark:text-zinc-200">CLI ingest token</strong> in the project panel. The plaintext token is shown once; store it in a password manager or CI secret.
-          </p>
-          <p>
-            On the machine or runner that will send logs, set:
-          </p>
-          <ul className="list-inside list-disc space-y-1 pl-1">
+          <ul className="list-inside list-disc space-y-2 pl-1">
             <li>
-              <Code>FORETRACE_API_URL</Code> — API base URL with no trailing slash.
+              <strong className="text-zinc-800 dark:text-zinc-200">Organization</strong> — your team’s workspace. Everything is grouped under one organization
+              at a time.
             </li>
             <li>
-              <Code>FORETRACE_TOKEN</Code> — the <Code>ft_ck_…</Code> value from the dashboard.
+              <strong className="text-zinc-800 dark:text-zinc-200">Project</strong> — one product, release, or initiative inside that organization.
             </li>
             <li>
-              <Code>FORETRACE_ORGANIZATION_ID</Code> and <Code>FORETRACE_PROJECT_ID</Code> — copy from the app URL or UI.
-            </li>
-            <li>
-              Optional: <Code>FORETRACE_TASK_ID</Code> to tie output to a task.
+              <strong className="text-zinc-800 dark:text-zinc-200">Task</strong> — a single piece of work inside a project (a ticket-sized item).
             </li>
           </ul>
           <p>
-            Install or build the Foretrace CLI, then pipe command output to ingest (for example <Code>npm run build 2&gt;&amp;1 | npm run terminal:ingest</Code> from the repo root) or use <Code>foretrace run -- &lt;command&gt;</Code>. Successful batches show up under <strong className="font-medium text-zinc-800 dark:text-zinc-200">Terminal incidents</strong> after classification.
+            <strong className="text-zinc-800 dark:text-zinc-200">Two different “addresses”:</strong> the{' '}
+            <strong className="text-zinc-800 dark:text-zinc-200">website address</strong> is what you type in the browser (often a <Code>vercel.app</Code> URL).
+            The <strong className="text-zinc-800 dark:text-zinc-200">API address</strong> is a different URL (often an <Code>onrender.com</Code> URL) that the
+            website calls in the background. <strong className="text-zinc-800 dark:text-zinc-200">Only people who set up hosting</strong> choose both addresses;
+            testers usually receive both links in an email or chat message.
+          </p>
+          <Note title="Important: website settings are not the same as CLI settings">
+            <p>
+              Variables that start with <Code>VITE_</Code> belong to the <strong>frontend build</strong> (for example on Vercel). They help the <em>browser</em>{' '}
+              find the API. They are <strong>not</strong> where you put <Code>FORETRACE_TOKEN</Code>.
+            </p>
+            <p>
+              Variables that start with <Code>FORETRACE_</Code> are read by the <strong>CLI program on your computer or in CI</strong>. You put them in your
+              terminal session, a small text file you load yourself, or your CI “secrets” screen—explained step by step in section 6.
+            </p>
+          </Note>
+          <Tip>
+            <strong className="text-zinc-800 dark:text-zinc-200">Rule of thumb:</strong> if you are only clicking in the browser, you only need the website
+            link and an account. If you are piping build logs into Foretrace, you also need the API link, the four <Code>FORETRACE_*</Code> values, and the CLI
+            installed once.
+          </Tip>
+        </StartSection>
+
+        <WorkflowStep step={1} id="step-1" title="Create an account and sign in">
+          <ol className="list-decimal space-y-4 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              Open the <strong className="text-zinc-800 dark:text-zinc-200">website link</strong> your team gave you (it should start with <Code>https://</Code>
+              ).
+            </li>
+            <li>
+              Look at the <strong className="text-zinc-800 dark:text-zinc-200">top-right</strong> of the page. Click <strong className="text-zinc-800 dark:text-zinc-200">Sign in</strong>.
+            </li>
+            <li>
+              If you have never used Foretrace on this site before, choose <strong className="text-zinc-800 dark:text-zinc-200">register</strong> (or the option
+              to create a new account), type your <strong>email</strong> and a <strong>password</strong> you can remember, and complete the form.
+            </li>
+            <li>
+              If you already registered, choose <strong className="text-zinc-800 dark:text-zinc-200">log in</strong> and enter the same email and password.
+            </li>
+            <li>
+              When login works, the header should show your <strong className="text-zinc-800 dark:text-zinc-200">email</strong> and a <strong>Sign out</strong>{' '}
+              button. You can refresh the page; you should stay signed in until you click Sign out or clear browser data.
+            </li>
+          </ol>
+          <Note title="Shared computer">
+            Always click <strong>Sign out</strong> when you finish on a school, library, or family PC so the next person cannot see your workspace.
+          </Note>
+        </WorkflowStep>
+
+        <WorkflowStep step={2} id="step-2" title="Create or open your organization (workspace)">
+          <ol className="list-decimal space-y-4 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              After sign-in, you land on the <strong className="text-zinc-800 dark:text-zinc-200">Overview</strong> page. On the right side, find the card titled{' '}
+              <strong className="text-zinc-800 dark:text-zinc-200">Organizations</strong>.
+            </li>
+            <li>
+              If it says there are <strong>no workspaces yet</strong>, click the button <strong className="text-zinc-800 dark:text-zinc-200">Create organization</strong>.
+              A window will open—type a <strong>name</strong> for your team (for example your company name) and follow the prompts until it saves.
+            </li>
+            <li>
+              If your team already created an organization and <strong>invited you</strong>, you should see it listed after you accept the invite (depending on
+              how your team set that up). Click it or follow their link so that organization becomes active.
+            </li>
+            <li>
+              When an organization is active, the browser address bar often shows <Code>?org=</Code> followed by a long <strong>random id</strong> (letters,
+              numbers, dashes). That id is your <strong className="text-zinc-800 dark:text-zinc-200">organization id</strong>. You can copy it from the address
+              bar when someone asks for <Code>FORETRACE_ORGANIZATION_ID</Code> for the CLI.
+            </li>
+          </ol>
+          <p>
+            If you belong to <strong>more than one</strong> organization, use the <strong className="text-zinc-800 dark:text-zinc-200">dropdown</strong> on
+            Projects, Alerts, or Settings to pick which workspace you are working in before you copy ids or mint tokens.
           </p>
         </WorkflowStep>
 
-        <WorkflowStep step={7} id="step-7" title="Review signals, then evaluate delivery risk">
+        <WorkflowStep step={3} id="step-3" title="Create a project inside that organization">
+          <ol className="list-decimal space-y-4 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              Click <strong className="text-zinc-800 dark:text-zinc-200">Projects</strong> in the <strong>left sidebar</strong> (on a phone, open the menu with
+              the three lines, then tap Projects).
+            </li>
+            <li>
+              Make sure the <strong className="text-zinc-800 dark:text-zinc-200">correct organization</strong> is selected (see the note above if you have
+              more than one).
+            </li>
+            <li>
+              Find the box where you can type a <strong>new project name</strong>. Type something clear (for example “Mobile app 2.0”) and click the button to{' '}
+              <strong>create</strong> the project.
+            </li>
+            <li>
+              The new project appears in the list. <strong className="text-zinc-800 dark:text-zinc-200">Click the row</strong> or the expand control so the row
+              opens downward. All tools for that project—tasks, GitHub, CLI tokens, signals, risk—appear <strong>inside this expanded area</strong>.
+            </li>
+            <li>
+              To copy the <strong className="text-zinc-800 dark:text-zinc-200">project id</strong> for the CLI: open your browser’s address bar while you are
+              focused on that project, or ask your admin—project ids are created by Foretrace when the project is saved; they look like long random strings with
+              dashes (UUIDs).
+            </li>
+          </ol>
+          <Tip>
+            If someone says “open the project panel,” they mean: Projects → expand that project so you see the sections stacked below the title.
+          </Tip>
+        </WorkflowStep>
+
+        <WorkflowStep step={4} id="step-4" title="Add tasks (so Foretrace can measure real work)">
+          <ol className="list-decimal space-y-4 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              With the project expanded, scroll to the <strong className="text-zinc-800 dark:text-zinc-200">tasks</strong> area.
+            </li>
+            <li>
+              Type a <strong>short title</strong> for the work (for example “Fix login bug”) in the add-task field and submit. Repeat for each real item you
+              want to track.
+            </li>
+            <li>
+              Set <strong>status</strong> and <strong>due dates</strong> the way your team works. Overdue and due-soon tasks feed the <strong>Signals</strong>{' '}
+              and <strong>Risk</strong> views later.
+            </li>
+            <li>
+              When work is finished, <strong>archive</strong> or clean up tasks so numbers stay honest.
+            </li>
+          </ol>
           <p>
-            Open the <strong className="font-medium text-zinc-800 dark:text-zinc-200">Signals</strong> panel for the project. You should see a time-window rollup: GitHub activity (if connected), terminal activity (if any), and task pressure. If the snapshot looks stale, click <strong className="font-medium text-zinc-800 dark:text-zinc-200">Refresh</strong> (PM/admin) to recompute.
-          </p>
-          <p>
-            When you are ready for a scored readout, click <strong className="font-medium text-zinc-800 dark:text-zinc-200">Evaluate</strong> under <strong className="font-medium text-zinc-800 dark:text-zinc-200">Delivery risk</strong>. That refreshes signals, runs the rule engine, saves a history row, and updates the latest risk level and reasons. Past runs appear in <strong className="font-medium text-zinc-800 dark:text-zinc-200">Evaluation history</strong>; an optional short narrative may appear if your deployment enables it.
-          </p>
-          <p>
-            Repeat this step whenever you want a fresh score—for example after a busy day of merges or before a release review.
+            Each task row has an id in the system (another UUID). If you use the optional <Code>FORETRACE_TASK_ID</Code> in the CLI, it must be{' '}
+            <strong>exactly</strong> that task’s id and the task must belong to <strong>this</strong> project—otherwise the server will reject the upload.
           </p>
         </WorkflowStep>
 
-        <WorkflowStep step={8} id="step-8" title="Watch the Alerts inbox">
+        <WorkflowStep step={5} id="step-5" title="Optional: connect GitHub (admin or PM)">
           <p>
-            When risk crosses thresholds your deployment cares about (for example first time at medium or higher, or a worsening trend), Foretrace can raise <strong className="font-medium text-zinc-800 dark:text-zinc-200">alerts</strong> for the organization.
+            Skip this whole section if you do not use GitHub yet. You can always return when you are ready.
           </p>
-          <p>
-            Open <strong className="font-medium text-zinc-800 dark:text-zinc-200">Alerts</strong> in the sidebar. Filter unread items, open an alert to see context, <strong className="font-medium text-zinc-800 dark:text-zinc-200">mark read</strong> when you have handled it, and use the link back to <strong className="font-medium text-zinc-800 dark:text-zinc-200">Projects</strong> to dig into the underlying project.
-          </p>
+          <ol className="list-decimal space-y-4 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              Expand the project, then open the <strong className="text-zinc-800 dark:text-zinc-200">GitHub</strong> section.
+            </li>
+            <li>
+              Type the repository in the form <Code>owner/repo</Code> (all lowercase, with one slash). Example: <Code>acme/widget</Code>.
+            </li>
+            <li>
+              Click to <strong>connect</strong>. Foretrace will show two critical things once: a <strong>webhook URL</strong> and a <strong>webhook secret</strong>.
+              Copy both into a safe place immediately—you cannot get the secret again from the same screen.
+            </li>
+            <li>
+              In GitHub in that repository, go to <strong>Settings → Webhooks → Add webhook</strong>. Paste the <strong>Payload URL</strong> from Foretrace,
+              choose <strong>application/json</strong>, and paste the <strong>secret</strong>. Save.
+            </li>
+            <li>
+              After GitHub sends events, Foretrace stores them and they count toward <strong>Signals</strong>. If nothing appears, ask your admin to confirm the
+              API’s public URL matches what GitHub can reach.
+            </li>
+            <li>
+              <strong>Optional PAT:</strong> only if your policy allows, you can save a GitHub personal access token in Foretrace for extra REST fields (counts,
+              branch status). Use the smallest permission set your security team approves.
+            </li>
+            <li>
+              <strong>User mapping:</strong> link GitHub usernames to Foretrace accounts so activity lines up with people you know in the app.
+            </li>
+          </ol>
         </WorkflowStep>
 
-        <WorkflowStep step={9} id="step-9" title="Review actions in Settings (audit log)">
+        <WorkflowStep step={6} id="step-6" title="Optional: send terminal / build logs with the CLI">
           <p>
-            Open <strong className="font-medium text-zinc-800 dark:text-zinc-200">Settings</strong> for a read-only <strong className="font-medium text-zinc-800 dark:text-zinc-200">audit log</strong> of recent actions in the selected organization—who changed what and when. Use it for oversight after invites, GitHub changes, token mints, or risk evaluations.
+            This section is for <strong className="text-zinc-800 dark:text-zinc-200">developers or automation</strong>. The website does <strong>not</strong>{' '}
+            have a box for <Code>FORETRACE_TOKEN</Code>. Those values go on the machine that runs the command line tool.
           </p>
+
+          <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">Part A — Mint a token in the browser</h3>
+          <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              Sign in, go to <strong>Projects</strong>, expand the right project.
+            </li>
+            <li>
+              Find <strong className="text-zinc-800 dark:text-zinc-200">CLI ingest tokens</strong> (or similar wording). Click to <strong>mint</strong> a new token.
+            </li>
+            <li>
+              Foretrace shows a long secret starting with <Code>ft_ck_</Code>. <strong>Copy it once</strong> into a password manager or your CI secrets vault.
+              The database only stores a fingerprint of the token—you cannot “view” the same secret again later; if you lose it, <strong>revoke</strong> and mint
+              a new one.
+            </li>
+          </ol>
+
+          <h3 className="mt-6 text-base font-semibold text-zinc-800 dark:text-zinc-200">Part B — Where the FORETRACE variables go</h3>
+          <p>
+            The CLI reads <strong>environment variables</strong> from the process that runs it. You choose <strong>one</strong> of these patterns:
+          </p>
+          <ul className="list-inside list-disc space-y-2 pl-1">
+            <li>
+              <strong>Temporary for one terminal window (good for trying once):</strong> set variables, then run the CLI in the <em>same</em> window.
+            </li>
+            <li>
+              <strong>CI (GitHub Actions, GitLab, etc.):</strong> add secrets in the website of your CI provider, then map them into <Code>env:</Code> for the job
+              step that runs Foretrace.
+            </li>
+          </ul>
+          <p className="font-medium text-zinc-800 dark:text-zinc-200">Windows (PowerShell) — copy-paste one block, edit the values, press Enter after each line:</p>
+          <PreBlock>{`$env:FORETRACE_API_URL = "https://YOUR-API.onrender.com"
+$env:FORETRACE_TOKEN = "ft_ck_paste_the_full_token_here"
+$env:FORETRACE_ORGANIZATION_ID = "paste-org-uuid-from-browser"
+$env:FORETRACE_PROJECT_ID = "paste-project-uuid"
+# Optional — only if you really have a task UUID:
+# $env:FORETRACE_TASK_ID = "paste-task-uuid"`}</PreBlock>
+          <p className="font-medium text-zinc-800 dark:text-zinc-200">Mac or Linux (bash or zsh) — same idea:</p>
+          <PreBlock>{`export FORETRACE_API_URL="https://YOUR-API.onrender.com"
+export FORETRACE_TOKEN="ft_ck_paste_the_full_token_here"
+export FORETRACE_ORGANIZATION_ID="paste-org-uuid-from-browser"
+export FORETRACE_PROJECT_ID="paste-project-uuid"
+# Optional:
+# export FORETRACE_TASK_ID="paste-task-uuid"`}</PreBlock>
+          <Note title="Plain .env files and the CLI">
+            <p>
+              The <Code>foretrace</Code> program <strong>does not automatically read a .env file</strong> from your disk. If you put lines in a file named{' '}
+              <Code>.env</Code>, you must either <strong>export</strong> them into the shell first (some teams use small helper scripts) or use the repo’s{' '}
+              <Code>npm run smoke:terminal-ingest</Code> script, which <em>does</em> load a root <Code>.env</Code> for smoke testing—not the same as everyday{' '}
+              <Code>foretrace ingest</Code>.
+            </p>
+            <p>
+              So: for a normal run, use <strong>PowerShell export</strong>, <strong>bash export</strong>, or <strong>CI secrets → env</strong> as shown above.
+            </p>
+          </Note>
+
+          <h3 className="mt-6 text-base font-semibold text-zinc-800 dark:text-zinc-200">Part C — Install the CLI and send one test</h3>
+          <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              Clone the Foretrace git repository (or use a copy your team gives you). In the repository root, run{' '}
+              <Code>npm install</Code> once, then <Code>npm run build -w @foretrace/cli</Code> so <Code>packages/cli/dist/cli.js</Code> exists.
+            </li>
+            <li>
+              With the environment variables still set in the <strong>same</strong> terminal, stay in the repo root and run a one-line test that works on
+              Windows and Mac:{' '}
+              <Code>node -e &quot;console.log(&apos;foretrace-cli-test&apos;)&quot; | node packages/cli/dist/cli.js ingest</Code> — that prints one line and
+              pipes it into ingest. Or use <Code>npm run terminal:ingest</Code> the same way with a pipe in front (that script runs the same CLI file; env vars
+              must still be set in that shell).
+            </li>
+            <li>
+              Go back to the browser → expand the project → <strong>Terminal incidents</strong>. After a short delay you should see the new fingerprinted line
+              (redacted). If the command printed an error with “401” or “403”, your token or ids do not match—double-check copy-paste and that the token was not
+              revoked.
+            </li>
+          </ol>
         </WorkflowStep>
 
-        <WorkflowStep step={10} id="step-10" title="Your ongoing loop—and troubleshooting">
+        <WorkflowStep step={7} id="step-7" title="Read signals, then run delivery risk">
+          <ol className="list-decimal space-y-4 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              Expand the project and open <strong className="text-zinc-800 dark:text-zinc-200">Signals</strong>. You should see counts for GitHub (if connected),
+              terminal activity, and tasks.
+            </li>
+            <li>
+              If you are a PM or admin and numbers look old, click <strong>Refresh</strong> to force a new snapshot.
+            </li>
+            <li>
+              Scroll to <strong className="text-zinc-800 dark:text-zinc-200">Delivery risk</strong>. Click <strong>Evaluate</strong>. Foretrace refreshes signals,
+              computes a level and reasons, and saves a row in <strong>Evaluation history</strong>.
+            </li>
+            <li>
+              Run <strong>Evaluate</strong> again whenever you want an updated score (for example after a big merge day).
+            </li>
+          </ol>
+        </WorkflowStep>
+
+        <WorkflowStep step={8} id="step-8" title="Check alerts">
+          <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              Click <strong className="text-zinc-800 dark:text-zinc-200">Alerts</strong> in the sidebar.
+            </li>
+            <li>
+              Pick the same organization if a selector is shown.
+            </li>
+            <li>
+              Read each line, use <strong>Unread only</strong> if you want a short list, and click <strong>Mark read</strong> when you have handled an item.
+            </li>
+            <li>
+              Use the link back to <strong>Projects</strong> when you need to fix the underlying work.
+            </li>
+          </ol>
+        </WorkflowStep>
+
+        <WorkflowStep step={9} id="step-9" title="Settings and audit log">
+          <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              Click <strong className="text-zinc-800 dark:text-zinc-200">Settings</strong> in the sidebar.
+            </li>
+            <li>
+              Choose the organization if prompted.
+            </li>
+            <li>
+              Read the <strong>audit log</strong> table—it is read-only and lists who did what recently (invites, tokens, GitHub actions, evaluations, etc.).
+            </li>
+          </ol>
+        </WorkflowStep>
+
+        <WorkflowStep step={10} id="step-10" title="What you do every day — and when something breaks">
           <p>
-            <strong className="font-medium text-zinc-800 dark:text-zinc-200">Day to day:</strong> keep tasks current, let webhooks and CLI feed signals, refresh or evaluate when you need a fresh picture, triage alerts, and spot-check the audit log after sensitive changes.
+            <strong className="text-zinc-800 dark:text-zinc-200">Healthy routine:</strong> keep tasks true, let GitHub webhooks and the CLI feed data, hit{' '}
+            <strong>Refresh</strong> or <strong>Evaluate</strong> when you need a fresh readout, clear alerts after you act, and glance at the audit log after
+            sensitive changes.
           </p>
           <p>
-            <strong className="font-medium text-zinc-800 dark:text-zinc-200">If the UI cannot reach the API</strong> (blank health, CORS errors in the browser console), confirm the frontend is configured with the correct API URL and that the API allows your exact site origin. The Overview page shows API health when the check succeeds.
+            <strong className="text-zinc-800 dark:text-zinc-200">If the website looks “empty” or login never finishes:</strong> ask your admin whether the{' '}
+            <strong>API URL</strong> on the frontend matches the live server and whether <strong>CORS</strong> allows your exact website address. The Overview
+            page shows a small <strong>API health</strong> hint when the browser can reach the server.
           </p>
           <p>
-            For deploy checklists, local developer setup, and CI examples, see the <strong className="font-medium text-zinc-800 dark:text-zinc-200">README</strong> in the Foretrace repository.
+            <strong className="text-zinc-800 dark:text-zinc-200">If the CLI says ingest failed:</strong> read the error text. <Code>401</Code> usually means
+            wrong or revoked token. <Code>403</Code> means the token does not belong to the org/project in the URL. <Code>400</Code> often means bad JSON or a{' '}
+            <Code>FORETRACE_TASK_ID</Code> that is not in this project.
+          </p>
+          <p>
+            <strong className="text-zinc-800 dark:text-zinc-200">Deeper deploy topics</strong> (Render, Vercel, database backups, GitHub org rules) live in the
+            repository <strong>README</strong>—share that file with whoever runs infrastructure.
           </p>
         </WorkflowStep>
       </article>

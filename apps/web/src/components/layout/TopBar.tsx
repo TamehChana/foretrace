@@ -6,7 +6,7 @@ import { ThemeToggle } from './ThemeToggle';
 
 function breadcrumbForPath(pathname: string): { section: string; page: string } {
   if (pathname === '/docs') {
-    return { section: 'Help', page: 'Workflow' };
+    return { section: 'Help', page: 'Setup guide' };
   }
   if (pathname === '/projects') {
     return { section: 'Projects', page: 'Directory' };

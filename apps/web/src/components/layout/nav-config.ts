@@ -7,7 +7,7 @@ export type NavItemConfig =
 
 export const primaryNav: NavItemConfig[] = [
   { id: 'overview', label: 'Overview', href: '/', icon: LayoutDashboard },
-  { id: 'docs', label: 'User guide', href: '/docs', icon: BookOpen },
+  { id: 'docs', label: 'Setup guide', href: '/docs', icon: BookOpen },
   { id: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban },
   { id: 'alerts', label: 'Alerts', href: '/alerts', icon: Bell },
 ];
