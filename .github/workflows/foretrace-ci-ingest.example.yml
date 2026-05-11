@@ -21,10 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Intentionally no `cache: npm` — setup-node's post-step cache save can hit
+      # "Path Validation Error" on monorepos; root `npm ci` is fast enough here.
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
 
       - name: Install and build web
         run: |
