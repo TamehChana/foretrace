@@ -92,6 +92,12 @@ export function configureApp(app: INestApplication): void {
     );
   }
 
+  const sessionCookiePartitioned =
+    isProd &&
+    !['0', 'false', 'no', 'off'].includes(
+      (process.env.SESSION_COOKIE_PARTITIONED ?? '1').trim().toLowerCase(),
+    );
+
   expressApp.use(
     session({
       name: 'foretrace.sid',
@@ -104,6 +110,9 @@ export function configureApp(app: INestApplication): void {
         sameSite: isProd ? 'none' : 'lax',
         secure: isProd,
         maxAge: 7 * 24 * 60 * 60 * 1000,
+        // Helps Chrome send the session cookie on credentialed fetches when the SPA
+        // and API are on different sites (CHIPS). Set SESSION_COOKIE_PARTITIONED=0 to disable.
+        ...(sessionCookiePartitioned ? { partitioned: true } : {}),
       },
     }),
   );

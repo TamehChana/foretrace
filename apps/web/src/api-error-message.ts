@@ -35,5 +35,14 @@ export async function readApiErrorMessage(res: Response): Promise<string> {
       ? trimmed.slice(0, 400)
       : `Request failed (${res.status})`;
   }
-  return messageFromParsedBody(body, res.status);
+  let msg = messageFromParsedBody(body, res.status);
+  if (
+    res.status === 401 &&
+    typeof import.meta.env !== 'undefined' &&
+    Boolean(import.meta.env.VITE_API_URL?.trim())
+  ) {
+    msg +=
+      ' If the API is on another host than this app: sign in again from this tab, allow cookies for the API domain, and set CORS_ORIGINS on the API to this site’s exact origin (https, no trailing slash).';
+  }
+  return msg;
 }
