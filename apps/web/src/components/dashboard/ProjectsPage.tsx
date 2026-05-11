@@ -664,6 +664,7 @@ export function ProjectsPage() {
                                 organizationId={organizationId}
                                 projectId={p.id}
                                 canManage={canManageProjects}
+                                currentUserId={currentUserId}
                                 refreshKey={dataBump}
                                 onRefresh={bumpData}
                               />

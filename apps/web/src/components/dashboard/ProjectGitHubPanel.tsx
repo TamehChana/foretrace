@@ -73,11 +73,19 @@ export function ProjectGitHubPanel(props: {
   organizationId: string;
   projectId: string;
   canManage: boolean;
+  /** Signed-in user’s Foretrace account UUID (for self-service copy into mapping). */
+  currentUserId: string | null;
   refreshKey: number;
   onRefresh: () => void;
 }) {
-  const { organizationId, projectId, canManage, refreshKey, onRefresh } =
-    props;
+  const {
+    organizationId,
+    projectId,
+    canManage,
+    currentUserId,
+    refreshKey,
+    onRefresh,
+  } = props;
 
   const showToast = useToast();
   const githubState = useProjectGithub(
@@ -571,6 +579,55 @@ export function ProjectGitHubPanel(props: {
               ? 'Link a collaborator’s GitHub login to their Foretrace user ID (members only). Developers can view mappings.'
               : 'Mappings are managed by PM and admin.'}
           </p>
+          {canManage ? (
+            <div className="mt-2 space-y-1.5 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+              <p>
+                <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                  GitHub login:
+                </span>{' '}
+                their GitHub <strong>username</strong> from{' '}
+                <span className="font-mono text-zinc-800 dark:text-zinc-200">
+                  github.com/<em>username</em>
+                </span>{' '}
+                (no <span className="font-mono">@</span>, not an email).
+              </p>
+              <p>
+                <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                  Foretrace user ID:
+                </span>{' '}
+                that person’s account UUID in Foretrace — they must already be in
+                this organization. They can send you the value from{' '}
+                <span className="font-mono">user.id</span> in the browser{' '}
+                <span className="font-mono">GET /auth/me</span> response (Network
+                tab), or paste your own ID below when mapping yourself.
+              </p>
+            </div>
+          ) : null}
+          {canManage && currentUserId ? (
+            <div className="mt-2 rounded-lg border border-zinc-200/90 bg-zinc-50/90 px-2.5 py-2 dark:border-zinc-700 dark:bg-zinc-900/50">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Your Foretrace user ID
+                  </p>
+                  <p
+                    className="mt-0.5 truncate font-mono text-[11px] text-zinc-800 dark:text-zinc-200"
+                    title={currentUserId}
+                  >
+                    {currentUserId}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void copy(currentUserId, 'User ID')}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  <ClipboardCopy size={14} strokeWidth={2} aria-hidden />
+                  Copy
+                </button>
+              </div>
+            </div>
+          ) : null}
           {linksState.status === 'loading' || linksState.status === 'idle' ? (
             <Skeleton className="mt-2 h-8 w-full" />
           ) : linksState.status === 'error' ? (
