@@ -8,8 +8,10 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedGuard } from '../auth/guards/authenticated.guard';
@@ -55,8 +57,13 @@ export class AlertsController {
   async markRead(
     @Param('organizationId') organizationId: string,
     @Param('alertId') alertId: string,
+    @Req() req: Request,
   ): Promise<{ data: Awaited<ReturnType<AlertsService['markRead']>> }> {
-    const data = await this.alerts.markRead(organizationId, alertId);
+    const data = await this.alerts.markRead(
+      organizationId,
+      alertId,
+      req.user!.id,
+    );
     return { data };
   }
 }

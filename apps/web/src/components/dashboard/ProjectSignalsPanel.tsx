@@ -5,6 +5,15 @@ import { apiFetch } from '../../api-fetch';
 import { useToast } from '../../providers/ToastProvider';
 import { Skeleton } from '../ui/Skeleton';
 
+type GithubRestSlice = {
+  fetchedAt: string;
+  openPullRequestsFromApi: number | null;
+  openIssuesFromApi: number | null;
+  defaultBranch: string | null;
+  defaultBranchHeadSha: string | null;
+  combinedStatus: string | null;
+};
+
 type SignalPayload = {
   windowHours: number;
   github: {
@@ -12,6 +21,7 @@ type SignalPayload = {
     openPullRequests: number | null;
     openIssues: number | null;
     lastEventAt: string | null;
+    rest?: GithubRestSlice | null;
   };
   terminal: {
     incidentsTouchedInWindow: number;
@@ -151,6 +161,43 @@ export function ProjectSignalsPanel(props: {
               {state.snapshot.payload.github.openIssues ?? '—'}
             </dd>
           </div>
+          {state.snapshot.payload.github.rest ? (
+            <div className="col-span-2 rounded-lg border border-zinc-200/80 bg-white px-2 py-2 sm:col-span-3 dark:border-zinc-700 dark:bg-zinc-950/40">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                GitHub REST (optional PAT)
+              </dt>
+              <dd className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-zinc-700 dark:text-zinc-300 sm:grid-cols-4">
+                <span>
+                  PRs (API):{' '}
+                  <strong className="tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {state.snapshot.payload.github.rest.openPullRequestsFromApi ??
+                      '—'}
+                  </strong>
+                </span>
+                <span>
+                  Issues (API):{' '}
+                  <strong className="tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {state.snapshot.payload.github.rest.openIssuesFromApi ?? '—'}
+                  </strong>
+                </span>
+                <span className="truncate sm:col-span-2">
+                  Default branch:{' '}
+                  <code className="text-[10px]">
+                    {state.snapshot.payload.github.rest.defaultBranch ?? '—'}
+                  </code>
+                </span>
+                <span>
+                  Combined status:{' '}
+                  <strong>
+                    {state.snapshot.payload.github.rest.combinedStatus ?? '—'}
+                  </strong>
+                </span>
+                <span className="text-zinc-500 sm:col-span-3">
+                  Fetched {formatWhen(state.snapshot.payload.github.rest.fetchedAt)}
+                </span>
+              </dd>
+            </div>
+          ) : null}
           <div className="rounded-lg bg-zinc-50 px-2 py-1.5 dark:bg-zinc-900/80">
             <dt className="text-zinc-500">Terminal batches (24h)</dt>
             <dd className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">

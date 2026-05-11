@@ -16,7 +16,8 @@ services:
     buildCommand: npm ci && npx turbo build --filter=@foretrace/api
     preDeployCommand: npm run db:migrate:deploy -w @foretrace/api
     startCommand: npm run start:prod -w @foretrace/api
-    healthCheckPath: /health
+    # Use DB-backed readiness probe so Render only routes traffic once Postgres is reachable.
+    healthCheckPath: /health/ready
     envVars:
       - key: NODE_VERSION
         value: '20'

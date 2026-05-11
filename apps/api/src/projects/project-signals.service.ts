@@ -1,8 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from './projects.service';
+import { GithubSignalRestEnricher } from './github-signal-rest-enricher';
+
+export type GithubRestEnrichment = {
+  fetchedAt: string;
+  openPullRequestsFromApi: number | null;
+  openIssuesFromApi: number | null;
+  defaultBranch: string | null;
+  defaultBranchHeadSha: string | null;
+  combinedStatus: string | null;
+};
 
 export type ProjectSignalPayload = {
   windowHours: number;
@@ -11,6 +21,7 @@ export type ProjectSignalPayload = {
     openPullRequests: number | null;
     openIssues: number | null;
     lastEventAt: string | null;
+    rest: GithubRestEnrichment | null;
   };
   terminal: {
     incidentsTouchedInWindow: number;
@@ -35,6 +46,7 @@ export class ProjectSignalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projectsService: ProjectsService,
+    private readonly githubRest: GithubSignalRestEnricher,
   ) {}
 
   /**
@@ -50,7 +62,7 @@ export class ProjectSignalsService {
     this.lastAutoRefreshAtMs.set(projectId, now);
     void this.refreshSnapshot(projectId, organizationId).catch((err: unknown) => {
       this.log.warn(
-        `Background signal snapshot refresh failed for project ${projectId}: ${
+        `Background project signal refresh failed for project ${projectId}: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
@@ -71,107 +83,124 @@ export class ProjectSignalsService {
   ) {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
 
-    const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
-    const now = new Date();
-    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock((hashtext(${projectId}::text))::bigint)`,
+      );
 
-    const connection = await this.prisma.gitHubConnection.findUnique({
-      where: { projectId },
-      select: {
-        id: true,
-        openPullRequestCount: true,
-        openIssueCount: true,
-        lastEventAt: true,
-      },
-    });
+      const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+      const now = new Date();
+      const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    let webhookEventsInWindow = 0;
-    if (connection) {
-      webhookEventsInWindow = await this.prisma.gitHubWebhookEvent.count({
+      const connection = await tx.gitHubConnection.findUnique({
+        where: { projectId },
+        select: {
+          id: true,
+          repositoryFullName: true,
+          githubPatCiphertext: true,
+          openPullRequestCount: true,
+          openIssueCount: true,
+          lastEventAt: true,
+        },
+      });
+
+      let webhookEventsInWindow = 0;
+      if (connection) {
+        webhookEventsInWindow = await tx.gitHubWebhookEvent.count({
+          where: {
+            connectionId: connection.id,
+            createdAt: { gte: since },
+          },
+        });
+      }
+
+      const incidentsTouchedInWindow = await tx.terminalIncident.count({
         where: {
-          connectionId: connection.id,
+          projectId,
+          lastSeenAt: { gte: since },
+        },
+      });
+
+      const newFingerprintsInWindow = await tx.terminalIncident.count({
+        where: {
+          projectId,
+          firstSeenAt: { gte: since },
+        },
+      });
+
+      const batchesInWindow = await tx.terminalIngestBatch.count({
+        where: {
+          projectId,
           createdAt: { gte: since },
         },
       });
-    }
 
-    const incidentsTouchedInWindow = await this.prisma.terminalIncident.count({
-      where: {
+      const activeTaskWhere: Prisma.TaskWhereInput = {
         projectId,
-        lastSeenAt: { gte: since },
-      },
-    });
+        status: { notIn: ['DONE', 'CANCELLED'] },
+      };
 
-    const newFingerprintsInWindow = await this.prisma.terminalIncident.count({
-      where: {
-        projectId,
-        firstSeenAt: { gte: since },
-      },
-    });
+      const activeCount = await tx.task.count({
+        where: activeTaskWhere,
+      });
 
-    const batchesInWindow = await this.prisma.terminalIngestBatch.count({
-      where: {
-        projectId,
-        createdAt: { gte: since },
-      },
-    });
+      const overdueCount = await tx.task.count({
+        where: {
+          ...activeTaskWhere,
+          deadline: { lt: now },
+        },
+      });
 
-    const activeTaskWhere: Prisma.TaskWhereInput = {
-      projectId,
-      status: { notIn: ['DONE', 'CANCELLED'] },
-    };
+      const dueWithin7DaysCount = await tx.task.count({
+        where: {
+          ...activeTaskWhere,
+          deadline: { gte: now, lte: in7Days },
+        },
+      });
 
-    const activeCount = await this.prisma.task.count({
-      where: activeTaskWhere,
-    });
+      let rest: GithubRestEnrichment | null = null;
+      if (connection?.repositoryFullName && connection.githubPatCiphertext) {
+        rest = await this.githubRest.enrich(
+          connection.repositoryFullName,
+          connection.githubPatCiphertext,
+        );
+      }
 
-    const overdueCount = await this.prisma.task.count({
-      where: {
-        ...activeTaskWhere,
-        deadline: { lt: now },
-      },
-    });
-
-    const dueWithin7DaysCount = await this.prisma.task.count({
-      where: {
-        ...activeTaskWhere,
-        deadline: { gte: now, lte: in7Days },
-      },
-    });
-
-    const payload: ProjectSignalPayload = {
-      windowHours,
-      github: {
-        webhookEventsInWindow,
-        openPullRequests: connection?.openPullRequestCount ?? null,
-        openIssues: connection?.openIssueCount ?? null,
-        lastEventAt: connection?.lastEventAt?.toISOString() ?? null,
-      },
-      terminal: {
-        incidentsTouchedInWindow,
-        newFingerprintsInWindow,
-        batchesInWindow,
-      },
-      tasks: {
-        activeCount,
-        overdueCount,
-        dueWithin7DaysCount,
-      },
-    };
-
-    return this.prisma.projectSignalSnapshot.upsert({
-      where: { projectId },
-      create: {
-        organizationId,
-        projectId,
+      const payload: ProjectSignalPayload = {
         windowHours,
-        payload: payload as unknown as Prisma.InputJsonValue,
-      },
-      update: {
-        windowHours,
-        payload: payload as unknown as Prisma.InputJsonValue,
-        computedAt: new Date(),
-      },
+        github: {
+          webhookEventsInWindow,
+          openPullRequests: connection?.openPullRequestCount ?? null,
+          openIssues: connection?.openIssueCount ?? null,
+          lastEventAt: connection?.lastEventAt?.toISOString() ?? null,
+          rest,
+        },
+        terminal: {
+          incidentsTouchedInWindow,
+          newFingerprintsInWindow,
+          batchesInWindow,
+        },
+        tasks: {
+          activeCount,
+          overdueCount,
+          dueWithin7DaysCount,
+        },
+      };
+
+      return tx.projectSignalSnapshot.upsert({
+        where: { projectId },
+        create: {
+          organizationId,
+          projectId,
+          windowHours,
+          payload: payload as unknown as Prisma.InputJsonValue,
+        },
+        update: {
+          windowHours,
+          payload: payload as unknown as Prisma.InputJsonValue,
+          computedAt: new Date(),
+        },
+      });
     });
   }
 }

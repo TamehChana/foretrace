@@ -6,6 +6,7 @@ import {
 import type { Role } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { sha256Utf8Hex } from './terminal-digest';
@@ -15,6 +16,7 @@ export class CliIngestTokenService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projectsService: ProjectsService,
+    private readonly audit: AuditService,
   ) {}
 
   private mintCliSecret(): string {
@@ -109,6 +111,14 @@ export class CliIngestTokenService {
     await this.prisma.cliIngestToken.update({
       where: { id: tokenRow.id },
       data: { revokedAt: new Date() },
+    });
+    await this.audit.log({
+      organizationId,
+      actorUserId,
+      action: 'CLI_TOKEN_REVOKED',
+      resourceType: 'cli_ingest_token',
+      resourceId: tokenRow.id,
+      metadata: { projectId },
     });
     return { ok: true };
   }

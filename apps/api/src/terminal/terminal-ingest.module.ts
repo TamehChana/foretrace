@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { ProjectsModule } from '../projects/projects.module';
 
@@ -13,7 +14,7 @@ import { TerminalIncidentsService } from './terminal-incidents.service';
 import { TerminalIngestService } from './terminal-ingest.service';
 
 @Module({
-  imports: [AuthModule, ProjectsModule],
+  imports: [AuthModule, AuditModule, ProjectsModule],
   controllers: [
     CliTokensController,
     TerminalBatchesController,

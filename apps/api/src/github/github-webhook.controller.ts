@@ -8,6 +8,7 @@ import {
   RawBody,
   Req,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { RawBodyRequest } from '@nestjs/common/interfaces/http/raw-body-request.interface.js';
 import type { Request } from 'express';
 
@@ -16,6 +17,7 @@ import { GithubWebhookService } from './github-webhook.service';
 /**
  * Stateless GitHub delivery endpoint (verified per linked repository secret).
  */
+@SkipThrottle()
 @Controller()
 export class GithubWebhookController {
   constructor(private readonly githubWebhookService: GithubWebhookService) {}

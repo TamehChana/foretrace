@@ -106,6 +106,10 @@ export function ProjectGitHubPanel(props: {
   const [linkSubmitting, setLinkSubmitting] = useState(false);
   const [linkDeleteBusy, setLinkDeleteBusy] = useState<string | null>(null);
 
+  const [githubPatInput, setGithubPatInput] = useState('');
+  const [patSaveBusy, setPatSaveBusy] = useState(false);
+  const [patClearBusy, setPatClearBusy] = useState(false);
+
   const copy = useCallback(
     async (text: string, label: string) => {
       try {
@@ -346,6 +350,125 @@ export function ProjectGitHubPanel(props: {
             </dd>
           </div>
         </dl>
+
+        <div className="mt-4 rounded-xl border border-zinc-200/80 bg-zinc-50/80 px-3 py-3 dark:border-zinc-700 dark:bg-zinc-900/40">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+            GitHub REST enrichment
+          </p>
+          <p className="mt-1 text-[12px] text-zinc-600 dark:text-zinc-400">
+            Optional fine-grained or classic PAT with{' '}
+            <code className="text-[11px]">repo</code> (and search scope for open
+            PR counts). Stored encrypted server-side; never shown again. Improves
+            signal snapshots when <code className="text-[11px]">FORETRACE_APP_SECRET</code>{' '}
+            is configured on the API.
+          </p>
+          <p className="mt-2 text-[12px]">
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">
+              Status:{' '}
+            </span>
+            {conn.hasGithubRestPat ? (
+              <span className="text-emerald-700 dark:text-emerald-400">
+                PAT on file — REST fields appear in Signals after refresh.
+              </span>
+            ) : (
+              <span className="text-zinc-500">No PAT — webhook counts only.</span>
+            )}
+          </p>
+          {canManage ? (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+              <label className="block flex-1 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                New token (paste once)
+                <input
+                  type="password"
+                  value={githubPatInput}
+                  onChange={(e) => setGithubPatInput(e.target.value)}
+                  placeholder="ghp_… or github_pat_…"
+                  autoComplete="off"
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 font-mono text-[12px] dark:border-zinc-700 dark:bg-zinc-950"
+                />
+              </label>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={patSaveBusy || githubPatInput.trim().length < 10}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                  onClick={() => {
+                    void (async () => {
+                      const pat = githubPatInput.trim();
+                      if (pat.length < 10) {
+                        return;
+                      }
+                      setPatSaveBusy(true);
+                      try {
+                        const res = await apiFetch(
+                          `/organizations/${organizationId}/projects/${projectId}/github/pat`,
+                          {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pat }),
+                          },
+                        );
+                        if (!res.ok) {
+                          showToast(await formatApiErrorResponse(res), 'error');
+                          return;
+                        }
+                        setGithubPatInput('');
+                        onRefresh();
+                        showToast('GitHub PAT saved', 'success');
+                      } catch (err: unknown) {
+                        showToast(
+                          err instanceof Error ? err.message : 'Request failed',
+                          'error',
+                        );
+                      } finally {
+                        setPatSaveBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  Save PAT
+                </button>
+                <button
+                  type="button"
+                  disabled={patClearBusy || !conn.hasGithubRestPat}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  onClick={() => {
+                    void (async () => {
+                      if (
+                        typeof window !== 'undefined' &&
+                        !window.confirm('Remove stored GitHub PAT?')
+                      ) {
+                        return;
+                      }
+                      setPatClearBusy(true);
+                      try {
+                        const res = await apiFetch(
+                          `/organizations/${organizationId}/projects/${projectId}/github/pat`,
+                          { method: 'DELETE' },
+                        );
+                        if (!res.ok) {
+                          showToast(await formatApiErrorResponse(res), 'error');
+                          return;
+                        }
+                        onRefresh();
+                        showToast('GitHub PAT removed', 'success');
+                      } catch (err: unknown) {
+                        showToast(
+                          err instanceof Error ? err.message : 'Request failed',
+                          'error',
+                        );
+                      } finally {
+                        setPatClearBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  Clear PAT
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         {revealed ? (
           <div

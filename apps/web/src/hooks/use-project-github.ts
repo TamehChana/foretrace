@@ -13,6 +13,8 @@ export type GithubRecentEventRow = {
 export type GithubConnectionView = {
   id: string;
   repositoryFullName: string;
+  /** True when a GitHub PAT is stored for REST enrichment (token is never returned). */
+  hasGithubRestPat: boolean;
   lastEventAt: string | null;
   lastPushAt: string | null;
   openPullRequestCount: number;
@@ -69,6 +71,7 @@ function parseSummary(json: unknown): ProjectGithubState {
   const connection: GithubConnectionView = {
     id: String(c.id),
     repositoryFullName: String(c.repositoryFullName),
+    hasGithubRestPat: Boolean(c.hasGithubRestPat),
     lastEventAt:
       typeof c.lastEventAt === 'string'
         ? c.lastEventAt

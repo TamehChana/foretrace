@@ -64,6 +64,7 @@ model User {
   tasksOwned       Task[]           @relation("TaskAssignee")
   githubUserLinks  GitHubUserLink[]
   cliIngestTokens CliIngestToken[]
+  auditLogs       AuditLog[]
 }
 
 model Organization {
@@ -80,7 +81,9 @@ model Organization {
   terminalIncidents        TerminalIncident[]
   projectSignalSnapshots   ProjectSignalSnapshot[]
   projectRiskEvaluations   ProjectRiskEvaluation[]
+  riskEvaluationRuns       RiskEvaluationRun[]
   alerts                   Alert[]
+  auditLogs                AuditLog[]
 }
 
 model Membership {
@@ -115,6 +118,7 @@ model Project {
   terminalIncidents    TerminalIncident[]
   signalSnapshot       ProjectSignalSnapshot?
   riskEvaluation       ProjectRiskEvaluation?
+  riskEvaluationRuns   RiskEvaluationRun[]
   alerts               Alert[]
 
   @@index([organizationId])
@@ -131,6 +135,8 @@ model GitHubConnection {
   lastPushAt           DateTime?
   openPullRequestCount Int       @default(0)
   openIssueCount       Int       @default(0)
+  /// AES-256-GCM ciphertext (base64) for optional GitHub REST enrichment; requires `FORETRACE_APP_SECRET` on API.
+  githubPatCiphertext  String?   @db.Text
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
@@ -294,6 +300,8 @@ model ProjectRiskEvaluation {
   score          Int
   /// Machine-readable reasons: `[{ "code": "TASKS_OVERDUE", "detail": "…" }]`
   reasons        Json
+  /// Optional human-facing narrative (heuristic and/or LLM). See `docs/AI.md`.
+  aiSummary      String?   @db.Text
   evaluatedAt    DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -301,6 +309,24 @@ model ProjectRiskEvaluation {
 
   @@index([organizationId])
   @@index([evaluatedAt(sort: Desc)])
+}
+
+/// Append-only risk evaluation history (production trend / audit trail).
+model RiskEvaluationRun {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  projectId      String    @db.Uuid
+  level          RiskLevel
+  score          Int
+  reasons        Json
+  aiSummary      String?   @db.Text
+  evaluatedAt    DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, evaluatedAt(sort: Desc)])
+  @@index([organizationId, evaluatedAt(sort: Desc)])
 }
 
 /// In-app notification (v0: risk elevation / worsening).
@@ -320,4 +346,21 @@ model Alert {
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([organizationId, readAt, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])
+}
+
+/// Immutable audit trail for security-sensitive actions (enterprise baseline).
+model AuditLog {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @db.Uuid
+  actorUserId      String?  @db.Uuid
+  action           String
+  resourceType     String?
+  resourceId       String?  @db.Uuid
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt(sort: Desc)])
 }

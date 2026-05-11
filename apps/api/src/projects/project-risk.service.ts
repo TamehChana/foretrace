@@ -2,12 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { RiskLevel, type Prisma } from '@prisma/client';
 
 import { AlertsService } from '../alerts/alerts.service';
+import { RiskInsightService } from '../ai/risk-insight.service';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
-import type { ProjectSignalPayload } from './project-signals.service';
+import type { GithubRestEnrichment, ProjectSignalPayload } from './project-signals.service';
 import { ProjectSignalsService } from './project-signals.service';
 import { ProjectsService } from './projects.service';
+import type { RiskReasonRow } from './risk-reason.types';
 
-export type RiskReasonRow = { code: string; detail: string };
+export type { RiskReasonRow } from './risk-reason.types';
 
 @Injectable()
 export class ProjectRiskService {
@@ -16,6 +19,8 @@ export class ProjectRiskService {
     private readonly projectsService: ProjectsService,
     private readonly signals: ProjectSignalsService,
     private readonly alerts: AlertsService,
+    private readonly audit: AuditService,
+    private readonly riskInsight: RiskInsightService,
   ) {}
 
   async getEvaluation(projectId: string, organizationId: string) {
@@ -25,11 +30,37 @@ export class ProjectRiskService {
     });
   }
 
+  async listEvaluationHistory(
+    projectId: string,
+    organizationId: string,
+    limit = 50,
+  ) {
+    await this.projectsService.getProjectInOrg(projectId, organizationId);
+    const take = Math.min(Math.max(limit, 1), 200);
+    return this.prisma.riskEvaluationRun.findMany({
+      where: { projectId, organizationId },
+      select: {
+        id: true,
+        level: true,
+        score: true,
+        reasons: true,
+        aiSummary: true,
+        evaluatedAt: true,
+      },
+      orderBy: { evaluatedAt: 'desc' },
+      take,
+    });
+  }
+
   /**
-   * Refreshes the signal snapshot, runs the v0 rule engine, and upserts the
-   * persisted project risk row.
+   * Refreshes the signal snapshot, runs the v0 rule engine, appends history,
+   * and upserts the persisted latest project risk row.
    */
-  async evaluateAndPersist(projectId: string, organizationId: string) {
+  async evaluateAndPersist(
+    projectId: string,
+    organizationId: string,
+    actorUserId: string,
+  ) {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
     const snapshot = await this.signals.refreshSnapshot(projectId, organizationId);
     const payload = snapshot.payload as unknown as ProjectSignalPayload;
@@ -45,6 +76,32 @@ export class ProjectRiskService {
       select: { name: true },
     });
 
+    const aiSummary = await this.riskInsight.summarize({
+      projectName: project?.name ?? 'Project',
+      level,
+      score,
+      reasons,
+    });
+
+    const run = await this.prisma.riskEvaluationRun.create({
+      data: {
+        organizationId,
+        projectId,
+        level,
+        score,
+        reasons: reasons as unknown as Prisma.InputJsonValue,
+        aiSummary,
+      },
+      select: {
+        id: true,
+        level: true,
+        score: true,
+        reasons: true,
+        aiSummary: true,
+        evaluatedAt: true,
+      },
+    });
+
     const row = await this.prisma.projectRiskEvaluation.upsert({
       where: { projectId },
       create: {
@@ -53,11 +110,13 @@ export class ProjectRiskService {
         level,
         score,
         reasons: reasons as unknown as Prisma.InputJsonValue,
+        aiSummary,
       },
       update: {
         level,
         score,
         reasons: reasons as unknown as Prisma.InputJsonValue,
+        aiSummary,
         evaluatedAt: new Date(),
       },
     });
@@ -70,7 +129,22 @@ export class ProjectRiskService {
       nextLevel: row.level,
       score: row.score,
       evaluationId: row.id,
+      evaluationRunId: run.id,
       reasonCodes: reasons.map((r) => r.code),
+    });
+
+    await this.audit.log({
+      organizationId,
+      actorUserId,
+      action: 'RISK_EVALUATED',
+      resourceType: 'project',
+      resourceId: projectId,
+      metadata: {
+        level: row.level,
+        score: row.score,
+        riskEvaluationRunId: run.id,
+        projectRiskEvaluationId: row.id,
+      },
     });
 
     return row;
@@ -126,6 +200,16 @@ export class ProjectRiskService {
       reasons.push({
         code: 'GITHUB_HIGH_CHURN',
         detail: `${gh} GitHub webhook events in the last ${hours}h.`,
+      });
+    }
+
+    const rest = payload.github.rest as GithubRestEnrichment | null | undefined;
+    if (rest?.combinedStatus === 'failure') {
+      score += 12;
+      reasons.push({
+        code: 'GITHUB_COMMIT_STATUS_FAILURE',
+        detail:
+          'GitHub combined status for the default branch is failure (from REST API).',
       });
     }
 

@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Application } from 'express';
+import helmet from 'helmet';
 import passport from 'passport';
 import session from 'express-session';
 
@@ -71,6 +72,13 @@ export function configureApp(app: INestApplication): void {
   const config = app.get(ConfigService);
   const expressApp = app.getHttpAdapter().getInstance() as Application;
   expressApp.set('trust proxy', 1);
+
+  expressApp.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
 
   const nodeEnv = config.get<string>('NODE_ENV') ?? 'development';
   const isProd = nodeEnv === 'production';

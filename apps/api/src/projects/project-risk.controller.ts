@@ -1,12 +1,17 @@
 import {
   Controller,
+  DefaultValuePipe,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Post,
+  Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { Role } from '@prisma/client';
 
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -19,6 +24,29 @@ import { ProjectRiskService } from './project-risk.service';
 @Controller('organizations/:organizationId/projects/:projectId/risk')
 export class ProjectRiskController {
   constructor(private readonly risk: ProjectRiskService) {}
+
+  @Get('history')
+  @UseGuards(
+    OrganizationUuidParamGuard,
+    ProjectUuidParamGuard,
+    AuthenticatedGuard,
+    RolesGuard,
+  )
+  @Roles()
+  async history(
+    @Param('organizationId') organizationId: string,
+    @Param('projectId') projectId: string,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ): Promise<{
+    data: Awaited<ReturnType<ProjectRiskService['listEvaluationHistory']>>;
+  }> {
+    const data = await this.risk.listEvaluationHistory(
+      projectId,
+      organizationId,
+      limit,
+    );
+    return { data };
+  }
 
   @Get()
   @UseGuards(
@@ -50,10 +78,15 @@ export class ProjectRiskController {
   async evaluate(
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
+    @Req() req: Request,
   ): Promise<{
     data: Awaited<ReturnType<ProjectRiskService['evaluateAndPersist']>>;
   }> {
-    const data = await this.risk.evaluateAndPersist(projectId, organizationId);
+    const data = await this.risk.evaluateAndPersist(
+      projectId,
+      organizationId,
+      req.user!.id,
+    );
     return { data };
   }
 }

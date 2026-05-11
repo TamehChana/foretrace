@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ProjectsModule } from '../projects/projects.module';
@@ -12,7 +13,7 @@ import { GithubWebhookController } from './github-webhook.controller';
 import { GithubWebhookService } from './github-webhook.service';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, AuthModule, ProjectsModule],
+  imports: [ConfigModule, PrismaModule, AuthModule, AuditModule, ProjectsModule],
   controllers: [GithubWebhookController, GithubIntegrationController],
   providers: [
     GithubWebhookService,

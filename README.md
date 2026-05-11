@@ -9,6 +9,7 @@ Foretrace is an AI-assisted **software project monitoring** web application: it 
 ## Documentation
 
 - **[Software requirements & architecture reference](docs/PROJECT_SRS.md)** — actors, workflows, stack, roadmap (SRS-style).
+- **[AI / risk narratives](docs/AI.md)** — how `aiSummary` is produced (heuristic + optional OpenAI), and how to extend or train later.
 - **[`.env.example`](.env.example)** — required variables for API, optional CLI/smoke; keep in sync with **`apps/api/.env`** and (for `VITE_*` only) **`apps/web/.env.example`**.
 
 ## Monorepo layout
@@ -33,9 +34,9 @@ Foretrace is an AI-assisted **software project monitoring** web application: it 
 
 The API **starts without `DATABASE_URL`** so you can iterate on the UI; Prisma connects on first query once you copy [`.env.example`](.env.example) and run Postgres.
 
-Current JSON endpoints include **`GET /health`**, session-based **`/auth/*`** (register, login, logout, `me`), **`GET /organizations`**, nested **projects/tasks**, **GitHub** link + webhooks, **CLI ingest tokens** (`…/cli-tokens` mint/list/revoke, session auth), **project signals** (`…/signals`, `…/signals/refresh`), **project risk v0** (`…/risk`, `…/risk/evaluate`), **organization alerts** (`GET …/organizations/:id/alerts`, `POST …/alerts/:alertId/read`), **terminal incidents** (`GET …/terminal/incidents?limit=`, session auth), and **terminal batches** (`POST …/terminal/batches`, Bearer `ft_ck_…` only — see [Terminal ingest](#terminal-ingest-foretracecli--api)).
+Current JSON endpoints include **`GET /health`**, **`GET /health/ready`** (DB probe), session-based **`/auth/*`** (register, login, logout, `me`), **`GET /organizations`**, nested **projects/tasks**, **GitHub** link + webhooks + optional **`PATCH/DELETE …/github/pat`** (stores an encrypted PAT for REST enrichment when **`FORETRACE_APP_SECRET`** is set — see [`.env.example`](.env.example)), **CLI ingest tokens** (`…/cli-tokens` mint/list/revoke, session auth), **project signals** (`…/signals`, `…/signals/refresh`), **project risk v0** (`…/risk`, `…/risk/history`, `…/risk/evaluate`), **organization alerts** (`GET …/organizations/:id/alerts`, `POST …/alerts/:alertId/read`), **`GET …/organizations/:id/audit-logs`**, **terminal incidents** (`GET …/terminal/incidents?limit=`, session auth), and **terminal batches** (`POST …/terminal/batches`, Bearer `ft_ck_…` only — see [Terminal ingest](#terminal-ingest-foretracecli--api)).
 
-Set **`SESSION_SECRET`** (32+ random characters) for production; see [`.env.example`](.env.example). In production, session cookies use **`SameSite=None`** and **`Secure`** so the Vercel-hosted SPA can call the Render API with `credentials: 'include'`.
+Set **`SESSION_SECRET`** (32+ random characters) and, if you use stored GitHub PATs, **`FORETRACE_APP_SECRET`** (16+ characters) for production; see [`.env.example`](.env.example). In production, session cookies use **`SameSite=None`** and **`Secure`** so the Vercel-hosted SPA can call the Render API with `credentials: 'include'`.
 
 ## Windows troubleshooting
 

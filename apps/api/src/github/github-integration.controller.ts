@@ -7,9 +7,12 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { Role } from '@prisma/client';
 
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -19,6 +22,7 @@ import { ProjectUuidParamGuard } from '../common/project-uuid-param.guard';
 import { OrganizationUuidParamGuard } from '../organizations/organization-uuid-param.guard';
 import { CreateGitHubConnectionDto } from './dto/create-github-connection.dto';
 import { CreateGitHubUserLinkDto } from './dto/create-github-user-link.dto';
+import { SetGithubPatDto } from './dto/set-github-pat.dto';
 import { GithubConnectionService } from './github-connection.service';
 
 @Controller('organizations/:organizationId/projects/:projectId/github')
@@ -57,11 +61,13 @@ export class GithubIntegrationController {
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
     @Body() dto: CreateGitHubConnectionDto,
+    @Req() req: Request,
   ) {
     const data = await this.githubConnectionService.create(
       projectId,
       organizationId,
       dto,
+      req.user!.id,
     );
     return { data };
   }
@@ -78,8 +84,59 @@ export class GithubIntegrationController {
   async disconnect(
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
+    @Req() req: Request,
   ): Promise<void> {
-    await this.githubConnectionService.delete(projectId, organizationId);
+    await this.githubConnectionService.delete(
+      projectId,
+      organizationId,
+      req.user!.id,
+    );
+  }
+
+  @Patch('pat')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(
+    OrganizationUuidParamGuard,
+    ProjectUuidParamGuard,
+    AuthenticatedGuard,
+    RolesGuard,
+  )
+  @Roles(Role.ADMIN, Role.PM)
+  async setPat(
+    @Param('organizationId') organizationId: string,
+    @Param('projectId') projectId: string,
+    @Body() dto: SetGithubPatDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.githubConnectionService.setGithubPat(
+      projectId,
+      organizationId,
+      dto.pat,
+      req.user!.id,
+    );
+    return { data };
+  }
+
+  @Delete('pat')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(
+    OrganizationUuidParamGuard,
+    ProjectUuidParamGuard,
+    AuthenticatedGuard,
+    RolesGuard,
+  )
+  @Roles(Role.ADMIN, Role.PM)
+  async clearPat(
+    @Param('organizationId') organizationId: string,
+    @Param('projectId') projectId: string,
+    @Req() req: Request,
+  ) {
+    const data = await this.githubConnectionService.clearGithubPat(
+      projectId,
+      organizationId,
+      req.user!.id,
+    );
+    return { data };
   }
 
   @Get('user-links')

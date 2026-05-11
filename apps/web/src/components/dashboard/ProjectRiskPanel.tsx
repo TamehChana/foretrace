@@ -16,6 +16,16 @@ type RiskRow = {
   level: RiskLevel;
   score: number;
   reasons: unknown;
+  aiSummary?: string | null;
+  evaluatedAt: string;
+};
+
+type RiskHistoryRow = {
+  id: string;
+  level: RiskLevel;
+  score: number;
+  reasons: unknown;
+  aiSummary?: string | null;
   evaluatedAt: string;
 };
 
@@ -72,6 +82,93 @@ function formatWhen(iso: string): string {
   }
 }
 
+type HistoryPanelState =
+  | { status: 'idle' | 'loading' }
+  | { status: 'ok'; rows: RiskHistoryRow[] }
+  | { status: 'error'; message: string };
+
+function EvaluationHistorySection(props: {
+  historyState: HistoryPanelState;
+}) {
+  const { historyState } = props;
+  return (
+    <div className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
+      <h4 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+        Evaluation history
+      </h4>
+      {historyState.status === 'loading' || historyState.status === 'idle' ? (
+        <Skeleton className="mt-2 h-16 w-full" />
+      ) : historyState.status === 'error' ? (
+        <p className="mt-2 text-[12px] text-rose-600 dark:text-rose-400">
+          {historyState.message}
+        </p>
+      ) : historyState.rows.length === 0 ? (
+        <p className="mt-2 text-[12px] text-zinc-500">No runs recorded yet.</p>
+      ) : (
+        <div className="mt-2 max-h-56 overflow-auto rounded-lg border border-zinc-100 dark:border-zinc-800">
+          <table className="w-full min-w-[320px] text-left text-[11px]">
+            <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-900/95">
+              <tr className="text-zinc-500">
+                <th className="px-2 py-1 font-medium">When</th>
+                <th className="px-2 py-1 font-medium">Level</th>
+                <th className="px-2 py-1 font-medium">Score</th>
+                <th className="px-2 py-1 font-medium">Top reason</th>
+                <th className="px-2 py-1 font-medium">Insight</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historyState.rows.map((h) => {
+                const first = parseReasons(h.reasons)[0];
+                const insight =
+                  typeof h.aiSummary === 'string' && h.aiSummary.trim().length > 0
+                    ? h.aiSummary.trim()
+                    : null;
+                return (
+                  <tr
+                    key={h.id}
+                    className="border-t border-zinc-100 odd:bg-white/60 dark:border-zinc-800 odd:dark:bg-zinc-950/40"
+                  >
+                    <td className="whitespace-nowrap px-2 py-1 text-zinc-600 dark:text-zinc-400">
+                      {formatWhen(h.evaluatedAt)}
+                    </td>
+                    <td className="px-2 py-1">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${levelBadgeClass(h.level)}`}
+                      >
+                        {h.level}
+                      </span>
+                    </td>
+                    <td className="tabular-nums px-2 py-1 text-zinc-800 dark:text-zinc-200">
+                      {h.score}
+                    </td>
+                    <td className="max-w-[180px] truncate px-2 py-1 text-zinc-600 dark:text-zinc-400">
+                      {first ? (
+                        <span title={first.detail}>{first.code}</span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td
+                      className="max-w-[140px] truncate px-2 py-1 text-zinc-500 dark:text-zinc-500"
+                      title={insight ?? undefined}
+                    >
+                      {insight
+                        ? insight.length > 48
+                          ? `${insight.slice(0, 48)}…`
+                          : insight
+                        : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ProjectRiskPanel(props: {
   organizationId: string;
   projectId: string;
@@ -88,6 +185,9 @@ export function ProjectRiskPanel(props: {
     | { status: 'ok'; row: RiskRow | null }
     | { status: 'error'; message: string }
   >({ status: 'idle' });
+  const [historyState, setHistoryState] = useState<HistoryPanelState>({
+    status: 'idle',
+  });
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
@@ -111,9 +211,55 @@ export function ProjectRiskPanel(props: {
     setState({ status: 'ok', row });
   }, [organizationId, projectId]);
 
+  const loadHistory = useCallback(async () => {
+    setHistoryState({ status: 'loading' });
+    const res = await apiFetch(
+      `/organizations/${organizationId}/projects/${projectId}/risk/history?limit=30`,
+    );
+    const raw: unknown = await res.json().catch(() => null);
+    if (!res.ok) {
+      setHistoryState({
+        status: 'error',
+        message: formatApiErrorResponse(raw, res.status),
+      });
+      return;
+    }
+    const body = raw as { data?: unknown };
+    const arr = Array.isArray(body.data) ? body.data : [];
+    const rows: RiskHistoryRow[] = [];
+    for (const item of arr) {
+      if (!item || typeof item !== 'object') {
+        continue;
+      }
+      const o = item as Record<string, unknown>;
+      const id = typeof o.id === 'string' ? o.id : null;
+      const level = o.level;
+      const score = o.score;
+      const evaluatedAt =
+        typeof o.evaluatedAt === 'string' ? o.evaluatedAt : null;
+      if (!id || !isRiskLevel(level) || typeof score !== 'number' || !evaluatedAt) {
+        continue;
+      }
+      const aiSummary =
+        typeof o.aiSummary === 'string' || o.aiSummary === null
+          ? (o.aiSummary as string | null)
+          : undefined;
+      rows.push({
+        id,
+        level,
+        score,
+        reasons: o.reasons,
+        aiSummary: aiSummary ?? undefined,
+        evaluatedAt,
+      });
+    }
+    setHistoryState({ status: 'ok', rows });
+  }, [organizationId, projectId]);
+
   useEffect(() => {
     void load();
-  }, [load, refreshKey]);
+    void loadHistory();
+  }, [load, loadHistory, refreshKey]);
 
   const evaluate = useCallback(async () => {
     const res = await apiFetch(
@@ -128,7 +274,8 @@ export function ProjectRiskPanel(props: {
     showToast('Risk re-evaluated', 'success');
     onEvaluated?.();
     await load();
-  }, [organizationId, projectId, load, showToast, onEvaluated]);
+    await loadHistory();
+  }, [organizationId, projectId, load, loadHistory, showToast, onEvaluated]);
 
   return (
     <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-950/60">
@@ -140,7 +287,9 @@ export function ProjectRiskPanel(props: {
           </h3>
           <p className="mt-1 text-[11px] text-zinc-500">
             Rule-based score from the 24h signal rollup (tasks, terminal, GitHub
-            churn). Evaluating refreshes signals first, then persists this row.
+            churn), plus an optional narrative (heuristic or OpenAI when
+            configured). Evaluating refreshes signals first, then persists this
+            row.
           </p>
         </div>
         {canManage ? (
@@ -165,12 +314,15 @@ export function ProjectRiskPanel(props: {
           {state.message}
         </p>
       ) : state.row === null ? (
-        <p className="mt-3 text-[13px] text-zinc-500">
-          No evaluation yet.
-          {canManage
-            ? ' Click Evaluate to refresh signals and compute the first score.'
-            : ' Ask a PM or admin to run an evaluation.'}
-        </p>
+        <div className="mt-3 space-y-3">
+          <p className="text-[13px] text-zinc-500">
+            No evaluation yet.
+            {canManage
+              ? ' Click Evaluate to refresh signals and compute the first score.'
+              : ' Ask a PM or admin to run an evaluation.'}
+          </p>
+          <EvaluationHistorySection historyState={historyState} />
+        </div>
       ) : (
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -200,6 +352,20 @@ export function ProjectRiskPanel(props: {
               </li>
             ))}
           </ul>
+
+          {typeof state.row.aiSummary === 'string' &&
+          state.row.aiSummary.trim().length > 0 ? (
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50/90 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900/70">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                PM insight
+              </h4>
+              <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-sans text-[12px] leading-relaxed text-zinc-800 dark:text-zinc-200">
+                {state.row.aiSummary.trim()}
+              </pre>
+            </div>
+          ) : null}
+
+          <EvaluationHistorySection historyState={historyState} />
         </div>
       )}
     </div>

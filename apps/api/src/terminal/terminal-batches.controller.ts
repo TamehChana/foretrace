@@ -7,6 +7,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { TerminalIngestBatchInput } from '@foretrace/shared';
 import type { Request } from 'express';
 
@@ -17,6 +18,7 @@ import { CliIngestAuthGuard } from './cli-ingest-auth.guard';
 import type { CliTokenContext } from './terminal-ingest.service';
 import { TerminalIngestService } from './terminal-ingest.service';
 
+@SkipThrottle()
 @Controller('organizations/:organizationId/projects/:projectId/terminal')
 export class TerminalBatchesController {
   constructor(private readonly ingest: TerminalIngestService) {}

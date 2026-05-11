@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -7,6 +8,8 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 
+import { AuditService } from '../audit/audit.service';
+import { encryptForStorage, isSecretConfigured } from '../crypto/app-secret-crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { normalizeRepositoryFullName } from './github-webhook-verify';
@@ -18,6 +21,7 @@ export class GithubConnectionService {
     private readonly prisma: PrismaService,
     private readonly projectsService: ProjectsService,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   private publicApiBaseUrl(): string {
@@ -41,6 +45,7 @@ export class GithubConnectionService {
       select: {
         id: true,
         repositoryFullName: true,
+        githubPatCiphertext: true,
         lastEventAt: true,
         lastPushAt: true,
         openPullRequestCount: true,
@@ -49,7 +54,14 @@ export class GithubConnectionService {
         updatedAt: true,
       },
     });
-    return row;
+    if (!row) {
+      return null;
+    }
+    const { githubPatCiphertext: _pat, ...rest } = row;
+    return {
+      ...rest,
+      hasGithubRestPat: Boolean(_pat),
+    };
   }
 
   async getWithRecentEvents(projectId: string, organizationId: string) {
@@ -72,7 +84,12 @@ export class GithubConnectionService {
     return { ...base, recentEvents };
   }
 
-  async create(projectId: string, organizationId: string, dto: CreateGitHubConnectionDto) {
+  async create(
+    projectId: string,
+    organizationId: string,
+    dto: CreateGitHubConnectionDto,
+    actorUserId: string,
+  ) {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
 
     const existing = await this.prisma.gitHubConnection.findUnique({
@@ -108,6 +125,15 @@ export class GithubConnectionService {
       },
     });
 
+    await this.audit.log({
+      organizationId,
+      actorUserId,
+      action: 'GITHUB_CONNECTED',
+      resourceType: 'github_connection',
+      resourceId: row.id,
+      metadata: { projectId, repositoryFullName },
+    });
+
     return {
       ...row,
       webhookSecret,
@@ -117,7 +143,11 @@ export class GithubConnectionService {
     };
   }
 
-  async delete(projectId: string, organizationId: string): Promise<void> {
+  async delete(
+    projectId: string,
+    organizationId: string,
+    actorUserId: string,
+  ): Promise<void> {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
     const row = await this.prisma.gitHubConnection.findUnique({
       where: { projectId },
@@ -127,6 +157,78 @@ export class GithubConnectionService {
       throw new NotFoundException('No GitHub connection for this project');
     }
     await this.prisma.gitHubConnection.delete({ where: { id: row.id } });
+    await this.audit.log({
+      organizationId,
+      actorUserId,
+      action: 'GITHUB_DISCONNECTED',
+      resourceType: 'project',
+      resourceId: projectId,
+      metadata: { connectionId: row.id },
+    });
+  }
+
+  async setGithubPat(
+    projectId: string,
+    organizationId: string,
+    pat: string,
+    actorUserId: string,
+  ) {
+    if (!isSecretConfigured()) {
+      throw new BadRequestException(
+        'Set FORETRACE_APP_SECRET (min 16 characters) on the API server before storing a GitHub PAT.',
+      );
+    }
+    const enc = encryptForStorage(pat.trim());
+    if (!enc) {
+      throw new BadRequestException('Could not encrypt PAT; check server configuration.');
+    }
+    const conn = await this.prisma.gitHubConnection.findFirst({
+      where: { projectId, project: { organizationId } },
+      select: { id: true },
+    });
+    if (!conn) {
+      throw new NotFoundException('No GitHub connection for this project');
+    }
+    await this.prisma.gitHubConnection.update({
+      where: { id: conn.id },
+      data: { githubPatCiphertext: enc },
+    });
+    await this.audit.log({
+      organizationId,
+      actorUserId,
+      action: 'GITHUB_PAT_SET',
+      resourceType: 'github_connection',
+      resourceId: conn.id,
+      metadata: { projectId },
+    });
+    return { ok: true as const };
+  }
+
+  async clearGithubPat(
+    projectId: string,
+    organizationId: string,
+    actorUserId: string,
+  ) {
+    const conn = await this.prisma.gitHubConnection.findFirst({
+      where: { projectId, project: { organizationId } },
+      select: { id: true },
+    });
+    if (!conn) {
+      throw new NotFoundException('No GitHub connection for this project');
+    }
+    await this.prisma.gitHubConnection.update({
+      where: { id: conn.id },
+      data: { githubPatCiphertext: null },
+    });
+    await this.audit.log({
+      organizationId,
+      actorUserId,
+      action: 'GITHUB_PAT_CLEARED',
+      resourceType: 'github_connection',
+      resourceId: conn.id,
+      metadata: { projectId },
+    });
+    return { ok: true as const };
   }
 
   async listUserLinks(projectId: string, organizationId: string) {
