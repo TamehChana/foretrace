@@ -232,9 +232,10 @@ export function DocumentationPage() {
               how your team set that up). Click it or follow their link so that organization becomes active.
             </li>
             <li>
-              When an organization is active, the browser address bar often shows <Code>?org=</Code> followed by a long <strong>random id</strong> (letters,
-              numbers, dashes). That id is your <strong className="text-zinc-800 dark:text-zinc-200">organization id</strong>. You can copy it from the address
-              bar when someone asks for <Code>FORETRACE_ORGANIZATION_ID</Code> for the CLI.
+              Your <strong className="text-zinc-800 dark:text-zinc-200">organization id</strong> is a long random value (letters, numbers, dashes). On the{' '}
+              <strong>Overview</strong>, the <strong>Organizations</strong> card lists each workspace name with its ID and a <strong>Copy ID</strong> button.
+              On <strong>Projects</strong> and <strong>Settings</strong>, an <strong>Organization ID</strong> box appears under the organization picker with the
+              same copy action. The address bar may also show <Code>?org=</Code> followed by the same id.
             </li>
           </ol>
           <p>

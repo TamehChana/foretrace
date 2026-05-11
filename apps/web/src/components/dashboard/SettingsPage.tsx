@@ -10,6 +10,7 @@ import { formatApiErrorResponse } from '../../api-error-message';
 import { apiFetch } from '../../api-fetch';
 import { useOrganizations } from '../../hooks/use-organizations';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
+import { OrganizationIdCopyRow } from '../ui/OrganizationIdCopyRow';
 import { PageHeader } from '../ui/PageHeader';
 import { Skeleton } from '../ui/Skeleton';
 
@@ -176,6 +177,8 @@ export function SettingsPage() {
               </select>
             </label>
           ) : null}
+
+          <OrganizationIdCopyRow organizationId={organizationId} className="max-w-md" />
 
           <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
             <ScrollText size={18} aria-hidden />
