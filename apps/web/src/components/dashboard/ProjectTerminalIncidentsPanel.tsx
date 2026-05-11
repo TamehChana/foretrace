@@ -86,12 +86,12 @@ export function ProjectTerminalIncidentsPanel(props: {
         <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">
           {state.message}
         </p>
-      ) : state.items.length === 0 ? (
+      ) : state.status === 'ok' && state.items.length === 0 ? (
         <p className="mt-3 text-[13px] text-zinc-500">
           No incidents yet. Ingest terminal output with the CLI to populate this
           list.
         </p>
-      ) : (
+      ) : state.status === 'ok' ? (
         <div className="mt-3 max-h-72 overflow-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
           <table className="w-full min-w-[520px] text-left text-[11px]">
             <thead className="sticky top-0 bg-zinc-100/95 dark:bg-zinc-900/95">
@@ -104,7 +104,7 @@ export function ProjectTerminalIncidentsPanel(props: {
               </tr>
             </thead>
             <tbody>
-              {state.items.map((row) => (
+              {state.items.map((row: IncidentRow) => (
                 <tr
                   key={row.id}
                   className="border-t border-zinc-100 odd:bg-white/70 dark:border-zinc-800 odd:dark:bg-zinc-950/40"
@@ -134,7 +134,7 @@ export function ProjectTerminalIncidentsPanel(props: {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -113,7 +113,7 @@ export function ProjectSignalsPanel(props: {
             Signals (24h rollup)
           </h3>
           <p className="mt-1 text-[11px] text-zinc-500">
-            First slice of SRS §7 — GitHub deliveries, terminal batches/incidents,
+            First slice of SRS section 7 — GitHub deliveries, terminal batches/incidents,
             and task pressure. The API also recomputes after webhooks and CLI ingest
             (at most about once per minute per project). PM/admin can force refresh.
           </p>
@@ -139,14 +139,14 @@ export function ProjectSignalsPanel(props: {
         <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">
           {state.message}
         </p>
-      ) : state.snapshot === null ? (
+      ) : state.status === 'ok' && state.snapshot === null ? (
         <p className="mt-3 text-[13px] text-zinc-500">
           No snapshot yet.
           {canManage
             ? ' Click Refresh to compute the first rollup.'
             : ' Ask a PM or admin to refresh signals.'}
         </p>
-      ) : (
+      ) : state.status === 'ok' && state.snapshot !== null ? (
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[12px] sm:grid-cols-3">
           <div className="rounded-lg bg-zinc-50 px-2 py-1.5 dark:bg-zinc-900/80">
             <dt className="text-zinc-500">GitHub events (24h)</dt>
@@ -241,7 +241,7 @@ export function ProjectSignalsPanel(props: {
             </dd>
           </div>
         </dl>
-      )}
+      ) : null}
     </div>
   );
 }

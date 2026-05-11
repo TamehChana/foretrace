@@ -14,7 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { formatApiErrorResponse } from '../../api-error-message';
+import { readApiErrorMessage } from '../../api-error-message';
 import { apiFetch } from '../../api-fetch';
 import { useOrganizations } from '../../hooks/use-organizations';
 import { useOrgMemberRole } from '../../hooks/use-org-member-role';
@@ -143,7 +143,7 @@ export function ProjectsPage() {
         },
       );
       if (!res.ok) {
-        showToast(await formatApiErrorResponse(res), 'error');
+        showToast(await readApiErrorMessage(res), 'error');
         return;
       }
       setNewProjectName('');
@@ -178,7 +178,7 @@ export function ProjectsPage() {
         },
       );
       if (!res.ok) {
-        showToast(await formatApiErrorResponse(res), 'error');
+        showToast(await readApiErrorMessage(res), 'error');
         return;
       }
       setInviteEmail('');
@@ -208,7 +208,7 @@ export function ProjectsPage() {
         },
       );
       if (!res.ok) {
-        showToast(await formatApiErrorResponse(res), 'error');
+        showToast(await readApiErrorMessage(res), 'error');
         return;
       }
       if (expandedProjectId === projectId) {
@@ -243,7 +243,7 @@ export function ProjectsPage() {
         },
       );
       if (!res.ok) {
-        showToast(await formatApiErrorResponse(res), 'error');
+        showToast(await readApiErrorMessage(res), 'error');
         return;
       }
       setTaskTitleByProject((prev) => ({ ...prev, [projectId]: '' }));
@@ -269,7 +269,7 @@ export function ProjectsPage() {
         { method: 'DELETE' },
       );
       if (!res.ok) {
-        showToast(await formatApiErrorResponse(res), 'error');
+        showToast(await readApiErrorMessage(res), 'error');
         return;
       }
       bumpData();

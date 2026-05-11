@@ -102,9 +102,9 @@ function EvaluationHistorySection(props: {
         <p className="mt-2 text-[12px] text-rose-600 dark:text-rose-400">
           {historyState.message}
         </p>
-      ) : historyState.rows.length === 0 ? (
+      ) : historyState.status === 'ok' && historyState.rows.length === 0 ? (
         <p className="mt-2 text-[12px] text-zinc-500">No runs recorded yet.</p>
-      ) : (
+      ) : historyState.status === 'ok' ? (
         <div className="mt-2 max-h-56 overflow-auto rounded-lg border border-zinc-100 dark:border-zinc-800">
           <table className="w-full min-w-[320px] text-left text-[11px]">
             <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-900/95">
@@ -117,7 +117,7 @@ function EvaluationHistorySection(props: {
               </tr>
             </thead>
             <tbody>
-              {historyState.rows.map((h) => {
+              {historyState.rows.map((h: RiskHistoryRow) => {
                 const first = parseReasons(h.reasons)[0];
                 const insight =
                   typeof h.aiSummary === 'string' && h.aiSummary.trim().length > 0
@@ -164,7 +164,7 @@ function EvaluationHistorySection(props: {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -313,7 +313,7 @@ export function ProjectRiskPanel(props: {
         <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">
           {state.message}
         </p>
-      ) : state.row === null ? (
+      ) : state.status === 'ok' && state.row === null ? (
         <div className="mt-3 space-y-3">
           <p className="text-[13px] text-zinc-500">
             No evaluation yet.
@@ -323,7 +323,7 @@ export function ProjectRiskPanel(props: {
           </p>
           <EvaluationHistorySection historyState={historyState} />
         </div>
-      ) : (
+      ) : state.status === 'ok' && state.row !== null ? (
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <span
@@ -367,7 +367,7 @@ export function ProjectRiskPanel(props: {
 
           <EvaluationHistorySection historyState={historyState} />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

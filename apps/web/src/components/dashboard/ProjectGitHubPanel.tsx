@@ -5,7 +5,7 @@ import {
   type ReactNode,
 } from 'react';
 import { ClipboardCopy, Link2, Link2Off, Plus, UserPlus } from 'lucide-react';
-import { formatApiErrorResponse } from '../../api-error-message';
+import { readApiErrorMessage } from '../../api-error-message';
 import { apiFetch } from '../../api-fetch';
 import {
   type GithubRecentEventRow,
@@ -140,7 +140,7 @@ export function ProjectGitHubPanel(props: {
         },
       );
       if (!res.ok) {
-        showToast(await formatApiErrorResponse(res), 'error');
+        showToast(await readApiErrorMessage(res), 'error');
         return;
       }
       const payload = (await res.json()) as {
@@ -182,7 +182,7 @@ export function ProjectGitHubPanel(props: {
         { method: 'DELETE' },
       );
       if (!res.ok) {
-        showToast(await formatApiErrorResponse(res), 'error');
+        showToast(await readApiErrorMessage(res), 'error');
         return;
       }
       setRevealed(null);
@@ -216,7 +216,7 @@ export function ProjectGitHubPanel(props: {
         },
       );
       if (!res.ok) {
-        showToast(await formatApiErrorResponse(res), 'error');
+        showToast(await readApiErrorMessage(res), 'error');
         return;
       }
       setLinkLogin('');
@@ -247,7 +247,7 @@ export function ProjectGitHubPanel(props: {
         { method: 'DELETE' },
       );
       if (!res.ok) {
-        showToast(await formatApiErrorResponse(res), 'error');
+        showToast(await readApiErrorMessage(res), 'error');
         return;
       }
       onRefresh();
@@ -409,7 +409,7 @@ export function ProjectGitHubPanel(props: {
                           },
                         );
                         if (!res.ok) {
-                          showToast(await formatApiErrorResponse(res), 'error');
+                          showToast(await readApiErrorMessage(res), 'error');
                           return;
                         }
                         setGithubPatInput('');
@@ -447,7 +447,7 @@ export function ProjectGitHubPanel(props: {
                           { method: 'DELETE' },
                         );
                         if (!res.ok) {
-                          showToast(await formatApiErrorResponse(res), 'error');
+                          showToast(await readApiErrorMessage(res), 'error');
                           return;
                         }
                         onRefresh();

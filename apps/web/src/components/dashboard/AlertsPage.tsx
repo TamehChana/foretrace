@@ -153,12 +153,15 @@ export function AlertsPage() {
         <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400">
           Sign in to see organization alerts.
         </p>
-      ) : organizations.status === 'loading' ||
-        organizations.status === 'idle' ? (
+      ) : organizations.status === 'loading' ? (
         <Skeleton className="mt-6 h-40 w-full max-w-2xl" />
       ) : organizations.status === 'error' ? (
         <p className="mt-6 text-sm text-rose-600 dark:text-rose-400">
           {organizations.message}
+        </p>
+      ) : organizations.status === 'signed_out' ? (
+        <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400">
+          Could not load your workspaces. Try signing in again.
         </p>
       ) : organizations.items.length === 0 ? (
         <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400">
@@ -186,7 +189,7 @@ export function AlertsPage() {
             <p className="text-sm text-rose-600 dark:text-rose-400">
               {state.message}
             </p>
-          ) : state.items.length === 0 ? (
+          ) : state.status === 'ok' && state.items.length === 0 ? (
             <div className="animate-rise rounded-2xl border border-dashed border-zinc-300/90 bg-white/80 p-10 text-center shadow-sm dark:border-zinc-700/90 dark:bg-zinc-900/40">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-500/12 text-accent-800 ring-1 ring-accent-400/25 dark:text-accent-200 dark:ring-accent-500/30">
                 <Bell size={28} strokeWidth={1.75} aria-hidden />
@@ -199,7 +202,7 @@ export function AlertsPage() {
                 elevated; matching events create rows here.
               </p>
             </div>
-          ) : (
+          ) : state.status === 'ok' ? (
             <ul className="max-w-3xl divide-y divide-zinc-100 rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-700 dark:bg-zinc-950/50">
               {state.items.map((row) => (
                 <li
@@ -239,7 +242,7 @@ export function AlertsPage() {
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
         </div>
       )}
     </main>

@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { RiskLevel, type Prisma } from '@prisma/client';
+import { RiskLevel } from '@prisma/client';
 
 import { AlertsService } from '../alerts/alerts.service';
 import { RiskInsightService } from '../ai/risk-insight.service';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
-import type { GithubRestEnrichment, ProjectSignalPayload } from './project-signals.service';
+import type {
+  GithubRestEnrichment,
+  ProjectSignalPayload,
+} from './project-signals.service';
 import { ProjectSignalsService } from './project-signals.service';
 import { ProjectsService } from './projects.service';
 import type { RiskReasonRow } from './risk-reason.types';
@@ -62,7 +65,10 @@ export class ProjectRiskService {
     actorUserId: string,
   ) {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
-    const snapshot = await this.signals.refreshSnapshot(projectId, organizationId);
+    const snapshot = await this.signals.refreshSnapshot(
+      projectId,
+      organizationId,
+    );
     const payload = snapshot.payload as unknown as ProjectSignalPayload;
     const { level, score, reasons } = this.computeRisk(payload);
 
@@ -89,7 +95,7 @@ export class ProjectRiskService {
         projectId,
         level,
         score,
-        reasons: reasons as unknown as Prisma.InputJsonValue,
+        reasons,
         aiSummary,
       },
       select: {
@@ -109,13 +115,13 @@ export class ProjectRiskService {
         projectId,
         level,
         score,
-        reasons: reasons as unknown as Prisma.InputJsonValue,
+        reasons,
         aiSummary,
       },
       update: {
         level,
         score,
-        reasons: reasons as unknown as Prisma.InputJsonValue,
+        reasons,
         aiSummary,
         evaluatedAt: new Date(),
       },

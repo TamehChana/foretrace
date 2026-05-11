@@ -130,12 +130,15 @@ export function SettingsPage() {
         <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400">
           Sign in to load workspace settings.
         </p>
-      ) : organizations.status === 'loading' ||
-        organizations.status === 'idle' ? (
+      ) : organizations.status === 'loading' ? (
         <Skeleton className="mt-6 h-40 w-full max-w-3xl" />
       ) : organizations.status === 'error' ? (
         <p className="mt-6 text-sm text-rose-600 dark:text-rose-400">
           {organizations.message}
+        </p>
+      ) : organizations.status === 'signed_out' ? (
+        <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400">
+          Could not load your workspaces. Try signing in again.
         </p>
       ) : organizations.items.length === 0 ? (
         <div className="animate-rise mt-6 rounded-2xl border border-dashed border-zinc-300/90 bg-white/80 p-10 text-center shadow-sm dark:border-zinc-700/90 dark:bg-zinc-900/40">
@@ -187,11 +190,11 @@ export function SettingsPage() {
             <p className="text-sm text-rose-600 dark:text-rose-400">
               {state.message}
             </p>
-          ) : state.items.length === 0 ? (
+          ) : state.status === 'ok' && state.items.length === 0 ? (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               No audit entries yet for this organization.
             </p>
-          ) : (
+          ) : state.status === 'ok' ? (
             <ul className="max-w-3xl divide-y divide-zinc-100 rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-700 dark:bg-zinc-950/50">
               {state.items.map((row) => (
                 <li key={row.id} className="px-4 py-3 text-[13px]">
@@ -219,7 +222,7 @@ export function SettingsPage() {
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
         </div>
       )}
     </main>

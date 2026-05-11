@@ -307,14 +307,14 @@ export function ProjectCliTokensPanel(props: {
         <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">
           {state.message}
         </p>
-      ) : state.items.length === 0 ? (
+      ) : state.status === 'ok' && state.items.length === 0 ? (
         <p className="mt-3 text-[13px] text-zinc-500">
           No tokens yet.
           {canMint ? ' Mint one to use the CLI with this project.' : null}
         </p>
-      ) : (
+      ) : state.status === 'ok' ? (
         <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
-          {state.items.map((row) => (
+          {state.items.map((row: CliTokenRow) => (
             <li
               key={row.id}
               className="flex flex-wrap items-center justify-between gap-2 py-2 text-[12px]"
@@ -353,7 +353,7 @@ export function ProjectCliTokensPanel(props: {
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </div>
   );
 }
