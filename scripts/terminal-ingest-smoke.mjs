@@ -115,6 +115,8 @@ async function main() {
 
   let cookie = process.env.FORETRACE_COOKIE?.trim() || '';
 
+  let bearer = '';
+
   if (!cookie) {
     const email = requireEnv('FORETRACE_EMAIL');
     const password = requireEnv('FORETRACE_PASSWORD');
@@ -125,27 +127,35 @@ async function main() {
       body: JSON.stringify({ email, password }),
     });
     cookie = cookieHeaderFromResponse(loginRes);
+    const loginBody = await readJson(loginRes);
     if (!loginRes.ok) {
-      const { text } = await readJson(loginRes);
-      console.error(`Login failed (${loginRes.status}): ${text}`);
+      console.error(`Login failed (${loginRes.status}): ${loginBody.text}`);
       process.exit(1);
     }
-    if (!cookie) {
+    if (typeof loginBody.data?.accessToken === 'string' && loginBody.data.accessToken.length > 0) {
+      bearer = loginBody.data.accessToken;
+    }
+    if (!cookie && !bearer) {
       console.error(
-        'Login succeeded but no Set-Cookie received. For cross-origin APIs, set FORETRACE_COOKIE manually.',
+        'Login succeeded but no Set-Cookie and no accessToken. Set FORETRACE_COOKIE or use a reachable API.',
       );
       process.exit(1);
     }
+  }
+
+  const mintHeaders = { 'Content-Type': 'application/json' };
+  if (cookie) {
+    mintHeaders.Cookie = cookie;
+  }
+  if (bearer) {
+    mintHeaders.Authorization = `Bearer ${bearer}`;
   }
 
   const mintRes = await fetch(
     `${base}/organizations/${encodeURIComponent(orgId)}/projects/${encodeURIComponent(projectId)}/cli-tokens`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Cookie: cookie,
-      },
+      headers: mintHeaders,
       body: JSON.stringify({ name: 'smoke-script' }),
     },
   );

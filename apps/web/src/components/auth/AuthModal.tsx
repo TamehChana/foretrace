@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useState } from 'react';
 
 import { apiFetch } from '../../api-fetch';
+import { setAccessToken } from '../../auth-token';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 
 type Mode = 'signin' | 'register';
@@ -13,6 +14,7 @@ type SessionEnvelope = {
     email: string;
     displayName: string | null;
   };
+  accessToken?: string;
 };
 
 export function AuthModal() {
@@ -80,6 +82,10 @@ export function AuthModal() {
         setError('Unexpected response from server.');
         setPending(false);
         return;
+      }
+
+      if (typeof user.accessToken === 'string' && user.accessToken.length > 0) {
+        setAccessToken(user.accessToken);
       }
 
       await refresh();

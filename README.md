@@ -197,7 +197,7 @@ Local dev stays unchanged: use **`apps/web/.env`** with **`VITE_API_URL`** point
 | Symptom | Check |
 |--------|--------|
 | `No 'Access-Control-Allow-Origin'` from **`…vercel.app`** to **`…onrender.com`** | **`CORS_ORIGINS`** on **Render** must list the **exact** SPA origin (HTTPS, no trailing slash). |
-| **`401 Unauthorized`** on **`…/github`** (or other session routes) while the UI looks signed in | The API did not receive a valid **`foretrace.sid`** cookie. **Re-register/login** from the SPA tab after any **`SESSION_SECRET`** change. On **Render**, set **`CORS_ORIGINS`** to this app’s origin (same as CORS errors). In the browser, allow **third-party / cross-site cookies** for the API host (strict tracking protection blocks them). Prefer **same registrable domain** for web + API (e.g. `app.example.com` + `api.example.com`) so the session is first-party. The API sets **`SameSite=None; Secure`** and (by default) **`Partitioned`** on the session cookie in production to help Chrome. |
+| **`401 Unauthorized`** on **`…/github`**, **`…/tasks`**, etc., while the UI looks signed in | Usually the **`foretrace.sid`** cookie is not sent to another host (Vercel → Render). **Sign out and sign in again** after upgrading the API: login/register responses include an **`accessToken`** the SPA stores in **`sessionStorage`** and sends as **`Authorization: Bearer`**, so API calls work without third-party cookies. Still set **`CORS_ORIGINS`** on Render to your SPA origin. If **`SESSION_SECRET`** changed, old cookies and tokens are invalid. |
 | Requests still hit the wrong host | **`VITE_API_URL`** on the **Vercel** frontend project must be the **Render** API URL; **redeploy** after changing (value is baked in at build time). |
 
 ## Next implementation steps

@@ -52,7 +52,7 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const userId = request.user?.id;
 
-    if (request.isAuthenticated?.() !== true || !userId) {
+    if (!userId) {
       throw new UnauthorizedException('Sign in required');
     }
 

@@ -20,16 +20,16 @@ function asError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
 }
 
+type AuthSuccessBody = { user: Express.User; accessToken: string };
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Get('me')
-  me(@Req() req: Request): { user: Express.User | null } {
-    if (req.isAuthenticated?.() !== true || !req.user) {
-      return { user: null };
-    }
-    return { user: req.user };
+  async me(@Req() req: Request): Promise<{ user: Express.User | null }> {
+    const user = await this.authService.resolveAuthenticatedUser(req);
+    return { user };
   }
 
   @Post('register')
@@ -58,7 +58,7 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Req() req: Request,
-  ): Promise<{ user: Express.User }> {
+  ): Promise<AuthSuccessBody> {
     const user = await this.authService.validateCredentials(
       dto.email,
       dto.password,
@@ -72,7 +72,7 @@ export class AuthController {
         resolve();
       });
     });
-    return { user };
+    return { user, accessToken: this.authService.issueAccessToken(user.id) };
   }
 
   @Post('logout')

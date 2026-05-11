@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import { apiFetch } from '../api-fetch';
+import { clearAccessToken } from '../auth-token';
 
 export type SessionUser = {
   id: string;
@@ -85,6 +86,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     } catch {
       // still refresh local state even if logout failed (e.g. offline)
     }
+    clearAccessToken();
     await refresh();
   }, [refresh]);
 
