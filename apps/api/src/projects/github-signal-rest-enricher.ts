@@ -59,23 +59,43 @@ export class GithubSignalRestEnricher {
         open_issues_count?: number;
       };
       const defaultBranch = repoJson.default_branch ?? null;
-      const openIssuesFromApi =
+      const openIssuesFromRepo =
         typeof repoJson.open_issues_count === 'number'
           ? repoJson.open_issues_count
           : null;
 
       let openPullRequestsFromApi: number | null = null;
-      const searchRes = await fetch(
+      const prSearchRes = await fetch(
         `${GITHUB_API}/search/issues?q=${encodeURIComponent(
           `repo:${owner}/${repo} is:pr is:open`,
         )}&per_page=1`,
         { headers },
       );
-      if (searchRes.ok) {
-        const searchJson = (await searchRes.json()) as { total_count?: number };
+      if (prSearchRes.ok) {
+        const searchJson = (await prSearchRes.json()) as { total_count?: number };
         if (typeof searchJson.total_count === 'number') {
           openPullRequestsFromApi = searchJson.total_count;
         }
+      }
+
+      /** Open issues only (PRs excluded), for rollup parity with webhook-driven issue counts. */
+      let openIssuesFromApi: number | null = null;
+      const issueSearchRes = await fetch(
+        `${GITHUB_API}/search/issues?q=${encodeURIComponent(
+          `repo:${owner}/${repo} is:issue is:open`,
+        )}&per_page=1`,
+        { headers },
+      );
+      if (issueSearchRes.ok) {
+        const issueSearchJson = (await issueSearchRes.json()) as {
+          total_count?: number;
+        };
+        if (typeof issueSearchJson.total_count === 'number') {
+          openIssuesFromApi = issueSearchJson.total_count;
+        }
+      }
+      if (openIssuesFromApi === null) {
+        openIssuesFromApi = openIssuesFromRepo;
       }
 
       let defaultBranchHeadSha: string | null = null;

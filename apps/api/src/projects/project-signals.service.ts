@@ -166,12 +166,18 @@ export class ProjectSignalsService {
         );
       }
 
+      /** Prefer live GitHub REST counts when PAT is configured (webhook counters start at 0). */
+      const openPullRequests =
+        rest?.openPullRequestsFromApi ?? connection?.openPullRequestCount ?? null;
+      const openIssues =
+        rest?.openIssuesFromApi ?? connection?.openIssueCount ?? null;
+
       const payload: ProjectSignalPayload = {
         windowHours,
         github: {
           webhookEventsInWindow,
-          openPullRequests: connection?.openPullRequestCount ?? null,
-          openIssues: connection?.openIssueCount ?? null,
+          openPullRequests,
+          openIssues,
           lastEventAt: connection?.lastEventAt?.toISOString() ?? null,
           rest,
         },

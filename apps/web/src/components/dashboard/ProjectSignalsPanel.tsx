@@ -248,9 +248,11 @@ export function ProjectSignalsPanel(props: {
           <span className="font-mono">{state.snapshot.payload.windowHours}h</span>.{' '}
           <strong className="font-medium text-zinc-800 dark:text-zinc-200">GitHub events</strong> need successful
           webhook deliveries that create rows (see the GitHub panel’s recent events).{' '}
-          <strong className="font-medium text-zinc-800 dark:text-zinc-200">Open PRs/issues</strong> come from
-          connection counters updated by <span className="font-mono">pull_request</span> /{' '}
-          <span className="font-mono">issues</span> webhooks, not from the Actions feed alone.{' '}
+          <strong className="font-medium text-zinc-800 dark:text-zinc-200">Open PRs/issues</strong> use live GitHub
+          counts when a <strong className="font-medium text-zinc-800 dark:text-zinc-200">PAT is saved</strong> on the
+          connection (GitHub panel); otherwise they follow counters from{' '}
+          <span className="font-mono">pull_request</span> / <span className="font-mono">issues</span> webhooks (not
+          Actions alone).{' '}
           <strong className="font-medium text-zinc-800 dark:text-zinc-200">Terminal</strong> counts need the CLI
           posting batches. <strong className="font-medium text-zinc-800 dark:text-zinc-200">Tasks</strong> exclude{' '}
           <span className="font-mono">DONE</span> / <span className="font-mono">CANCELLED</span>; overdue / due-in-7d
