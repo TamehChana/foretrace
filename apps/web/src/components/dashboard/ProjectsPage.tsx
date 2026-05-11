@@ -433,16 +433,26 @@ export function ProjectsPage() {
                 New project
               </h2>
               <form
+                autoComplete="off"
                 onSubmit={onCreateProject}
                 className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
               >
-                <label className="block flex-1 text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                  Name
+                <label
+                  htmlFor="new-project-name"
+                  className="block flex-1 text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                >
+                  Project name
                   <input
+                    id="new-project-name"
+                    name="foretrace-project-name"
                     type="text"
                     required
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
+                    data-bwignore
                     className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                     maxLength={180}
                   />
@@ -602,6 +612,7 @@ export function ProjectsPage() {
                             )}
                           </div>
                           <form
+                            autoComplete="off"
                             className="mt-4 flex gap-2"
                             onSubmit={(e) => {
                               e.preventDefault();
@@ -609,6 +620,7 @@ export function ProjectsPage() {
                             }}
                           >
                             <input
+                              name={`foretrace-task-title-${p.id}`}
                               type="text"
                               placeholder="New task title"
                               value={taskTitleByProject[p.id] ?? ''}
@@ -618,6 +630,10 @@ export function ProjectsPage() {
                                   [p.id]: e.target.value,
                                 }))
                               }
+                              autoComplete="off"
+                              data-1p-ignore
+                              data-lpignore="true"
+                              data-bwignore
                               className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                               maxLength={300}
                             />
