@@ -5,6 +5,9 @@ import { MOBILE_NAV_OPEN_BUTTON_ID, useLayoutShell } from './layout-context';
 import { ThemeToggle } from './ThemeToggle';
 
 function breadcrumbForPath(pathname: string): { section: string; page: string } {
+  if (pathname === '/docs') {
+    return { section: 'Help', page: 'User guide' };
+  }
   if (pathname === '/projects') {
     return { section: 'Projects', page: 'Directory' };
   }

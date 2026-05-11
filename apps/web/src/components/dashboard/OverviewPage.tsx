@@ -1,4 +1,5 @@
-import { Activity, Cpu, Layers } from 'lucide-react';
+import { Activity, BookOpen, Cpu, Layers } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { ApiHealthState } from '../../hooks/use-api-health';
 import type { OrganizationsState } from '../../hooks/use-organizations';
 import { PageHeader } from '../ui/PageHeader';
@@ -38,13 +39,22 @@ export function OverviewPage({
           </>
         }
         meta={
-          <div className="text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-              Today
-            </p>
-            <p className="mt-1 text-sm font-medium text-zinc-800 dark:text-zinc-100">
-              {formatToday()}
-            </p>
+          <div className="flex flex-col items-end gap-3 text-right">
+            <Link
+              to="/docs"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200/90 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 shadow-sm transition-[box-shadow,transform] hover:border-accent-300/60 hover:shadow-md active:scale-[0.99] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-accent-600/40"
+            >
+              <BookOpen size={14} strokeWidth={2.5} aria-hidden />
+              User guide
+            </Link>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                Today
+              </p>
+              <p className="mt-1 text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                {formatToday()}
+              </p>
+            </div>
           </div>
         }
       />

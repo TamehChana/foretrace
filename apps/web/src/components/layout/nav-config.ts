@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Bell, FolderKanban, LayoutDashboard, Settings2 } from 'lucide-react';
+import { Bell, BookOpen, FolderKanban, LayoutDashboard, Settings2 } from 'lucide-react';
 
 export type NavItemConfig =
   | { id: string; label: string; href: string; icon: LucideIcon; disabled?: false }
@@ -7,6 +7,7 @@ export type NavItemConfig =
 
 export const primaryNav: NavItemConfig[] = [
   { id: 'overview', label: 'Overview', href: '/', icon: LayoutDashboard },
+  { id: 'docs', label: 'User guide', href: '/docs', icon: BookOpen },
   { id: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban },
   { id: 'alerts', label: 'Alerts', href: '/alerts', icon: Bell },
 ];
