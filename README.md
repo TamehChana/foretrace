@@ -168,7 +168,7 @@ Requires DB migrations applied (`CliIngestToken`, `TerminalIngestBatch`, `Termin
 
 - **`foretrace run -- <command>`** — runs the command, **streams** stdout/stderr to your terminal, then **POSTs** captured lines (default: only when the command exits **non-zero**; set **`FORETRACE_INGEST_ON=always`** to always send when there is output). Same `FORETRACE_*` env vars as `ingest`.
 - **One-time shell snippet** — `foretrace hook print-zsh` or `foretrace hook print-bash` prints a small **`ftx`** wrapper you paste into `~/.zshrc` / `~/.bashrc`; then use **`ftx npm run build`** instead of typing the full pipe. (Optional global `alias npm=…` is **not** recommended; use `ftx` or `package.json` scripts.)
-- **Fully automatic CI logs** — copy [`.github/workflows/foretrace-ci-ingest.example.yml`](.github/workflows/foretrace-ci-ingest.example.yml) into an active workflow, add the listed **GitHub Actions secrets**, and adjust the build step; every push can upload **`tee`**’d logs to Foretrace **without** anyone running the CLI on a laptop.
+- **Fully automatic CI logs** — workflow [`.github/workflows/foretrace-ci-ingest.example.yml`](.github/workflows/foretrace-ci-ingest.example.yml) runs on **main/master** pushes: **`npm ci`**, **`npm run build -w @foretrace/web`** (log via **`tee`**), then optional **`POST …/terminal/batches`**. If the four **`FORETRACE_*`** repository secrets are **not** set, the upload step is **skipped** (green CI); when they are set, a failed ingest fails the job so you notice misconfiguration.
 
 **Smoke script (login → mint token → ingest one batch):** set `FORETRACE_API_URL`, `FORETRACE_EMAIL`, `FORETRACE_PASSWORD`, `FORETRACE_ORGANIZATION_ID`, `FORETRACE_PROJECT_ID` in `.env` (repo root), then:
 
