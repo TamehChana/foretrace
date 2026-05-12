@@ -70,9 +70,9 @@ export class MembershipsService {
     actorUserId: string,
   ): Promise<{ userId: string; role: Role }> {
     const actorRole = await this.assertMember(actorUserId, organizationId);
-    if (actorRole !== Role.ADMIN) {
+    if (actorRole !== Role.ADMIN && actorRole !== Role.PM) {
       throw new BadRequestException(
-        'Only organization administrators can add members.',
+        'Only organization administrators and PMs can add members.',
       );
     }
 

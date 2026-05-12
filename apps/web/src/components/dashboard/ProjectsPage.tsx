@@ -126,7 +126,7 @@ export function ProjectsPage() {
   const canManageProjects = role === 'ADMIN' || role === 'PM';
   const canAssignTasks =
     role === 'ADMIN' || role === 'PM' || role === 'DEVELOPER';
-  const canInvite = role === 'ADMIN';
+  const canInvite = role === 'ADMIN' || role === 'PM';
   const currentUserId =
     snapshot.status === 'ready' && snapshot.user?.id
       ? snapshot.user.id
@@ -445,7 +445,8 @@ export function ProjectsPage() {
                 Add member
               </h2>
               <p className="mt-1 text-[13px] text-zinc-600 dark:text-zinc-400">
-                User must already have an account. Assign PM or developer.
+                The person must already have signed up with this exact email
+                address. You can make them a PM or a developer (not admin).
               </p>
               <form
                 onSubmit={onInvite}

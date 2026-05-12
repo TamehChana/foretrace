@@ -15,6 +15,7 @@ import type { Request } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthenticatedGuard } from '../auth/guards/authenticated.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { BodyDtoPipe } from '../common/pipes/body-dto.pipe';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { OrganizationUuidParamGuard } from './organization-uuid-param.guard';
 import { MembershipsService } from './memberships.service';
@@ -63,10 +64,10 @@ export class OrganizationMembersController {
   @Post('members')
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(OrganizationUuidParamGuard, AuthenticatedGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.PM)
   async inviteMember(
     @Param('organizationId') organizationId: string,
-    @Body() dto: InviteMemberDto,
+    @Body(new BodyDtoPipe(InviteMemberDto)) dto: InviteMemberDto,
     @Req() req: Request,
   ): Promise<{
     data: Awaited<ReturnType<MembershipsService['inviteByEmail']>>;

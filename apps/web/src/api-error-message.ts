@@ -7,6 +7,31 @@ function messageFromParsedBody(body: unknown, httpStatus: number): string {
     if (Array.isArray(m) && m.every((x) => typeof x === 'string')) {
       return m.join(' ');
     }
+    if (Array.isArray(m)) {
+      const parts = m
+        .map((item) => {
+          if (typeof item === 'string') {
+            return item;
+          }
+          if (
+            item &&
+            typeof item === 'object' &&
+            'constraints' in item &&
+            (item as { constraints: unknown }).constraints &&
+            typeof (item as { constraints: Record<string, string> })
+              .constraints === 'object'
+          ) {
+            return Object.values(
+              (item as { constraints: Record<string, string> }).constraints,
+            ).join(' ');
+          }
+          return null;
+        })
+        .filter((s): s is string => Boolean(s && s.length));
+      if (parts.length > 0) {
+        return parts.join(' ');
+      }
+    }
   }
   return `Request failed (${httpStatus})`;
 }
