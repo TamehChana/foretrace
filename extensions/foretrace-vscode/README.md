@@ -20,6 +20,12 @@ The packaged VSIX does **not** declare `enabledApiProposals`, so activation work
 
 If capture start warns that the API is missing, use **Foretrace: Send editor selection** (or CLI / CI) instead.
 
+## Troubleshooting (Cursor)
+
+- If **Set CLI ingest token** errors immediately, the folder may be **Restricted / not trusted**. Trust the workspace (banner at top, or command **Workspaces: Manage Workspace Trust**), reload, try again.
+- **View → Output** → channel **Foretrace** — shows activation and token-save steps (v0.1.2+).
+- Command palette → **Foretrace: Show log** opens that output.
+
 ## Package VSIX
 
 From the **monorepo root** (recommended):

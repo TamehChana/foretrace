@@ -2,7 +2,7 @@
   "name": "foretrace-vscode",
   "displayName": "Foretrace",
   "description": "Stream integrated-terminal output to Foretrace (batched POST …/terminal/batches). MVP VSIX.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "foretrace",
   "private": true,
   "repository": {
@@ -16,11 +16,13 @@
   },
   "categories": ["Other"],
   "activationEvents": [
+    "onStartupFinished",
     "onCommand:foretrace.setCliToken",
     "onCommand:foretrace.sendTestBatch",
     "onCommand:foretrace.sendEditorSelection",
     "onCommand:foretrace.startTerminalCapture",
-    "onCommand:foretrace.stopTerminalCapture"
+    "onCommand:foretrace.stopTerminalCapture",
+    "onCommand:foretrace.showLog"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -44,6 +46,10 @@
       {
         "command": "foretrace.stopTerminalCapture",
         "title": "Foretrace: Stop terminal capture"
+      },
+      {
+        "command": "foretrace.showLog",
+        "title": "Foretrace: Show log"
       }
     ],
     "configuration": {

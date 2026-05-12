@@ -5,6 +5,12 @@ const SECRET_CLI_TOKEN = 'foretrace.cliToken';
 const MAX_LINES = 320;
 const MAX_LINE_CHARS = 12_288;
 
+const outputChannel = vscode.window.createOutputChannel('Foretrace');
+
+function logLine(message: string): void {
+  outputChannel.appendLine(`[${new Date().toISOString()}] ${message}`);
+}
+
 type TerminalWriteEvent = { terminal: vscode.Terminal; data: string };
 
 type WindowWithTerminalData = typeof vscode.window & {
@@ -82,7 +88,7 @@ async function postTerminalBatch(
   }
   const token = await context.secrets.get(SECRET_CLI_TOKEN);
   if (!token || !token.startsWith('ft_ck_')) {
-    throw new Error('Run “Foretrace: Set CLI token” and paste a minted ft_ck_ token');
+    throw new Error('Run “Foretrace: Set CLI ingest token” and paste a minted ft_ck_ token');
   }
 
   const url = `${base}/organizations/${encodeURIComponent(org)}/projects/${encodeURIComponent(proj)}/terminal/batches`;
@@ -138,7 +144,7 @@ class TerminalCaptureSession {
     const w = windowWithTerminalData();
     if (typeof w.onDidWriteTerminalData !== 'function') {
       void vscode.window.showWarningMessage(
-        'Foretrace: this editor build does not expose terminalDataWriteEvent. Use VS Code ≥1.85 with proposed API enabled for this extension, or use the CLI / CI path.',
+        'Foretrace: this editor build does not expose integrated-terminal streaming. Use “Send editor selection” or the CLI.',
       );
       return;
     }
@@ -194,10 +200,23 @@ class TerminalCaptureSession {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  const pkg = context.extension.packageJSON as { version?: string };
+  logLine(`activate v${pkg.version ?? '?'}`);
+  context.subscriptions.push(outputChannel);
+
   const session = new TerminalCaptureSession(context);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('foretrace.setCliToken', async () => {
+      logLine('setCliToken: command started');
+      if (vscode.workspace.isTrusted === false) {
+        logLine('setCliToken: blocked — workspace is Restricted (not trusted)');
+        void vscode.window.showErrorMessage(
+          'Foretrace: This folder is in Restricted Mode. Trust this workspace (blue banner, or Command “Workspaces: Manage Workspace Trust”), then run “Set CLI ingest token” again.',
+        );
+        outputChannel.show(true);
+        return;
+      }
       try {
         const token = await vscode.window.showInputBox({
           title: 'Foretrace CLI token',
@@ -206,21 +225,34 @@ export function activate(context: vscode.ExtensionContext): void {
           ignoreFocusOut: true,
         });
         if (!token?.trim()) {
+          logLine('setCliToken: cancelled (empty input)');
           return;
         }
         const t = token.trim();
         if (!t.startsWith('ft_ck_')) {
           void vscode.window.showErrorMessage('Token must start with ft_ck_');
+          logLine('setCliToken: rejected — token prefix invalid');
           return;
         }
         await context.secrets.store(SECRET_CLI_TOKEN, t);
+        logLine('setCliToken: stored in secret storage');
         void vscode.window.showInformationMessage('Foretrace: CLI token stored securely');
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        const stack = e instanceof Error ? e.stack : undefined;
+        logLine(`setCliToken: error — ${msg}`);
+        if (stack) {
+          logLine(stack);
+        }
+        outputChannel.show(true);
         void vscode.window.showErrorMessage(
-          `Foretrace: could not save token (${msg}). If this persists, report whether you are on Cursor vs VS Code.`,
+          `Foretrace: could not save token (${msg}). Open View → Output → channel “Foretrace” for details. If you see Restricted Mode, trust the workspace first.`,
         );
       }
+    }),
+
+    vscode.commands.registerCommand('foretrace.showLog', () => {
+      outputChannel.show(true);
     }),
 
     vscode.commands.registerCommand('foretrace.sendTestBatch', async () => {
