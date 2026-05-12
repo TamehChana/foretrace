@@ -16,7 +16,7 @@
     "sync-web-vsix": "node scripts/sync-vsix-to-web-public.mjs",
     "build:vercel": "node scripts/vercel-deploy-web.mjs",
     "vercel-build": "npm ci --include=dev && npm install vite@8.0.11 --no-save --workspace=@foretrace/web",
-    "extension:package": "cross-env NODE_ENV=development npm run build -w foretrace-vscode && cd extensions/foretrace-vscode && npx --yes @vscode/vsce package --no-dependencies"
+    "extension:package": "cross-env NODE_ENV=development npm install --include=dev -w foretrace-vscode && npm run build -w foretrace-vscode && cd extensions/foretrace-vscode && npx --yes @vscode/vsce package --no-dependencies"
   },
   "dependencies": {
     "vite": "^8.0.10"
@@ -35,5 +35,10 @@
   "packageManager": "npm@10.9.2",
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "foretrace-vscode": {
+      "@types/vscode": "1.74.0"
+    }
   }
 }
