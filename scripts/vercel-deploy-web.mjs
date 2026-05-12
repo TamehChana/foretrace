@@ -27,6 +27,9 @@ function run(cmd, args, opts = {}) {
 run('npm', ['run', 'build', '-w', '@foretrace/shared'], {
   shell: process.platform === 'win32',
 });
+run('npm', ['run', 'sync-web-vsix'], {
+  shell: process.platform === 'win32',
+});
 run('npm', ['run', 'build', '-w', '@foretrace/web'], {
   shell: process.platform === 'win32',
 });

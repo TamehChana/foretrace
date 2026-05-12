@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { ArrowLeft, BookOpen, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import {
+  FORETRACE_VSCODE_DOWNLOAD_PATH,
+  FORETRACE_VSCODE_FILENAME,
+  FORETRACE_VSCODE_VERSION,
+} from '../../lib/foretrace-vscode-download';
 import { PageHeader } from '../ui/PageHeader';
 
 const STEPS = [
@@ -11,10 +16,11 @@ const STEPS = [
   { id: 'step-4', label: '4 · Tasks' },
   { id: 'step-5', label: '5 · GitHub' },
   { id: 'step-6', label: '6 · CLI / terminal' },
-  { id: 'step-7', label: '7 · Signals & risk' },
-  { id: 'step-8', label: '8 · Alerts' },
-  { id: 'step-9', label: '9 · Settings' },
-  { id: 'step-10', label: '10 · Every day' },
+  { id: 'step-7', label: '7 · VS Code / Cursor extension' },
+  { id: 'step-8', label: '8 · Signals & risk' },
+  { id: 'step-9', label: '9 · Alerts' },
+  { id: 'step-10', label: '10 · Settings' },
+  { id: 'step-11', label: '11 · Every day' },
 ] as const;
 
 function WorkflowStep({
@@ -417,7 +423,69 @@ export FORETRACE_PROJECT_ID="paste-project-uuid"
           </ol>
         </WorkflowStep>
 
-        <WorkflowStep step={7} id="step-7" title="Read signals, then run delivery risk">
+        <WorkflowStep step={7} id="step-7" title="Install the VS Code / Cursor extension (optional)">
+          <p>
+            Use this when you want to send integrated-terminal or editor output from{' '}
+            <strong className="text-zinc-800 dark:text-zinc-200">Visual Studio Code</strong> or{' '}
+            <strong className="text-zinc-800 dark:text-zinc-200">Cursor</strong> to Foretrace without piping through the CLI on every command.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href={FORETRACE_VSCODE_DOWNLOAD_PATH}
+              download={FORETRACE_VSCODE_FILENAME}
+              className="inline-flex items-center gap-2 rounded-xl border border-accent-600 bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-[box-shadow,transform] hover:bg-accent-600 active:scale-[0.99] dark:border-accent-500 dark:bg-accent-600 dark:hover:bg-accent-500"
+            >
+              <Download size={18} strokeWidth={2.5} aria-hidden />
+              Download extension ({FORETRACE_VSCODE_VERSION})
+            </a>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              File: <Code>{FORETRACE_VSCODE_FILENAME}</Code>
+            </span>
+          </div>
+          <Note title="If the download returns 404">
+            <p>
+              From the repository root run <Code>npm install --include=dev</Code> then <Code>npm run sync-web-vsix</Code>, then restart the web dev server. Production
+              builds run this automatically before packaging the site.
+            </p>
+          </Note>
+          <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">Install in the editor</h3>
+          <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              Download the <Code>.vsix</Code> using the button above.
+            </li>
+            <li>
+              Open <strong className="text-zinc-800 dark:text-zinc-200">Extensions</strong> (<Code>Ctrl+Shift+X</Code> / <Code>Cmd+Shift+X</Code>).
+            </li>
+            <li>
+              Open the <strong>⋯</strong> menu on the Extensions sidebar → <strong className="text-zinc-800 dark:text-zinc-200">Install from VSIX…</strong> → choose the
+              downloaded file.
+            </li>
+            <li>
+              Reload the editor if prompted so Foretrace commands appear in the command palette.
+            </li>
+          </ol>
+          <h3 className="mt-6 text-base font-semibold text-zinc-800 dark:text-zinc-200">Connect to your project</h3>
+          <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              In <strong className="text-zinc-800 dark:text-zinc-200">Settings</strong>, search <strong>Foretrace</strong> and set <Code>foretrace.apiBaseUrl</Code> (API
+              origin, no trailing slash), <Code>foretrace.organizationId</Code>, and <Code>foretrace.projectId</Code> — same values as in sections 2–3 and the CLI
+              variables in section 6.
+            </li>
+            <li>
+              Mint a <strong className="text-zinc-800 dark:text-zinc-200">CLI ingest token</strong> in the browser (starts with <Code>ft_ck_</Code>).
+            </li>
+            <li>
+              Command palette → <strong className="text-zinc-800 dark:text-zinc-200">Foretrace: Set CLI token</strong> — paste the token once (stored in editor secret
+              storage, not in your repo).
+            </li>
+            <li>
+              Run <strong className="text-zinc-800 dark:text-zinc-200">Foretrace: Send test batch</strong> to verify the API. Optional: <strong>Start terminal capture</strong>{' '}
+              (requires editor support for the proposed terminal stream API; if unavailable, use <strong>Send editor selection</strong> or the CLI in section 6).
+            </li>
+          </ol>
+        </WorkflowStep>
+
+        <WorkflowStep step={8} id="step-8" title="Read signals, then run delivery risk">
           <ol className="list-decimal space-y-4 pl-5 marker:font-semibold marker:text-zinc-500">
             <li>
               Expand the project and open <strong className="text-zinc-800 dark:text-zinc-200">Signals</strong>. You should see counts for GitHub (if connected),
@@ -436,7 +504,7 @@ export FORETRACE_PROJECT_ID="paste-project-uuid"
           </ol>
         </WorkflowStep>
 
-        <WorkflowStep step={8} id="step-8" title="Check alerts">
+        <WorkflowStep step={9} id="step-9" title="Check alerts">
           <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-zinc-500">
             <li>
               Click <strong className="text-zinc-800 dark:text-zinc-200">Alerts</strong> in the sidebar.
@@ -453,7 +521,7 @@ export FORETRACE_PROJECT_ID="paste-project-uuid"
           </ol>
         </WorkflowStep>
 
-        <WorkflowStep step={9} id="step-9" title="Settings and audit log">
+        <WorkflowStep step={10} id="step-10" title="Settings and audit log">
           <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-zinc-500">
             <li>
               Click <strong className="text-zinc-800 dark:text-zinc-200">Settings</strong> in the sidebar.
@@ -467,7 +535,7 @@ export FORETRACE_PROJECT_ID="paste-project-uuid"
           </ol>
         </WorkflowStep>
 
-        <WorkflowStep step={10} id="step-10" title="What you do every day — and when something breaks">
+        <WorkflowStep step={11} id="step-11" title="What you do every day — and when something breaks">
           <p>
             <strong className="text-zinc-800 dark:text-zinc-200">Healthy routine:</strong> keep tasks true, let GitHub webhooks and the CLI feed data, hit{' '}
             <strong>Refresh</strong> or <strong>Evaluate</strong> when you need a fresh readout, clear alerts after you act, and glance at the audit log after

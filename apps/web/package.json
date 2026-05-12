@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node ../../scripts/sync-vsix-to-web-public.mjs",
     "dev": "vite",
-    "build": "node scripts/run-vite.mjs build",
+    "build": "node ../../scripts/sync-vsix-to-web-public.mjs && node scripts/run-vite.mjs build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "preview": "node scripts/run-vite.mjs preview",
     "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",

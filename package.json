@@ -13,6 +13,7 @@
     "terminal:ingest": "node packages/cli/dist/cli.js ingest",
     "smoke:terminal-ingest": "node scripts/terminal-ingest-smoke.mjs",
     "sync-web-dist-root": "node scripts/sync-web-dist-root.mjs",
+    "sync-web-vsix": "node scripts/sync-vsix-to-web-public.mjs",
     "build:vercel": "node scripts/vercel-deploy-web.mjs",
     "vercel-build": "npm ci --include=dev && npm install vite@8.0.11 --no-save --workspace=@foretrace/web",
     "extension:package": "cross-env NODE_ENV=development npm run build -w foretrace-vscode && cd extensions/foretrace-vscode && npx --yes @vscode/vsce package --no-dependencies"
