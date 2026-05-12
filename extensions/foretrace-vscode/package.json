@@ -2,7 +2,7 @@
   "name": "foretrace-vscode",
   "displayName": "Foretrace",
   "description": "Stream integrated-terminal output to Foretrace (batched POST …/terminal/batches). MVP VSIX.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "foretrace",
   "private": true,
   "repository": {
@@ -15,7 +15,6 @@
     "vscode": "^1.85.0"
   },
   "categories": ["Other"],
-  "enabledApiProposals": ["terminalDataWriteEvent"],
   "activationEvents": [
     "onCommand:foretrace.setCliToken",
     "onCommand:foretrace.sendTestBatch",

@@ -2,13 +2,15 @@
 
 Sends terminal or editor text to your Foretrace API (`POST …/terminal/batches`) using a **CLI ingest token** (`ft_ck_…`).
 
+The packaged VSIX does **not** declare `enabledApiProposals`, so activation works in **Cursor** and stable VS Code. **Start terminal capture** still uses the stream API only when the editor exposes it at runtime.
+
 ## Setup
 
 1. **Settings → Extensions → Foretrace** (or JSON settings) and set:
    - `foretrace.apiBaseUrl` — e.g. `https://your-api.onrender.com` (no trailing slash)
    - `foretrace.organizationId` — org UUID
    - `foretrace.projectId` — project UUID (must match where you minted the token)
-2. Command palette → **Foretrace: Set CLI token** — paste `ft_ck_…` from Foretrace → Project → CLI ingest tokens.
+2. Command palette → **Foretrace: Set CLI ingest token** — paste `ft_ck_…` from Foretrace → Project → CLI ingest tokens.
 3. **Foretrace: Send test batch** — verifies connectivity.
 
 ## Terminal streaming
@@ -27,7 +29,7 @@ npm install --include=dev
 npm run extension:package
 ```
 
-This runs `vsce` and writes `extensions/foretrace-vscode/foretrace-vscode-0.1.0.vsix` (version follows `package.json`).
+This runs `vsce` and writes `extensions/foretrace-vscode/foretrace-vscode-<version>.vsix` (version follows `package.json`).
 
 Alternatively, from this folder after root `npm install --include=dev`: `npm run package`.
 
