@@ -82,7 +82,7 @@ export class MembershipsService {
       select: { id: true },
     });
     if (!user) {
-      throw new NotFoundException(
+      throw new BadRequestException(
         'No user with that email. They must register first.',
       );
     }
