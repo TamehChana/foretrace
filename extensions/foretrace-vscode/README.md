@@ -1,0 +1,31 @@
+# Foretrace VS Code extension (MVP)
+
+Sends terminal or editor text to your Foretrace API (`POST …/terminal/batches`) using a **CLI ingest token** (`ft_ck_…`).
+
+## Setup
+
+1. **Settings → Extensions → Foretrace** (or JSON settings) and set:
+   - `foretrace.apiBaseUrl` — e.g. `https://your-api.onrender.com` (no trailing slash)
+   - `foretrace.organizationId` — org UUID
+   - `foretrace.projectId` — project UUID (must match where you minted the token)
+2. Command palette → **Foretrace: Set CLI token** — paste `ft_ck_…` from Foretrace → Project → CLI ingest tokens.
+3. **Foretrace: Send test batch** — verifies connectivity.
+
+## Terminal streaming
+
+- **Foretrace: Start terminal capture** — listens to integrated terminal output (requires editor support for `terminalDataWriteEvent` proposed API) and POSTs lines on a timer (`foretrace.flushIntervalMs`, default 2000 ms).
+- **Foretrace: Stop terminal capture** — stops listening and flushes any pending buffer.
+
+If capture start warns that the API is missing, use **Foretrace: Send editor selection** (or CLI / CI) instead.
+
+## Package VSIX
+
+From repo root:
+
+```bash
+cd extensions/foretrace-vscode
+npm install
+npm run package
+```
+
+Install the generated `.vsix` in VS Code / Cursor: **Extensions → … → Install from VSIX…**.

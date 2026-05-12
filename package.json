@@ -3,6 +3,7 @@
   "private": true,
   "workspaces": [
     "apps/*",
+    "extensions/*",
     "packages/*"
   ],
   "scripts": {
@@ -13,7 +14,8 @@
     "smoke:terminal-ingest": "node scripts/terminal-ingest-smoke.mjs",
     "sync-web-dist-root": "node scripts/sync-web-dist-root.mjs",
     "build:vercel": "node scripts/vercel-deploy-web.mjs",
-    "vercel-build": "npm ci --include=dev && npm install vite@8.0.11 --no-save --workspace=@foretrace/web"
+    "vercel-build": "npm ci --include=dev && npm install vite@8.0.11 --no-save --workspace=@foretrace/web",
+    "extension:package": "cross-env NODE_ENV=development npm run build -w foretrace-vscode && cd extensions/foretrace-vscode && npx --yes @vscode/vsce package --no-dependencies"
   },
   "dependencies": {
     "vite": "^8.0.10"
@@ -22,8 +24,12 @@
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
     "@types/express-session": "^1.19.0",
+    "@types/node": "^24.0.0",
     "@types/nodemailer": "^6.4.23",
     "@types/passport": "^1.0.17",
+    "@types/vscode": "^1.118.0",
+    "@vscode/vsce": "^3.6.0",
+    "cross-env": "^7.0.3",
     "turbo": "^2.5.4"
   },
   "packageManager": "npm@10.9.2",

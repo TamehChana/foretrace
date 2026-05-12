@@ -1,0 +1,86 @@
+{
+  "name": "foretrace-vscode",
+  "displayName": "Foretrace",
+  "description": "Stream integrated-terminal output to Foretrace (batched POST …/terminal/batches). MVP VSIX.",
+  "version": "0.1.0",
+  "publisher": "foretrace",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "enabledApiProposals": ["terminalDataWriteEvent"],
+  "activationEvents": [
+    "onCommand:foretrace.setCliToken",
+    "onCommand:foretrace.sendTestBatch",
+    "onCommand:foretrace.sendEditorSelection",
+    "onCommand:foretrace.startTerminalCapture",
+    "onCommand:foretrace.stopTerminalCapture"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "foretrace.setCliToken",
+        "title": "Foretrace: Set CLI token (ft_ck_…)"
+      },
+      {
+        "command": "foretrace.sendTestBatch",
+        "title": "Foretrace: Send test batch (one line)"
+      },
+      {
+        "command": "foretrace.sendEditorSelection",
+        "title": "Foretrace: Send editor selection (or visible range if empty)"
+      },
+      {
+        "command": "foretrace.startTerminalCapture",
+        "title": "Foretrace: Start terminal capture"
+      },
+      {
+        "command": "foretrace.stopTerminalCapture",
+        "title": "Foretrace: Stop terminal capture"
+      }
+    ],
+    "configuration": {
+      "title": "Foretrace",
+      "properties": {
+        "foretrace.apiBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Foretrace API base URL (no trailing slash), e.g. https://your-api.onrender.com"
+        },
+        "foretrace.organizationId": {
+          "type": "string",
+          "default": "",
+          "description": "Organization UUID"
+        },
+        "foretrace.projectId": {
+          "type": "string",
+          "default": "",
+          "description": "Project UUID (must match the project where the CLI token was minted)"
+        },
+        "foretrace.flushIntervalMs": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 500,
+          "maximum": 60000,
+          "description": "How often to POST batched terminal lines while capture is running"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "package": "npm run compile && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "~5.7.3"
+  }
+}
