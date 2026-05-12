@@ -479,8 +479,10 @@ export FORETRACE_PROJECT_ID="paste-project-uuid"
               storage, not in your repo).
             </li>
             <li>
-              Run <strong className="text-zinc-800 dark:text-zinc-200">Foretrace: Send test batch</strong> to verify the API. Optional: <strong>Start terminal capture</strong>{' '}
-              (requires editor support for the proposed terminal stream API; if unavailable, use <strong>Send editor selection</strong> or the CLI in section 6).
+              Run <strong className="text-zinc-800 dark:text-zinc-200">Foretrace: Send test batch</strong> to verify the API. Optional:{' '}
+              <strong>Start terminal capture</strong> — on <strong className="text-zinc-800 dark:text-zinc-200">stable VS Code</strong> you must launch the app with{' '}
+              <Code>--enable-proposed-api foretrace.foretrace-vscode</Code> (see the extension README for a copy-paste command); otherwise use{' '}
+              <strong>Send editor selection</strong> or the CLI in section 6.
             </li>
           </ol>
         </WorkflowStep>
