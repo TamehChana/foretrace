@@ -122,6 +122,11 @@ async function postIngest(
   const textOut = await res.text();
   if (!res.ok) {
     console.error(`Ingest failed (${res.status}): ${textOut}`);
+    if (res.status === 403) {
+      console.error(
+        'Hint: FORETRACE_ORGANIZATION_ID and FORETRACE_PROJECT_ID must match the project where you minted this token (see API message for the token’s org/project).',
+      );
+    }
     process.exit(1);
   }
 

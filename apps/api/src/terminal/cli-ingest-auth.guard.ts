@@ -56,7 +56,11 @@ export class CliIngestAuthGuard implements CanActivate {
       row.organizationId.toLowerCase() !== orgNorm ||
       row.projectId.toLowerCase() !== projNorm
     ) {
-      throw new ForbiddenException('CLI token is not scoped to this project');
+      throw new ForbiddenException(
+        `CLI token is scoped to organization ${row.organizationId} and project ${row.projectId}; ` +
+          `the request URL used organization ${organizationId} and project ${projectId}. ` +
+          `Set FORETRACE_ORGANIZATION_ID and FORETRACE_PROJECT_ID to match the project where you minted this token.`,
+      );
     }
 
     req.cliIngestContext = {
