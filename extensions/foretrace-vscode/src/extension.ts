@@ -5,7 +5,7 @@ const SECRET_CLI_TOKEN = 'foretrace.cliToken';
 const MAX_LINES = 320;
 const MAX_LINE_CHARS = 12_288;
 
-const outputChannel = vscode.window.createOutputChannel('Foretrace');
+const outputChannel = vscode.window.createOutputChannel('Foretrace (ingest)');
 
 function logLine(message: string): void {
   outputChannel.appendLine(`[${new Date().toISOString()}] ${message}`);
@@ -201,8 +201,28 @@ class TerminalCaptureSession {
 
 export function activate(context: vscode.ExtensionContext): void {
   const pkg = context.extension.packageJSON as { version?: string };
-  logLine(`activate v${pkg.version ?? '?'}`);
+  const ver = pkg.version ?? '?';
+  logLine(`activate v${ver}`);
   context.subscriptions.push(outputChannel);
+
+  console.info(`[Foretrace] extension activated v${ver}`);
+
+  const bannerKey = 'foretrace.activateHintDismissedForVersion';
+  const dismissed = context.globalState.get<string>(bannerKey);
+  if (dismissed !== ver) {
+    void vscode.window
+      .showInformationMessage(
+        `Foretrace ${ver} is running. Logs: View → Output → “Foretrace (ingest)”, or command “Foretrace: Open output log”.`,
+        'Open output log',
+        'OK',
+      )
+      .then((choice) => {
+        if (choice === 'Open output log') {
+          outputChannel.show(true);
+        }
+        void context.globalState.update(bannerKey, ver);
+      });
+  }
 
   const session = new TerminalCaptureSession(context);
 
@@ -246,7 +266,7 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         outputChannel.show(true);
         void vscode.window.showErrorMessage(
-          `Foretrace: could not save token (${msg}). Open View → Output → channel “Foretrace” for details. If you see Restricted Mode, trust the workspace first.`,
+          `Foretrace: could not save token (${msg}). Open View → Output → channel “Foretrace (ingest)”, or run “Foretrace: Open output log”. If you see Restricted Mode, trust the workspace first.`,
         );
       }
     }),

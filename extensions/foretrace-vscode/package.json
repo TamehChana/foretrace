@@ -2,7 +2,7 @@
   "name": "foretrace-vscode",
   "displayName": "Foretrace",
   "description": "Stream integrated-terminal output to Foretrace (batched POST …/terminal/batches). MVP VSIX.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "foretrace",
   "private": true,
   "repository": {
@@ -12,7 +12,7 @@
   },
   "license": "MIT",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.74.0"
   },
   "categories": ["Other"],
   "activationEvents": [
@@ -49,7 +49,7 @@
       },
       {
         "command": "foretrace.showLog",
-        "title": "Foretrace: Show log"
+        "title": "Foretrace: Open output log"
       }
     ],
     "configuration": {

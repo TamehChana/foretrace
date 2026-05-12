@@ -23,8 +23,8 @@ If capture start warns that the API is missing, use **Foretrace: Send editor sel
 ## Troubleshooting (Cursor)
 
 - If **Set CLI ingest token** errors immediately, the folder may be **Restricted / not trusted**. Trust the workspace (banner at top, or command **Workspaces: Manage Workspace Trust**), reload, try again.
-- **View → Output** → channel **Foretrace** — shows activation and token-save steps (v0.1.2+).
-- Command palette → **Foretrace: Show log** opens that output.
+- **View → Output** → channel **Foretrace (ingest)** — shows activation and token-save steps (v0.1.3+).
+- Command palette → **Foretrace: Open output log** opens that channel.
 
 ## Package VSIX
 
