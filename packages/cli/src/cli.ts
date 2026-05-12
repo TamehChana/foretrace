@@ -1,8 +1,80 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
+import { dirname, join } from 'node:path';
 import { parseTerminalIngestBatch } from '@foretrace/shared';
+
+const FORETRACE_ENV_KEY = /^FORETRACE_[A-Za-z0-9_]+$/;
+
+/**
+ * Fills missing `FORETRACE_*` from `.env` files: walks from cwd to filesystem root.
+ * Files further from cwd are applied first; each nearer `.env` overwrites file-sourced
+ * keys so the **closest** `.env` to cwd wins. Non-empty shell exports are never replaced.
+ */
+function hydrateForetraceEnvFromAncestorDotenv(): void {
+  const paths: string[] = [];
+  let dir = process.cwd();
+  for (let i = 0; i < 16; i++) {
+    const candidate = join(dir, '.env');
+    if (existsSync(candidate)) {
+      paths.push(candidate);
+    }
+    const parent = dirname(dir);
+    if (parent === dir) {
+      break;
+    }
+    dir = parent;
+  }
+  /** keys from shallow → deep (cwd first, repo root last) */
+  const fromFiles = new Map<string, string>();
+  for (const filePath of [...paths].reverse()) {
+    for (const { key, val } of parseForetraceEntriesFromDotenvFile(filePath)) {
+      fromFiles.set(key, val);
+    }
+  }
+  for (const [key, val] of fromFiles) {
+    const existing = process.env[key];
+    if (existing !== undefined && String(existing).trim() !== '') {
+      continue;
+    }
+    process.env[key] = val;
+  }
+}
+
+function parseForetraceEntriesFromDotenvFile(
+  filePath: string,
+): { key: string; val: string }[] {
+  const out: { key: string; val: string }[] = [];
+  let raw = readFileSync(filePath, 'utf8');
+  if (raw.length > 0 && raw.charCodeAt(0) === 0xfeff) {
+    raw = raw.slice(1);
+  }
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) {
+      continue;
+    }
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) {
+      continue;
+    }
+    const key = trimmed.slice(0, eq).trim();
+    if (!FORETRACE_ENV_KEY.test(key)) {
+      continue;
+    }
+    let val = trimmed.slice(eq + 1).trim();
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    out.push({ key, val });
+  }
+  return out;
+}
 
 type ForetraceEnv = {
   apiUrl: string;
@@ -27,6 +99,8 @@ function assertHeaderAscii(label: string, value: string): void {
 }
 
 function readForetraceEnv(): ForetraceEnv {
+  hydrateForetraceEnvFromAncestorDotenv();
+
   const apiUrl = process.env.FORETRACE_API_URL?.trim().replace(/\/+$/, '');
   const token = process.env.FORETRACE_TOKEN?.trim() ?? '';
   const orgId = process.env.FORETRACE_ORGANIZATION_ID?.trim() ?? '';
@@ -228,6 +302,10 @@ Environment (ingest + run):
   FORETRACE_ORGANIZATION_ID     Organization UUID
   FORETRACE_PROJECT_ID          Project UUID
   FORETRACE_TASK_ID             Optional task UUID
+
+  If any FORETRACE_* variable is unset or empty, the CLI loads it from '.env' files
+  found walking up from cwd: parent folders first, then the closest '.env' to cwd
+  wins for each key. Non-empty shell exports always take precedence.
 
 Environment (run only):
   FORETRACE_INGEST_ON           "always" (default) = ingest whenever there is captured output (success or failure)

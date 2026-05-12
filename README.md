@@ -158,7 +158,7 @@ Requires DB migrations applied (`CliIngestToken`, `TerminalIngestBatch`, `Termin
 1. **Mint CLI token (session auth required):**
    - `POST /organizations/:organizationId/projects/:projectId/cli-tokens`
    - Store the returned plaintext token securely; DB stores only SHA-256 digest.
-2. **Set CLI env vars** (see [`.env.example`](.env.example)): `FORETRACE_API_URL`, `FORETRACE_TOKEN`, `FORETRACE_ORGANIZATION_ID`, `FORETRACE_PROJECT_ID`, optional `FORETRACE_TASK_ID`.
+2. **Set CLI env vars** (see [`.env.example`](.env.example)): `FORETRACE_API_URL`, `FORETRACE_TOKEN`, `FORETRACE_ORGANIZATION_ID`, `FORETRACE_PROJECT_ID`, optional `FORETRACE_TASK_ID`. You can put them in a **repo root** `.env` (gitignored): the CLI walks upward from the current directory; parent `.env` files apply first and the **closest** `.env` to cwd wins per key. Shell exports still override file values.
 3. **Build CLI once** (after changes): `npm run build -w @foretrace/cli`
 4. **Pipe command output to CLI:**
 
