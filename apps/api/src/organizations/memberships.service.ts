@@ -32,6 +32,37 @@ export class MembershipsService {
     return role;
   }
 
+  /** Org members with user id and email — for task assignee pickers (caller must be a member). */
+  async listMembersWithUsers(
+    organizationId: string,
+    actorUserId: string,
+  ): Promise<
+    Array<{
+      userId: string;
+      email: string;
+      displayName: string | null;
+      role: Role;
+    }>
+  > {
+    await this.assertMember(actorUserId, organizationId);
+    const rows = await this.prisma.membership.findMany({
+      where: { organizationId },
+      select: {
+        role: true,
+        user: {
+          select: { id: true, email: true, displayName: true },
+        },
+      },
+      orderBy: { user: { email: 'asc' } },
+    });
+    return rows.map((r) => ({
+      userId: r.user.id,
+      email: r.user.email,
+      displayName: r.user.displayName,
+      role: r.role,
+    }));
+  }
+
   /** Invite/add an existing registered user (`passwordHash` presence optional for future SSO). Requires target user row. */
   async inviteByEmail(
     organizationId: string,

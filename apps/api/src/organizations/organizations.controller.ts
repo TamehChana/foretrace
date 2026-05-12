@@ -88,6 +88,24 @@ export class OrganizationsController {
     return { data: { role } };
   }
 
+  @Get(':organizationId/members')
+  @UseGuards(OrganizationUuidParamGuard, AuthenticatedGuard, RolesGuard)
+  @Roles()
+  async listMembers(
+    @Param('organizationId') organizationId: string,
+    @Req() req: Request,
+  ): Promise<{
+    data: Awaited<
+      ReturnType<MembershipsService['listMembersWithUsers']>
+    >;
+  }> {
+    const data = await this.membershipsService.listMembersWithUsers(
+      organizationId,
+      req.user!.id,
+    );
+    return { data };
+  }
+
   @Post(':organizationId/members')
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(OrganizationUuidParamGuard, AuthenticatedGuard, RolesGuard)

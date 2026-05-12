@@ -22,6 +22,11 @@ import {
   parseCreateProjectEnvelope,
   useOrgProjects,
 } from '../../hooks/use-org-projects';
+import {
+  memberLabel,
+  useOrgMembers,
+  type OrgMemberRow,
+} from '../../hooks/use-org-members';
 import { type OrgTaskRow, useOrgTasks } from '../../hooks/use-org-tasks';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 import { useToast } from '../../providers/ToastProvider';
@@ -94,6 +99,7 @@ export function ProjectsPage() {
     expandedProjectId,
     dataBump,
   );
+  const membersState = useOrgMembers(organizationId, dataBump);
 
   const [newProjectName, setNewProjectName] = useState('');
   const [projectSubmitting, setProjectSubmitting] = useState(false);
@@ -105,7 +111,12 @@ export function ProjectsPage() {
   const [taskTitleByProject, setTaskTitleByProject] = useState<
     Record<string, string>
   >({});
+  /** Optional assignee user id when creating a task (per project). */
+  const [taskAssignOnCreate, setTaskAssignOnCreate] = useState<
+    Record<string, string>
+  >({});
   const [taskSubmitting, setTaskSubmitting] = useState(false);
+  const [assigningTaskId, setAssigningTaskId] = useState<string | null>(null);
 
   const role = memberRole.status === 'ok' ? memberRole.role : null;
   const cliPanelRole =
@@ -113,6 +124,8 @@ export function ProjectsPage() {
       ? (role as 'ADMIN' | 'PM' | 'DEVELOPER')
       : null;
   const canManageProjects = role === 'ADMIN' || role === 'PM';
+  const canAssignTasks =
+    role === 'ADMIN' || role === 'PM' || role === 'DEVELOPER';
   const canInvite = role === 'ADMIN';
   const currentUserId =
     snapshot.status === 'ready' && snapshot.user?.id
@@ -196,6 +209,7 @@ export function ProjectsPage() {
       }
       setInviteEmail('');
       bumpWorkspaceList();
+      bumpData();
       showToast('Member added', 'success');
     } catch (err: unknown) {
       showToast(
@@ -245,6 +259,11 @@ export function ProjectsPage() {
     if (!title) {
       return;
     }
+    const assignRaw = (taskAssignOnCreate[projectId] ?? '').trim();
+    const body: { title: string; assigneeId?: string } = { title };
+    if (assignRaw.length > 0) {
+      body.assigneeId = assignRaw;
+    }
     setTaskSubmitting(true);
     try {
       const res = await apiFetch(
@@ -252,7 +271,7 @@ export function ProjectsPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title }),
+          body: JSON.stringify(body),
         },
       );
       if (!res.ok) {
@@ -260,6 +279,7 @@ export function ProjectsPage() {
         return;
       }
       setTaskTitleByProject((prev) => ({ ...prev, [projectId]: '' }));
+      setTaskAssignOnCreate((prev) => ({ ...prev, [projectId]: '' }));
       bumpData();
       showToast('Task added', 'success');
     } catch (err: unknown) {
@@ -269,6 +289,43 @@ export function ProjectsPage() {
       );
     } finally {
       setTaskSubmitting(false);
+    }
+  };
+
+  const patchTaskAssignee = async (
+    projectId: string,
+    taskId: string,
+    assigneeId: string | null,
+  ) => {
+    if (!organizationId) {
+      return;
+    }
+    setAssigningTaskId(taskId);
+    try {
+      const res = await apiFetch(
+        `/organizations/${organizationId}/projects/${projectId}/tasks/${taskId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assigneeId }),
+        },
+      );
+      if (!res.ok) {
+        showToast(await readApiErrorMessage(res), 'error');
+        return;
+      }
+      bumpData();
+      showToast(
+        assigneeId ? 'Assignee updated' : 'Task unassigned',
+        'success',
+      );
+    } catch (err: unknown) {
+      showToast(
+        err instanceof Error ? err.message : 'Request failed',
+        'error',
+      );
+    } finally {
+      setAssigningTaskId(null);
     }
   };
 
@@ -557,6 +614,21 @@ export function ProjectsPage() {
                             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                               Tasks
                             </h3>
+                            <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                              Pick an assignee from the list (including yourself).
+                              Task due dates roll into{' '}
+                              <strong className="font-medium text-zinc-600 dark:text-zinc-400">
+                                Signals
+                              </strong>{' '}
+                              below; GitHub, CLI, and terminal panels add live
+                              activity for this project.
+                            </p>
+                            {membersState.status === 'error' ? (
+                              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+                                Could not load members for assignment:{' '}
+                                {membersState.message}
+                              </p>
+                            ) : null}
                             {role === 'DEVELOPER' ? (
                               <p className="mt-1 text-[11px] text-zinc-500">
                                 You can delete tasks you created; PM and admin
@@ -575,78 +647,193 @@ export function ProjectsPage() {
                               </p>
                             ) : (
                               <ul className="mt-2 space-y-2">
-                                {tasksState.tasks.map((t) => (
-                                  <li
-                                    key={t.id}
-                                    className="flex items-start justify-between gap-2 rounded-xl bg-zinc-50 px-3 py-2 dark:bg-zinc-950/80"
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                                        {t.title}
-                                      </p>
-                                      <p className="text-[11px] text-zinc-500">
-                                        {t.status} · {t.priority} · progress{' '}
-                                        {t.progress}%
-                                      </p>
-                                    </div>
-                                    {canDeleteThisTask(t) ? (
-                                      <button
-                                        type="button"
-                                        title={
-                                          role === 'DEVELOPER'
-                                            ? 'Delete task (you created this)'
-                                            : 'Delete task'
-                                        }
-                                        onClick={() => {
-                                          void deleteTask(p.id, t.id);
-                                        }}
-                                        className="shrink-0 rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-rose-600 dark:hover:bg-zinc-800 dark:hover:text-rose-400"
-                                      >
-                                        <Trash2
-                                          size={14}
-                                          strokeWidth={2}
-                                          aria-hidden
-                                        />
-                                      </button>
-                                    ) : null}
-                                  </li>
-                                ))}
+                                {tasksState.tasks.map((t) => {
+                                  const membersList: OrgMemberRow[] | null =
+                                    membersState.status === 'ok'
+                                      ? membersState.members
+                                      : null;
+                                  const assigneeLine = (() => {
+                                    if (!t.assigneeId) {
+                                      return 'Unassigned';
+                                    }
+                                    const m = membersList?.find(
+                                      (x) => x.userId === t.assigneeId,
+                                    );
+                                    return m
+                                      ? memberLabel(m)
+                                      : 'Assigned (member list loading…)';
+                                  })();
+                                  return (
+                                    <li
+                                      key={t.id}
+                                      className="rounded-xl bg-zinc-50 px-3 py-2 dark:bg-zinc-950/80"
+                                    >
+                                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                        <div className="min-w-0 flex-1 space-y-1">
+                                          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                            {t.title}
+                                          </p>
+                                          <p className="text-[11px] text-zinc-500">
+                                            {t.status} · {t.priority} · progress{' '}
+                                            {t.progress}%
+                                          </p>
+                                          {!canAssignTasks ? (
+                                            <p className="text-[11px] text-zinc-600 dark:text-zinc-300">
+                                              <span className="font-medium text-zinc-500">
+                                                Assignee:
+                                              </span>{' '}
+                                              {assigneeLine}
+                                            </p>
+                                          ) : null}
+                                        </div>
+                                        <div className="flex shrink-0 flex-col gap-2 sm:items-end sm:pl-2">
+                                          {canAssignTasks ? (
+                                            <div className="flex w-full min-w-[12rem] flex-col gap-0.5 sm:w-56">
+                                              <label
+                                                htmlFor={`assign-${p.id}-${t.id}`}
+                                                className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                              >
+                                                Assign to
+                                              </label>
+                                              <select
+                                                id={`assign-${p.id}-${t.id}`}
+                                                className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 shadow-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                                                value={t.assigneeId ?? ''}
+                                                disabled={
+                                                  assigningTaskId === t.id ||
+                                                  membersState.status !== 'ok'
+                                                }
+                                                onChange={(e) => {
+                                                  const v =
+                                                    e.target.value.trim();
+                                                  const next =
+                                                    v.length > 0 ? v : null;
+                                                  const prev =
+                                                    t.assigneeId ?? null;
+                                                  if (next === prev) {
+                                                    return;
+                                                  }
+                                                  void patchTaskAssignee(
+                                                    p.id,
+                                                    t.id,
+                                                    next,
+                                                  );
+                                                }}
+                                              >
+                                                <option value="">
+                                                  Unassigned
+                                                </option>
+                                                {membersState.status ===
+                                                  'ok' &&
+                                                  membersState.members.map(
+                                                    (m) => (
+                                                      <option
+                                                        key={m.userId}
+                                                        value={m.userId}
+                                                      >
+                                                        {memberLabel(m)}
+                                                      </option>
+                                                    ),
+                                                  )}
+                                              </select>
+                                            </div>
+                                          ) : null}
+                                          {canDeleteThisTask(t) ? (
+                                            <button
+                                              type="button"
+                                              title={
+                                                role === 'DEVELOPER'
+                                                  ? 'Delete task (you created this)'
+                                                  : 'Delete task'
+                                              }
+                                              onClick={() => {
+                                                void deleteTask(p.id, t.id);
+                                              }}
+                                              className="self-end rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-rose-600 dark:hover:bg-zinc-800 dark:hover:text-rose-400"
+                                            >
+                                              <Trash2
+                                                size={14}
+                                                strokeWidth={2}
+                                                aria-hidden
+                                              />
+                                            </button>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    </li>
+                                  );
+                                })}
                               </ul>
                             )}
                           </div>
                           <form
                             autoComplete="off"
-                            className="mt-4 flex gap-2"
+                            className="mt-4 flex flex-col gap-3"
                             onSubmit={(e) => {
                               e.preventDefault();
                               void createTask(p.id);
                             }}
                           >
-                            <input
-                              name={`foretrace-task-title-${p.id}`}
-                              type="text"
-                              placeholder="New task title"
-                              value={taskTitleByProject[p.id] ?? ''}
-                              onChange={(e) =>
-                                setTaskTitleByProject((prev) => ({
-                                  ...prev,
-                                  [p.id]: e.target.value,
-                                }))
-                              }
-                              autoComplete="off"
-                              data-1p-ignore
-                              data-lpignore="true"
-                              data-bwignore
-                              className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-                              maxLength={300}
-                            />
-                            <button
-                              type="submit"
-                              disabled={taskSubmitting}
-                              className="shrink-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                            >
-                              Add
-                            </button>
+                            <div className="flex gap-2">
+                              <input
+                                name={`foretrace-task-title-${p.id}`}
+                                type="text"
+                                placeholder="New task title"
+                                value={taskTitleByProject[p.id] ?? ''}
+                                onChange={(e) =>
+                                  setTaskTitleByProject((prev) => ({
+                                    ...prev,
+                                    [p.id]: e.target.value,
+                                  }))
+                                }
+                                autoComplete="off"
+                                data-1p-ignore
+                                data-lpignore="true"
+                                data-bwignore
+                                className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                                maxLength={300}
+                              />
+                              <button
+                                type="submit"
+                                disabled={taskSubmitting}
+                                className="shrink-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                              >
+                                Add
+                              </button>
+                            </div>
+                            {canAssignTasks ? (
+                              <div className="flex max-w-md flex-col gap-1">
+                                <label
+                                  htmlFor={`new-task-assign-${p.id}`}
+                                  className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                >
+                                  Assign when created (optional)
+                                </label>
+                                <select
+                                  id={`new-task-assign-${p.id}`}
+                                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                                  value={taskAssignOnCreate[p.id] ?? ''}
+                                  disabled={
+                                    taskSubmitting ||
+                                    membersState.status !== 'ok'
+                                  }
+                                  onChange={(e) =>
+                                    setTaskAssignOnCreate((prev) => ({
+                                      ...prev,
+                                      [p.id]: e.target.value,
+                                    }))
+                                  }
+                                >
+                                  <option value="">No assignee</option>
+                                  {membersState.status === 'ok' &&
+                                    membersState.members.map((m) => (
+                                      <option key={m.userId} value={m.userId}>
+                                        {memberLabel(m)}
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
+                            ) : null}
                           </form>
                           {organizationId ? (
                             <>
