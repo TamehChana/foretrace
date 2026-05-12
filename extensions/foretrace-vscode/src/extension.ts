@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import * as os from 'node:os';
+import * as os from 'os';
 
 const SECRET_CLI_TOKEN = 'foretrace.cliToken';
 const MAX_LINES = 320;
@@ -200,6 +200,17 @@ class TerminalCaptureSession {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  try {
+    doActivate(context);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[Foretrace] activate failed', e);
+    void vscode.window.showErrorMessage(`Foretrace failed to start: ${msg}`);
+    throw e;
+  }
+}
+
+function doActivate(context: vscode.ExtensionContext): void {
   const pkg = context.extension.packageJSON as { version?: string };
   const ver = pkg.version ?? '?';
   logLine(`activate v${ver}`);
