@@ -67,7 +67,16 @@ function readForetraceEnv(): ForetraceEnv {
     process.exit(1);
   }
 
-  return { apiUrl, token, orgId, projectId, taskId };
+  const orgIdLower = orgId.toLowerCase();
+  const projectIdLower = projectId.toLowerCase();
+
+  return {
+    apiUrl,
+    token,
+    orgId: orgIdLower,
+    projectId: projectIdLower,
+    taskId: taskId?.toLowerCase(),
+  };
 }
 
 function linesFromOutput(raw: string, maxBytes = 400_000): string[] {

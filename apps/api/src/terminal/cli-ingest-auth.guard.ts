@@ -46,11 +46,15 @@ export class CliIngestAuthGuard implements CanActivate {
 
     const organizationId = req.params['organizationId'];
     const projectId = req.params['projectId'];
+    if (typeof organizationId !== 'string' || typeof projectId !== 'string') {
+      throw new ForbiddenException('CLI token is not scoped to this project');
+    }
+    /** UUID path segments may differ by case from `@db.Uuid` values returned by Prisma. */
+    const orgNorm = organizationId.toLowerCase();
+    const projNorm = projectId.toLowerCase();
     if (
-      typeof organizationId !== 'string' ||
-      typeof projectId !== 'string' ||
-      row.organizationId !== organizationId ||
-      row.projectId !== projectId
+      row.organizationId.toLowerCase() !== orgNorm ||
+      row.projectId.toLowerCase() !== projNorm
     ) {
       throw new ForbiddenException('CLI token is not scoped to this project');
     }
