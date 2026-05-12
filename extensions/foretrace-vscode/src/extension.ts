@@ -198,22 +198,29 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('foretrace.setCliToken', async () => {
-      const token = await vscode.window.showInputBox({
-        title: 'Foretrace CLI token',
-        prompt: 'Paste ft_ck_… (minted in Foretrace → project → CLI ingest tokens)',
-        password: true,
-        ignoreFocusOut: true,
-      });
-      if (!token?.trim()) {
-        return;
+      try {
+        const token = await vscode.window.showInputBox({
+          title: 'Foretrace CLI token',
+          prompt: 'Paste the full secret from the website (starts with ft_ck_)',
+          password: true,
+          ignoreFocusOut: true,
+        });
+        if (!token?.trim()) {
+          return;
+        }
+        const t = token.trim();
+        if (!t.startsWith('ft_ck_')) {
+          void vscode.window.showErrorMessage('Token must start with ft_ck_');
+          return;
+        }
+        await context.secrets.store(SECRET_CLI_TOKEN, t);
+        void vscode.window.showInformationMessage('Foretrace: CLI token stored securely');
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        void vscode.window.showErrorMessage(
+          `Foretrace: could not save token (${msg}). If this persists, report whether you are on Cursor vs VS Code.`,
+        );
       }
-      const t = token.trim();
-      if (!t.startsWith('ft_ck_')) {
-        void vscode.window.showErrorMessage('Token must start with ft_ck_');
-        return;
-      }
-      await context.secrets.store(SECRET_CLI_TOKEN, t);
-      void vscode.window.showInformationMessage('Foretrace: CLI token stored securely');
     }),
 
     vscode.commands.registerCommand('foretrace.sendTestBatch', async () => {

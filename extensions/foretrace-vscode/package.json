@@ -28,7 +28,7 @@
     "commands": [
       {
         "command": "foretrace.setCliToken",
-        "title": "Foretrace: Set CLI token (ft_ck_…)"
+        "title": "Foretrace: Set CLI ingest token"
       },
       {
         "command": "foretrace.sendTestBatch",
