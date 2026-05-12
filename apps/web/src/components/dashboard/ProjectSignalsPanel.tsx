@@ -12,6 +12,8 @@ type GithubRestSlice = {
   defaultBranch: string | null;
   defaultBranchHeadSha: string | null;
   combinedStatus: string | null;
+  lastRepositoryPushAt: string | null;
+  mergedPullRequestsLast7Days: number | null;
 };
 
 type SignalPayload = {
@@ -44,6 +46,15 @@ type SignalPayload = {
     lastIncidentAt: string | null;
     lastBatchAt: string | null;
   }>;
+  /** Batches in the window grouped by the user who created the CLI ingest token. */
+  terminalByMintedTokenUser?: Array<{
+    userId: string;
+    email: string;
+    displayName: string | null;
+    batchesInWindow: number;
+    linesInWindow: number;
+    incidentRowsLinkedToMintedBatchesInWindow: number;
+  }>;
 };
 
 type SnapshotRow = {
@@ -54,6 +65,21 @@ type SnapshotRow = {
   payload: SignalPayload;
   computedAt: string;
 };
+
+function mintedByUserLabel(r: {
+  displayName: string | null;
+  email: string;
+  userId: string;
+}): string {
+  const n = r.displayName?.trim();
+  if (n) {
+    return n;
+  }
+  if (r.email) {
+    return r.email;
+  }
+  return `User ${r.userId.slice(0, 8)}…`;
+}
 
 function assigneeLabelForSignals(r: {
   assigneeDisplayName: string | null;
@@ -222,6 +248,23 @@ export function ProjectSignalsPanel(props: {
                     {state.snapshot.payload.github.rest.combinedStatus ?? '—'}
                   </strong>
                 </span>
+                <span>
+                  Last push:{' '}
+                  <strong>
+                    {state.snapshot.payload.github.rest.lastRepositoryPushAt
+                      ? formatWhen(
+                          state.snapshot.payload.github.rest.lastRepositoryPushAt,
+                        )
+                      : '—'}
+                  </strong>
+                </span>
+                <span>
+                  Merged PRs (7d):{' '}
+                  <strong className="tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {state.snapshot.payload.github.rest.mergedPullRequestsLast7Days ??
+                      '—'}
+                  </strong>
+                </span>
                 <span className="text-zinc-500 sm:col-span-3">
                   Fetched {formatWhen(state.snapshot.payload.github.rest.fetchedAt)}
                 </span>
@@ -330,6 +373,59 @@ export function ProjectSignalsPanel(props: {
             </div>
           </div>
         ) : null}
+        {(state.snapshot.payload.terminalByMintedTokenUser?.length ?? 0) > 0 ? (
+          <div className="col-span-2 mt-3 sm:col-span-3">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              Terminal by CLI token minter (24h)
+            </h4>
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Counts batches posted with tokens created by each user. This is who
+              issued the ingest token, not necessarily the machine operator unless
+              each developer uses their own token.
+            </p>
+            <div className="mt-2 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+              <table className="w-full min-w-[28rem] border-collapse text-left text-[11px]">
+                <thead>
+                  <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900/80">
+                    <th className="px-2 py-1.5 font-semibold text-zinc-600 dark:text-zinc-400">
+                      Token minter
+                    </th>
+                    <th className="px-2 py-1.5 font-semibold text-zinc-600 dark:text-zinc-400">
+                      Batches (24h)
+                    </th>
+                    <th className="px-2 py-1.5 font-semibold text-zinc-600 dark:text-zinc-400">
+                      Lines (24h)
+                    </th>
+                    <th className="px-2 py-1.5 font-semibold text-zinc-600 dark:text-zinc-400">
+                      Incidents linked (24h)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.snapshot.payload.terminalByMintedTokenUser!.map((r) => (
+                    <tr
+                      key={r.userId}
+                      className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
+                    >
+                      <td className="max-w-[14rem] truncate px-2 py-1.5 font-medium text-zinc-900 dark:text-zinc-100">
+                        {mintedByUserLabel(r)}
+                      </td>
+                      <td className="px-2 py-1.5 tabular-nums text-zinc-800 dark:text-zinc-200">
+                        {r.batchesInWindow}
+                      </td>
+                      <td className="px-2 py-1.5 tabular-nums text-zinc-800 dark:text-zinc-200">
+                        {r.linesInWindow}
+                      </td>
+                      <td className="px-2 py-1.5 tabular-nums text-zinc-800 dark:text-zinc-200">
+                        {r.incidentRowsLinkedToMintedBatchesInWindow}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
         <p className="mt-3 rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-400">
           <strong className="font-medium text-zinc-800 dark:text-zinc-200">Why everything can stay at zero:</strong>{' '}
           this rollup only counts what Foretrace has <em>stored</em> for this project in the last{' '}
@@ -342,7 +438,8 @@ export function ProjectSignalsPanel(props: {
           <span className="font-mono">pull_request</span> / <span className="font-mono">issues</span> webhooks (not
           Actions alone).{' '}
           <strong className="font-medium text-zinc-800 dark:text-zinc-200">Terminal</strong> counts need the CLI
-          posting batches; set <strong className="font-medium text-zinc-800 dark:text-zinc-200">FORETRACE_TASK_ID</strong>{' '}
+          posting batches; the <strong className="font-medium text-zinc-800 dark:text-zinc-200">token minter</strong>{' '}
+          table uses who created each ingest token. Set <strong className="font-medium text-zinc-800 dark:text-zinc-200">FORETRACE_TASK_ID</strong>{' '}
           to attribute noise to a task and assignee in the table above. <strong className="font-medium text-zinc-800 dark:text-zinc-200">Tasks</strong> exclude{' '}
           <span className="font-mono">DONE</span> / <span className="font-mono">CANCELLED</span>; overdue / due-in-7d
           need active tasks with deadlines.

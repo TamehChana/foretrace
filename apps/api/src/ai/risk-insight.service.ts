@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { RiskLevel } from '@prisma/client';
 
+import {
+  compactProjectSignalEvidenceForAi,
+  type ProjectSignalPayload,
+} from '../projects/project-signals.service';
 import type { RiskReasonRow } from '../projects/risk-reason.types';
 
 export type RiskInsightContext = {
@@ -9,11 +13,13 @@ export type RiskInsightContext = {
   level: RiskLevel;
   score: number;
   reasons: RiskReasonRow[];
+  /** Structured snapshot slice for models (no secrets, no raw terminal lines). */
+  signalEvidence?: Record<string, unknown>;
 };
 
 /**
- * Produces a short PM-facing narrative. Replace or extend with fine-tuned models,
- * RAG over incidents, or a dedicated inference service — see `docs/AI.md`.
+ * Produces a short PM-facing narrative + delivery outlook line.
+ * Extend with RAG over incidents, async workers, or fine-tuned models — see `docs/AI.md`.
  */
 @Injectable()
 export class RiskInsightService {
@@ -21,6 +27,10 @@ export class RiskInsightService {
 
   constructor(private readonly config: ConfigService) {}
 
+  /**
+   * When a full snapshot exists, pass it as `signalEvidence` (use
+   * `compactProjectSignalEvidenceForAi`) so the model can fuse tasks, GitHub, and terminal.
+   */
   async summarize(context: RiskInsightContext): Promise<string> {
     const llm = await this.tryOpenAi(context);
     if (llm) {
@@ -29,7 +39,26 @@ export class RiskInsightService {
     return this.heuristic(context);
   }
 
+  /** Build evidence from a snapshot payload (convenience for callers). */
+  evidenceFromSnapshot(payload: ProjectSignalPayload): Record<string, unknown> {
+    return compactProjectSignalEvidenceForAi(payload);
+  }
+
+  private heuristicVerdict(ctx: RiskInsightContext): string {
+    if (ctx.level === 'CRITICAL' || ctx.level === 'HIGH') {
+      return 'AT_RISK';
+    }
+    if (ctx.level === 'MEDIUM' || ctx.score >= 35) {
+      return 'ELEVATED_FRICTION';
+    }
+    if (ctx.level === 'LOW' && ctx.score < 22) {
+      return 'ON_TRACK';
+    }
+    return 'WATCH';
+  }
+
   private heuristic(ctx: RiskInsightContext): string {
+    const verdict = this.heuristicVerdict(ctx);
     const top = ctx.reasons
       .filter((r) => r.code !== 'BASELINE')
       .slice(0, 4);
@@ -38,12 +67,14 @@ export class RiskInsightService {
         ? top.map((r) => `• ${r.detail}`).join('\n')
         : ctx.reasons.map((r) => `• ${r.detail}`).join('\n');
     return [
+      `VERDICT: ${verdict}`,
+      '',
       `Delivery risk is ${ctx.level} (score ${ctx.score}/100) for “${ctx.projectName}”.`,
       '',
       'Signals considered:',
       bullets,
       '',
-      'Next: review overdue and due-soon tasks, check recent terminal friction, and align on GitHub activity if the repo is linked.',
+      'Next: review overdue and due-soon tasks, check terminal friction by task and by CLI token owner, and align on GitHub activity if the repo is linked.',
     ]
       .join('\n')
       .slice(0, 8000);
@@ -70,16 +101,23 @@ export class RiskInsightService {
       return null;
     }
     const model = this.openAiModel();
-    const system =
-      'You are a senior delivery lead. Write 2–4 short sentences: plain English, no hype, cite concrete signals from the JSON. No markdown headings.';
+    const system = [
+      'You are a senior software delivery lead.',
+      'You receive JSON: rule-based risk (level, score, reasons) plus `signalEvidence` (tasks counts, GitHub rollup, terminal aggregates, task-linked terminal rows, per-user CLI token mint activity).',
+      'Do not invent facts not supported by the JSON. Do not mention secrets or tokens.',
+      'Output plain text (no markdown headings).',
+      'First line MUST be exactly one of: VERDICT: ON_TRACK | VERDICT: WATCH | VERDICT: ELEVATED_FRICTION | VERDICT: AT_RISK',
+      'Then 2–5 short sentences explaining why, citing concrete numbers from signalEvidence where possible.',
+    ].join(' ');
     const user = JSON.stringify({
       projectName: ctx.projectName,
       level: ctx.level,
       score: ctx.score,
       reasons: ctx.reasons,
+      signalEvidence: ctx.signalEvidence ?? {},
     });
     const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 12_000);
+    const t = setTimeout(() => controller.abort(), 14_000);
     try {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -89,8 +127,8 @@ export class RiskInsightService {
         },
         body: JSON.stringify({
           model,
-          temperature: 0.25,
-          max_tokens: 400,
+          temperature: 0.2,
+          max_tokens: 500,
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: user },

@@ -3,16 +3,9 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from './projects.service';
+import type { GithubRestEnrichment } from './github-signal-rest-enricher';
 import { GithubSignalRestEnricher } from './github-signal-rest-enricher';
-
-export type GithubRestEnrichment = {
-  fetchedAt: string;
-  openPullRequestsFromApi: number | null;
-  openIssuesFromApi: number | null;
-  defaultBranch: string | null;
-  defaultBranchHeadSha: string | null;
-  combinedStatus: string | null;
-};
+export type { GithubRestEnrichment } from './github-signal-rest-enricher';
 
 export type ProjectSignalTaskTerminalFriction = {
   taskId: string;
@@ -24,6 +17,15 @@ export type ProjectSignalTaskTerminalFriction = {
   batchesPostedInWindow: number;
   lastIncidentAt: string | null;
   lastBatchAt: string | null;
+};
+
+export type ProjectSignalTerminalByMintedUser = {
+  userId: string;
+  email: string;
+  displayName: string | null;
+  batchesInWindow: number;
+  linesInWindow: number;
+  incidentRowsLinkedToMintedBatchesInWindow: number;
 };
 
 export type ProjectSignalPayload = {
@@ -45,8 +47,10 @@ export type ProjectSignalPayload = {
     overdueCount: number;
     dueWithin7DaysCount: number;
   };
-  /** Present on snapshots after this feature ships; ties terminal batches/incidents to tasks + assignees. */
+  /** Task-scoped terminal when CLI sends `taskId`. */
   tasksWithTerminalFriction?: ProjectSignalTaskTerminalFriction[];
+  /** Terminal batches in the window grouped by the user who minted the ingest token. */
+  terminalByMintedTokenUser?: ProjectSignalTerminalByMintedUser[];
 };
 
 /** Minimum gap between automatic snapshot recomputes for the same project (webhooks + ingest). */
@@ -265,6 +269,90 @@ export class ProjectSignalsService {
           .slice(0, 25);
       }
 
+      const byMint = new Map<
+        string,
+        { batches: number; lines: number; incidents: number }
+      >();
+      const batchRowsForUsers = await tx.terminalIngestBatch.findMany({
+        where: { projectId, createdAt: { gte: since } },
+        select: { lineCount: true, metadata: true },
+      });
+      for (const br of batchRowsForUsers) {
+        const meta = br.metadata as Record<string, unknown> | null;
+        const uid =
+          meta && typeof meta.mintedByUserId === 'string'
+            ? meta.mintedByUserId
+            : null;
+        if (!uid) {
+          continue;
+        }
+        const cur = byMint.get(uid) ?? {
+          batches: 0,
+          lines: 0,
+          incidents: 0,
+        };
+        cur.batches += 1;
+        cur.lines += br.lineCount;
+        byMint.set(uid, cur);
+      }
+
+      const incidentsWithBatch = await tx.terminalIncident.findMany({
+        where: {
+          projectId,
+          lastSeenAt: { gte: since },
+          batchId: { not: null },
+        },
+        select: { batch: { select: { metadata: true } } },
+      });
+      for (const ir of incidentsWithBatch) {
+        const meta = ir.batch?.metadata as Record<string, unknown> | null;
+        const uid =
+          meta && typeof meta.mintedByUserId === 'string'
+            ? meta.mintedByUserId
+            : null;
+        if (!uid) {
+          continue;
+        }
+        const cur = byMint.get(uid) ?? {
+          batches: 0,
+          lines: 0,
+          incidents: 0,
+        };
+        cur.incidents += 1;
+        byMint.set(uid, cur);
+      }
+
+      let terminalByMintedTokenUser: ProjectSignalTerminalByMintedUser[] = [];
+      if (byMint.size > 0) {
+        const mintIds = [...byMint.keys()];
+        const mintUsers = await tx.user.findMany({
+          where: { id: { in: mintIds } },
+          select: { id: true, email: true, displayName: true },
+        });
+        const mintMap = new Map(mintUsers.map((u) => [u.id, u]));
+        terminalByMintedTokenUser = mintIds
+          .map((id) => {
+            const u = mintMap.get(id);
+            const g = byMint.get(id)!;
+            return {
+              userId: id,
+              email: u?.email ?? id,
+              displayName: u?.displayName ?? null,
+              batchesInWindow: g.batches,
+              linesInWindow: g.lines,
+              incidentRowsLinkedToMintedBatchesInWindow: g.incidents,
+            };
+          })
+          .sort(
+            (a, b) =>
+              b.batchesInWindow +
+              b.incidentRowsLinkedToMintedBatchesInWindow -
+              (a.batchesInWindow +
+                a.incidentRowsLinkedToMintedBatchesInWindow),
+          )
+          .slice(0, 24);
+      }
+
       let rest: GithubRestEnrichment | null = null;
       if (connection?.repositoryFullName && connection.githubPatCiphertext) {
         rest = await this.githubRest.enrich(
@@ -299,6 +387,7 @@ export class ProjectSignalsService {
           dueWithin7DaysCount,
         },
         tasksWithTerminalFriction,
+        terminalByMintedTokenUser,
       };
 
       return tx.projectSignalSnapshot.upsert({
@@ -317,4 +406,41 @@ export class ProjectSignalsService {
       });
     });
   }
+}
+
+/** Safe JSON for LLM prompts — strips raw terminal line payloads. */
+export function compactProjectSignalEvidenceForAi(
+  p: ProjectSignalPayload,
+): Record<string, unknown> {
+  const rest = p.github.rest;
+  return {
+    windowHours: p.windowHours,
+    tasks: p.tasks,
+    terminal: p.terminal,
+    github: {
+      webhookEventsInWindow: p.github.webhookEventsInWindow,
+      openPullRequests: p.github.openPullRequests,
+      openIssues: p.github.openIssues,
+      lastEventAt: p.github.lastEventAt,
+      rest: rest
+        ? {
+            fetchedAt: rest.fetchedAt,
+            combinedStatus: rest.combinedStatus,
+            defaultBranch: rest.defaultBranch,
+            openPullRequestsFromApi: rest.openPullRequestsFromApi,
+            openIssuesFromApi: rest.openIssuesFromApi,
+            lastRepositoryPushAt: rest.lastRepositoryPushAt,
+            mergedPullRequestsLast7Days: rest.mergedPullRequestsLast7Days,
+          }
+        : null,
+    },
+    tasksWithTerminalFriction: (p.tasksWithTerminalFriction ?? []).slice(
+      0,
+      15,
+    ),
+    terminalByMintedTokenUser: (p.terminalByMintedTokenUser ?? []).slice(
+      0,
+      15,
+    ),
+  };
 }

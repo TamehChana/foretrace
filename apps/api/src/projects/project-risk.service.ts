@@ -5,11 +5,12 @@ import { AlertsService } from '../alerts/alerts.service';
 import { RiskInsightService } from '../ai/risk-insight.service';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
-import type {
-  GithubRestEnrichment,
-  ProjectSignalPayload,
+import {
+  compactProjectSignalEvidenceForAi,
+  ProjectSignalsService,
+  type GithubRestEnrichment,
+  type ProjectSignalPayload,
 } from './project-signals.service';
-import { ProjectSignalsService } from './project-signals.service';
 import { ProjectsService } from './projects.service';
 import type { RiskReasonRow } from './risk-reason.types';
 
@@ -87,6 +88,7 @@ export class ProjectRiskService {
       level,
       score,
       reasons,
+      signalEvidence: compactProjectSignalEvidenceForAi(payload),
     });
 
     const run = await this.prisma.riskEvaluationRun.create({
