@@ -28,7 +28,6 @@
     "@types/node": "^24.0.0",
     "@types/nodemailer": "^6.4.23",
     "@types/passport": "^1.0.17",
-    "@types/vscode": "^1.118.0",
     "@vscode/vsce": "^3.6.0",
     "cross-env": "^7.0.3",
     "turbo": "^2.5.4"
