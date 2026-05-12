@@ -33,6 +33,17 @@ type SignalPayload = {
     overdueCount: number;
     dueWithin7DaysCount: number;
   };
+  tasksWithTerminalFriction?: Array<{
+    taskId: string;
+    title: string;
+    assigneeId: string | null;
+    assigneeEmail: string | null;
+    assigneeDisplayName: string | null;
+    incidentTouchesInWindow: number;
+    batchesPostedInWindow: number;
+    lastIncidentAt: string | null;
+    lastBatchAt: string | null;
+  }>;
 };
 
 type SnapshotRow = {
@@ -43,6 +54,24 @@ type SnapshotRow = {
   payload: SignalPayload;
   computedAt: string;
 };
+
+function assigneeLabelForSignals(r: {
+  assigneeDisplayName: string | null;
+  assigneeEmail: string | null;
+  assigneeId: string | null;
+}): string {
+  const n = r.assigneeDisplayName?.trim();
+  if (n) {
+    return n;
+  }
+  if (r.assigneeEmail) {
+    return r.assigneeEmail;
+  }
+  if (r.assigneeId) {
+    return `User ${r.assigneeId.slice(0, 8)}…`;
+  }
+  return 'Unassigned';
+}
 
 function formatWhen(iso: string): string {
   try {
@@ -242,6 +271,65 @@ export function ProjectSignalsPanel(props: {
             </dd>
           </div>
         </dl>
+        {(state.snapshot.payload.tasksWithTerminalFriction?.length ?? 0) >
+        0 ? (
+          <div className="col-span-2 mt-3 sm:col-span-3">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              Task + assignee (terminal)
+            </h4>
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Shown when the CLI sets{' '}
+              <code className="rounded bg-zinc-100 px-1 text-[10px] dark:bg-zinc-800">
+                FORETRACE_TASK_ID
+              </code>{' '}
+              to a task in this project. Incidents and batches in the window are
+              grouped by that task; assignee comes from the task record.
+            </p>
+            <div className="mt-2 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+              <table className="w-full min-w-[28rem] border-collapse text-left text-[11px]">
+                <thead>
+                  <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900/80">
+                    <th className="px-2 py-1.5 font-semibold text-zinc-600 dark:text-zinc-400">
+                      Task
+                    </th>
+                    <th className="px-2 py-1.5 font-semibold text-zinc-600 dark:text-zinc-400">
+                      Assignee
+                    </th>
+                    <th className="px-2 py-1.5 font-semibold text-zinc-600 dark:text-zinc-400">
+                      Incidents (24h)
+                    </th>
+                    <th className="px-2 py-1.5 font-semibold text-zinc-600 dark:text-zinc-400">
+                      Batches (24h)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.snapshot.payload.tasksWithTerminalFriction!.map(
+                    (r) => (
+                      <tr
+                        key={r.taskId}
+                        className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
+                      >
+                        <td className="max-w-[12rem] truncate px-2 py-1.5 font-medium text-zinc-900 dark:text-zinc-100">
+                          {r.title}
+                        </td>
+                        <td className="max-w-[10rem] truncate px-2 py-1.5 text-zinc-700 dark:text-zinc-300">
+                          {assigneeLabelForSignals(r)}
+                        </td>
+                        <td className="px-2 py-1.5 tabular-nums text-zinc-800 dark:text-zinc-200">
+                          {r.incidentTouchesInWindow}
+                        </td>
+                        <td className="px-2 py-1.5 tabular-nums text-zinc-800 dark:text-zinc-200">
+                          {r.batchesPostedInWindow}
+                        </td>
+                      </tr>
+                    ),
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
         <p className="mt-3 rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-400">
           <strong className="font-medium text-zinc-800 dark:text-zinc-200">Why everything can stay at zero:</strong>{' '}
           this rollup only counts what Foretrace has <em>stored</em> for this project in the last{' '}
@@ -254,7 +342,8 @@ export function ProjectSignalsPanel(props: {
           <span className="font-mono">pull_request</span> / <span className="font-mono">issues</span> webhooks (not
           Actions alone).{' '}
           <strong className="font-medium text-zinc-800 dark:text-zinc-200">Terminal</strong> counts need the CLI
-          posting batches. <strong className="font-medium text-zinc-800 dark:text-zinc-200">Tasks</strong> exclude{' '}
+          posting batches; set <strong className="font-medium text-zinc-800 dark:text-zinc-200">FORETRACE_TASK_ID</strong>{' '}
+          to attribute noise to a task and assignee in the table above. <strong className="font-medium text-zinc-800 dark:text-zinc-200">Tasks</strong> exclude{' '}
           <span className="font-mono">DONE</span> / <span className="font-mono">CANCELLED</span>; overdue / due-in-7d
           need active tasks with deadlines.
         </p>

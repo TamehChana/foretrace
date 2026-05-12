@@ -14,6 +14,18 @@ export type GithubRestEnrichment = {
   combinedStatus: string | null;
 };
 
+export type ProjectSignalTaskTerminalFriction = {
+  taskId: string;
+  title: string;
+  assigneeId: string | null;
+  assigneeEmail: string | null;
+  assigneeDisplayName: string | null;
+  incidentTouchesInWindow: number;
+  batchesPostedInWindow: number;
+  lastIncidentAt: string | null;
+  lastBatchAt: string | null;
+};
+
 export type ProjectSignalPayload = {
   windowHours: number;
   github: {
@@ -33,6 +45,8 @@ export type ProjectSignalPayload = {
     overdueCount: number;
     dueWithin7DaysCount: number;
   };
+  /** Present on snapshots after this feature ships; ties terminal batches/incidents to tasks + assignees. */
+  tasksWithTerminalFriction?: ProjectSignalTaskTerminalFriction[];
 };
 
 /** Minimum gap between automatic snapshot recomputes for the same project (webhooks + ingest). */
@@ -158,6 +172,99 @@ export class ProjectSignalsService {
         },
       });
 
+      type FrictionAgg = {
+        incidentTouches: number;
+        batchesPosted: number;
+        lastIncidentAt: Date | null;
+        lastBatchAt: Date | null;
+      };
+      const byTask = new Map<string, FrictionAgg>();
+
+      const incidentGroups = await tx.terminalIncident.groupBy({
+        by: ['taskId'],
+        where: {
+          projectId,
+          taskId: { not: null },
+          lastSeenAt: { gte: since },
+        },
+        _count: { id: true },
+        _max: { lastSeenAt: true },
+      });
+      for (const row of incidentGroups) {
+        if (!row.taskId) {
+          continue;
+        }
+        byTask.set(row.taskId, {
+          incidentTouches: row._count.id,
+          batchesPosted: 0,
+          lastIncidentAt: row._max.lastSeenAt,
+          lastBatchAt: null,
+        });
+      }
+
+      const batchGroups = await tx.terminalIngestBatch.groupBy({
+        by: ['taskId'],
+        where: {
+          projectId,
+          taskId: { not: null },
+          createdAt: { gte: since },
+        },
+        _count: { id: true },
+        _max: { createdAt: true },
+      });
+      for (const row of batchGroups) {
+        if (!row.taskId) {
+          continue;
+        }
+        const existing = byTask.get(row.taskId) ?? {
+          incidentTouches: 0,
+          batchesPosted: 0,
+          lastIncidentAt: null,
+          lastBatchAt: null,
+        };
+        existing.batchesPosted = row._count.id;
+        existing.lastBatchAt = row._max.createdAt;
+        byTask.set(row.taskId, existing);
+      }
+
+      let tasksWithTerminalFriction: ProjectSignalTaskTerminalFriction[] = [];
+      if (byTask.size > 0) {
+        const taskIds = [...byTask.keys()];
+        const tasks = await tx.task.findMany({
+          where: { id: { in: taskIds }, projectId },
+          select: {
+            id: true,
+            title: true,
+            assigneeId: true,
+            assignee: { select: { email: true, displayName: true } },
+          },
+        });
+        const taskMap = new Map(tasks.map((t) => [t.id, t]));
+        tasksWithTerminalFriction = [...byTask.entries()]
+          .map(([taskId, agg]) => {
+            const t = taskMap.get(taskId);
+            return {
+              taskId,
+              title: t?.title ?? '(removed task)',
+              assigneeId: t?.assigneeId ?? null,
+              assigneeEmail: t?.assignee?.email ?? null,
+              assigneeDisplayName: t?.assignee?.displayName ?? null,
+              incidentTouchesInWindow: agg.incidentTouches,
+              batchesPostedInWindow: agg.batchesPosted,
+              lastIncidentAt: agg.lastIncidentAt?.toISOString() ?? null,
+              lastBatchAt: agg.lastBatchAt?.toISOString() ?? null,
+            };
+          })
+          .sort((a, b) => {
+            const wa =
+              a.incidentTouchesInWindow + a.batchesPostedInWindow;
+            const wb =
+              b.incidentTouchesInWindow + b.batchesPostedInWindow;
+            return wb - wa;
+          })
+          .slice(0, 25);
+      }
+
       let rest: GithubRestEnrichment | null = null;
       if (connection?.repositoryFullName && connection.githubPatCiphertext) {
         rest = await this.githubRest.enrich(
@@ -191,6 +298,7 @@ export class ProjectSignalsService {
           overdueCount,
           dueWithin7DaysCount,
         },
+        tasksWithTerminalFriction,
       };
 
       return tx.projectSignalSnapshot.upsert({

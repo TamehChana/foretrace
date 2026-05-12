@@ -301,7 +301,8 @@ Environment (ingest + run):
   FORETRACE_TOKEN               Bearer token (ft_ck_…)
   FORETRACE_ORGANIZATION_ID     Organization UUID
   FORETRACE_PROJECT_ID          Project UUID
-  FORETRACE_TASK_ID             Optional task UUID
+  FORETRACE_TASK_ID             Optional task UUID — set so terminal batches and
+                                incidents roll up to that task in Signals (assignee shown there).
 
   If any FORETRACE_* variable is unset or empty, the CLI loads it from '.env' files
   found walking up from cwd: parent folders first, then the closest '.env' to cwd

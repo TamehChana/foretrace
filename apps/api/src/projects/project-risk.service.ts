@@ -200,6 +200,36 @@ export class ProjectRiskService {
       });
     }
 
+    const taskTerminal = payload.tasksWithTerminalFriction ?? [];
+    const taskTouchSum = taskTerminal.reduce(
+      (s, r) => s + r.incidentTouchesInWindow,
+      0,
+    );
+    if (taskTouchSum > 0) {
+      score += Math.min(taskTouchSum * 2, 12);
+      const lines = taskTerminal
+        .filter((r) => r.incidentTouchesInWindow > 0)
+        .slice(0, 4)
+        .map((r) => {
+          const who =
+            r.assigneeDisplayName?.trim() ||
+            r.assigneeEmail ||
+            (r.assigneeId ? `user ${r.assigneeId.slice(0, 8)}…` : 'unassigned');
+          return `"${r.title}" (${who}): ${r.incidentTouchesInWindow} incident touch(es)`;
+        });
+      const more =
+        taskTerminal.filter((r) => r.incidentTouchesInWindow > 0).length > 4
+          ? ` (+${
+              taskTerminal.filter((r) => r.incidentTouchesInWindow > 0)
+                .length - 4
+            } more)`
+          : '';
+      reasons.push({
+        code: 'TASK_SCOPED_TERMINAL',
+        detail: `Terminal friction tied to tasks (CLI used task id) in the last ${hours}h: ${lines.join('; ')}${more}.`,
+      });
+    }
+
     const gh = payload.github.webhookEventsInWindow;
     if (gh > 40) {
       score += 6;
