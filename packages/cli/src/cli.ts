@@ -12,11 +12,25 @@ type ForetraceEnv = {
   taskId?: string;
 };
 
+/** HTTP headers must be Latin-1 / ByteString; catch smart quotes or `…` from copied docs. */
+function assertHeaderAscii(label: string, value: string): void {
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    if (c > 0x7f) {
+      console.error(
+        `${label} contains a non-ASCII character at index ${i} (code ${c}). ` +
+          `Paste the real value from Foretrace — not a placeholder like ft_ck_… from documentation.`,
+      );
+      process.exit(1);
+    }
+  }
+}
+
 function readForetraceEnv(): ForetraceEnv {
-  const apiUrl = process.env.FORETRACE_API_URL?.replace(/\/+$/, '');
-  const token = process.env.FORETRACE_TOKEN;
-  const orgId = process.env.FORETRACE_ORGANIZATION_ID;
-  const projectId = process.env.FORETRACE_PROJECT_ID;
+  const apiUrl = process.env.FORETRACE_API_URL?.trim().replace(/\/+$/, '');
+  const token = process.env.FORETRACE_TOKEN?.trim() ?? '';
+  const orgId = process.env.FORETRACE_ORGANIZATION_ID?.trim() ?? '';
+  const projectId = process.env.FORETRACE_PROJECT_ID?.trim() ?? '';
   const taskRaw = process.env.FORETRACE_TASK_ID?.trim();
   const taskId =
     taskRaw !== undefined && taskRaw.length > 0 ? taskRaw : undefined;
@@ -35,6 +49,21 @@ function readForetraceEnv(): ForetraceEnv {
   }
   if (!projectId) {
     console.error('FORETRACE_PROJECT_ID is required');
+    process.exit(1);
+  }
+
+  assertHeaderAscii('FORETRACE_API_URL', apiUrl);
+  assertHeaderAscii('FORETRACE_TOKEN', token);
+  assertHeaderAscii('FORETRACE_ORGANIZATION_ID', orgId);
+  assertHeaderAscii('FORETRACE_PROJECT_ID', projectId);
+  if (taskId) {
+    assertHeaderAscii('FORETRACE_TASK_ID', taskId);
+  }
+
+  if (!token.startsWith('ft_ck_')) {
+    console.error(
+      'FORETRACE_TOKEN should start with ft_ck_ (mint a CLI ingest token in the Foretrace project dashboard).',
+    );
     process.exit(1);
   }
 
