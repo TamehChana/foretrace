@@ -327,6 +327,13 @@ export function DocumentationPage() {
               <strong>User mapping:</strong> link GitHub usernames to Foretrace accounts so activity lines up with people you know in the app.
             </li>
           </ol>
+          <Tip>
+            <strong className="text-zinc-800 dark:text-zinc-200">Quick checks when activity looks empty:</strong> in GitHub open the webhook’s{' '}
+            <strong>Recent Deliveries</strong>—each row should be <strong>200</strong> (if not, fix URL, secret, or content type). Enable at least{' '}
+            <strong>Push</strong>, <strong>Pull requests</strong>, and <strong>Issues</strong> for the events Foretrace aggregates. To save an optional classic or
+            fine-grained <strong>PAT</strong> in Foretrace, the API host must have <Code>FORETRACE_APP_SECRET</Code> set (see your deploy docs), then use{' '}
+            <strong>Save PAT</strong> once and refresh <strong>Signals</strong>.
+          </Tip>
         </WorkflowStep>
 
         <WorkflowStep step={6} id="step-6" title="Optional: send terminal / build logs with the CLI">
