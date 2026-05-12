@@ -5,10 +5,9 @@ const SECRET_CLI_TOKEN = 'foretrace.cliToken';
 const MAX_LINES = 320;
 const MAX_LINE_CHARS = 12_288;
 
-const outputChannel = vscode.window.createOutputChannel('Foretrace (ingest)');
-
-function logLine(message: string): void {
-  outputChannel.appendLine(`[${new Date().toISOString()}] ${message}`);
+function isWorkspaceTrusted(): boolean {
+  const w = vscode.workspace as { isTrusted?: boolean };
+  return w.isTrusted !== false;
 }
 
 type TerminalWriteEvent = { terminal: vscode.Terminal; data: string };
@@ -211,36 +210,24 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 function doActivate(context: vscode.ExtensionContext): void {
+  const outputChannel = vscode.window.createOutputChannel('Foretrace (ingest)');
+  context.subscriptions.push(outputChannel);
+  const logLine = (message: string): void => {
+    outputChannel.appendLine(`[${new Date().toISOString()}] ${message}`);
+  };
+
   const pkg = context.extension.packageJSON as { version?: string };
   const ver = pkg.version ?? '?';
   logLine(`activate v${ver}`);
-  context.subscriptions.push(outputChannel);
 
   console.info(`[Foretrace] extension activated v${ver}`);
-
-  const bannerKey = 'foretrace.activateHintDismissedForVersion';
-  const dismissed = context.globalState.get<string>(bannerKey);
-  if (dismissed !== ver) {
-    void vscode.window
-      .showInformationMessage(
-        `Foretrace ${ver} is running. Logs: View → Output → “Foretrace (ingest)”, or command “Foretrace: Open output log”.`,
-        'Open output log',
-        'OK',
-      )
-      .then((choice) => {
-        if (choice === 'Open output log') {
-          outputChannel.show(true);
-        }
-        void context.globalState.update(bannerKey, ver);
-      });
-  }
 
   const session = new TerminalCaptureSession(context);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('foretrace.setCliToken', async () => {
       logLine('setCliToken: command started');
-      if (vscode.workspace.isTrusted === false) {
+      if (!isWorkspaceTrusted()) {
         logLine('setCliToken: blocked — workspace is Restricted (not trusted)');
         void vscode.window.showErrorMessage(
           'Foretrace: This folder is in Restricted Mode. Trust this workspace (blue banner, or Command “Workspaces: Manage Workspace Trust”), then run “Set CLI ingest token” again.',

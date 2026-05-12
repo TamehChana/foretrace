@@ -22,9 +22,12 @@ If capture start warns that the API is missing, use **Foretrace: Send editor sel
 
 ## Troubleshooting (Cursor)
 
-- If **Set CLI ingest token** errors immediately, the folder may be **Restricted / not trusted**. Trust the workspace (banner at top, or command **Workspaces: Manage Workspace Trust**), reload, try again.
-- **View → Output** → channel **Foretrace (ingest)** — shows activation and token-save steps (v0.1.4+).
-- Command palette → **Foretrace: Open output log** opens that channel.
+Cursor is based on VS Code but **lags or diverges** on the extension host. This build uses **`engines.vscode: *`**, **implicit activation** (no `activationEvents` — Cursor sometimes mishandles `onCommand:…` lists), and **`extensionKind` workspace + ui**.
+
+- If you see **`command 'foretrace.setCliToken' not found`**: uninstall Foretrace, **quit Cursor completely**, install **`foretrace-vscode-0.1.6.vsix`**, reopen, run **Developer: Reload Window**, then try the command again.
+- If **Set CLI ingest token** fails for policy reasons, the folder may be **Restricted / not trusted** — trust the workspace (**Workspaces: Manage Workspace Trust**), reload, try again.
+- **View → Output** → **Foretrace (ingest)** — activation and token steps. Command palette → **Foretrace: Open output log** opens that channel.
+- If it **still** fails only in Cursor, use **VS Code** for this extension until Cursor matches a newer VS Code base, or update Cursor to the latest stable.
 
 ## Package VSIX
 
