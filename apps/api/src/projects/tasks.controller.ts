@@ -20,6 +20,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { ProjectUuidParamGuard } from '../common/project-uuid-param.guard';
 import { TaskUuidParamGuard } from '../common/task-uuid-param.guard';
 import { OrganizationUuidParamGuard } from '../organizations/organization-uuid-param.guard';
+import { BodyDtoPipe } from '../common/pipes/body-dto.pipe';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TasksService } from './tasks.service';
@@ -56,7 +57,7 @@ export class TasksController {
   async create(
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
-    @Body() dto: CreateTaskDto,
+    @Body(new BodyDtoPipe(CreateTaskDto)) dto: CreateTaskDto,
     @Req() req: Request,
   ): Promise<{ data: Awaited<ReturnType<TasksService['createTask']>> }> {
     const data = await this.tasksService.createTask(
@@ -103,7 +104,7 @@ export class TasksController {
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
     @Param('taskId') taskId: string,
-    @Body() dto: UpdateTaskDto,
+    @Body(new BodyDtoPipe(UpdateTaskDto)) dto: UpdateTaskDto,
   ): Promise<{ data: Awaited<ReturnType<TasksService['updateTask']>> }> {
     const data = await this.tasksService.updateTask(
       taskId,

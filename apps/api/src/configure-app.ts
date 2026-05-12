@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
-import { ValidationPipe } from '@nestjs/common';
+
+import { ForetraceValidationPipe } from './common/pipes/foretrace-validation.pipe';
 import { ConfigService } from '@nestjs/config';
 import type { Application } from 'express';
 import helmet from 'helmet';
@@ -120,7 +121,7 @@ export function configureApp(app: INestApplication): void {
   expressApp.use(passport.session());
 
   app.useGlobalPipes(
-    new ValidationPipe({
+    new ForetraceValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
