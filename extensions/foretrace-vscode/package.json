@@ -5,6 +5,11 @@
   "version": "0.1.0",
   "publisher": "foretrace",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TamehChana/foretrace.git",
+    "directory": "extensions/foretrace-vscode"
+  },
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
