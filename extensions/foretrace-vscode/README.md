@@ -20,12 +20,15 @@ If capture start warns that the API is missing, use **Foretrace: Send editor sel
 
 ## Package VSIX
 
-From repo root:
+From the **monorepo root** (recommended):
 
 ```bash
-cd extensions/foretrace-vscode
-npm install
-npm run package
+npm install --include=dev
+npm run extension:package
 ```
+
+This runs `vsce` and writes `extensions/foretrace-vscode/foretrace-vscode-0.1.0.vsix` (version follows `package.json`).
+
+Alternatively, from this folder after root `npm install --include=dev`: `npm run package`.
 
 Install the generated `.vsix` in VS Code / Cursor: **Extensions → … → Install from VSIX…**.

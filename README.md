@@ -18,6 +18,7 @@ Foretrace is an AI-assisted **software project monitoring** web application: it 
 |------|---------|------|
 | `packages/shared` | `@foretrace/shared` | Zod contracts and shared TypeScript APIs |
 | `packages/cli` | `@foretrace/cli` | Terminal log ingest CLI (`foretrace ingest`) |
+| `extensions/foretrace-vscode` | `foretrace-vscode` | VS Code / Cursor extension (optional terminal → API; package a `.vsix` — see extension README) |
 | `apps/web` | `@foretrace/web` | React + Vite SPA (Tailwind CSS v4, Lucide) |
 | `apps/api` | `@foretrace/api` | NestJS HTTP API |
 
@@ -29,6 +30,7 @@ Foretrace is an AI-assisted **software project monitoring** web application: it 
 - `npm run lint` — typecheck/lint pipelines per package
 - `npm run smoke:terminal-ingest` — end-to-end script: login → mint CLI token → sample `POST …/terminal/batches` (requires `FORETRACE_*` in `.env`; see [`.env.example`](.env.example))
 - `npm run terminal:ingest` — pipe stdin to the API via built `@foretrace/cli` (build CLI first: `npm run build -w @foretrace/cli`)
+- `npm run extension:package` — build and pack the VS Code extension to `extensions/foretrace-vscode/foretrace-vscode-*.vsix` (after `npm install --include=dev`; details in [`extensions/foretrace-vscode/README.md`](extensions/foretrace-vscode/README.md))
 
 **Ports:** API `http://localhost:3000`, web `http://localhost:5173` (Vite dev server proxies `GET /health`, auth routes under `/auth`, and `GET /organizations` to the API with cookies).
 
