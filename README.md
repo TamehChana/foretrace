@@ -120,6 +120,8 @@ Models live in [`apps/api/prisma/schema.prisma`](apps/api/prisma/schema.prisma) 
 
 ## Deployment (Render API + Vercel frontend)
 
+**Same git repo, usually two hosted services:** the **API + Postgres** on Render and the **static SPA** on Vercel are both built from this monorepo — that is normal, not a second “product install.” Local development is **one** `npm install` at the repo root (`turbo` / workspaces).
+
 Intended split: **Nest + PostgreSQL on [Render](https://render.com/)**, **Vite static app on [Vercel](https://vercel.com/)** (monorepo root stays the Git project for both). The browser **never** needs `VITE_API_URL` to point at the same host as the SPA: set **`VITE_API_URL`** on the Vercel **frontend** project to your **`https://…onrender.com`** API URL, and set **`CORS_ORIGINS`** on **Render** to your **`https://…vercel.app`** SPA origin.
 
 ### Render (backend)
@@ -138,6 +140,8 @@ If Prisma cannot connect, confirm the Render **`DATABASE_URL`** matches what Pri
 **`API_PUBLIC_URL`** on Render should match the public **`https://…onrender.com`** service URL (no trailing slash) so GitHub connection responses show the correct **`POST /webhooks/github`** URL. It must **not** be the Vercel SPA URL unless the API is actually served from there.
 
 ### GitHub webhooks (API)
+
+Foretrace uses **per-repository webhooks** (you paste the **Payload URL** and **secret** in each repo’s GitHub settings). There is **no** separate “install this GitHub App once for the whole org” flow in v1.
 
 Requires DB migrations applied (`GitHubConnection`, `GitHubWebhookEvent`, `GitHubUserLink` tables).
 
