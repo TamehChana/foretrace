@@ -20,8 +20,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { ProjectUuidParamGuard } from '../common/project-uuid-param.guard';
 import { TaskUuidParamGuard } from '../common/task-uuid-param.guard';
 import { OrganizationUuidParamGuard } from '../organizations/organization-uuid-param.guard';
-import type { CreateTaskDto } from './dto/create-task.dto';
-import type { UpdateTaskDto } from './dto/update-task.dto';
+import { CreateTaskDto } from './dto/create-task.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
 import { TasksService } from './tasks.service';
 
 @Controller('organizations/:organizationId/projects/:projectId/tasks')
