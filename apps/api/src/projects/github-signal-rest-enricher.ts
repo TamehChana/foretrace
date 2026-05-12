@@ -9,6 +9,10 @@ export type GithubRestEnrichment = {
   defaultBranch: string | null;
   defaultBranchHeadSha: string | null;
   combinedStatus: string | null;
+  /** ISO timestamp of last push to the repo (GitHub `pushed_at`). */
+  lastRepositoryPushAt: string | null;
+  /** PRs merged in the last 7 calendar days (search API, repo-wide). */
+  mergedPullRequestsLast7Days: number | null;
 };
 
 const GITHUB_API = 'https://api.github.com';
@@ -57,12 +61,15 @@ export class GithubSignalRestEnricher {
       const repoJson = (await repoRes.json()) as {
         default_branch?: string;
         open_issues_count?: number;
+        pushed_at?: string;
       };
       const defaultBranch = repoJson.default_branch ?? null;
       const openIssuesFromRepo =
         typeof repoJson.open_issues_count === 'number'
           ? repoJson.open_issues_count
           : null;
+      const lastRepositoryPushAt =
+        typeof repoJson.pushed_at === 'string' ? repoJson.pushed_at : null;
 
       let openPullRequestsFromApi: number | null = null;
       const prSearchRes = await fetch(
@@ -98,6 +105,24 @@ export class GithubSignalRestEnricher {
         openIssuesFromApi = openIssuesFromRepo;
       }
 
+      let mergedPullRequestsLast7Days: number | null = null;
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const mergedSince = weekAgo.toISOString().slice(0, 10);
+      const mergedSearchRes = await fetch(
+        `${GITHUB_API}/search/issues?q=${encodeURIComponent(
+          `repo:${owner}/${repo} is:pr is:merged merged:>${mergedSince}`,
+        )}&per_page=1`,
+        { headers },
+      );
+      if (mergedSearchRes.ok) {
+        const mergedJson = (await mergedSearchRes.json()) as {
+          total_count?: number;
+        };
+        if (typeof mergedJson.total_count === 'number') {
+          mergedPullRequestsLast7Days = mergedJson.total_count;
+        }
+      }
+
       let defaultBranchHeadSha: string | null = null;
       let combinedStatus: string | null = null;
       if (defaultBranch) {
@@ -130,6 +155,8 @@ export class GithubSignalRestEnricher {
         defaultBranch,
         defaultBranchHeadSha,
         combinedStatus,
+        lastRepositoryPushAt,
+        mergedPullRequestsLast7Days,
       };
     } catch (e: unknown) {
       this.log.warn(
