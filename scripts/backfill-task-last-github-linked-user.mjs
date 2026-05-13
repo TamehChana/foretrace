@@ -15,7 +15,11 @@
  * Optional:
  *   FORETRACE_BACKFILL_PROJECT_ID=<uuid>  limit to one project
  *
- * npm:
+ * npm (repo root):
+ *   npm run backfill:task-github-linked-user
+ *   npm run backfill:task-github-linked-user -- --apply
+ *
+ * npm (from apps/api):
  *   npm run backfill:task-github-linked-user
  *   npm run backfill:task-github-linked-user -- --apply
  */
