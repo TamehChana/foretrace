@@ -63,4 +63,12 @@ export class UpdateTaskDto {
   @Min(1)
   @Max(2_147_483_647)
   githubIssueNumber?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  githubPullRequestNumber?: number | null;
 }

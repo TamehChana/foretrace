@@ -80,3 +80,52 @@ export function collectIssueReferencesFromGithubWebhook(
 
   return [...ids];
 }
+
+/** Pull request number from `pull_request` webhook payloads. */
+export function extractPullRequestNumber(
+  payload: unknown,
+  eventType: string,
+): number | null {
+  if (eventType !== 'pull_request') {
+    return null;
+  }
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const pr = (payload as Record<string, unknown>).pull_request;
+  if (!pr || typeof pr !== 'object') {
+    return null;
+  }
+  const n = (pr as { number?: unknown }).number;
+  if (typeof n === 'number' && Number.isFinite(n) && n > 0) {
+    return Math.trunc(n);
+  }
+  return null;
+}
+
+export function summarizeGithubWebhookTouch(
+  eventType: string,
+  action: string | undefined,
+  issueNums: number[],
+  pullRequestNumber: number | null,
+): string {
+  const sorted = [...issueNums].sort((a, b) => a - b);
+  const issuePart =
+    sorted.length > 0
+      ? `issues #${sorted.slice(0, 8).join(', #')}${
+          sorted.length > 8 ? '…' : ''
+        }`
+      : '';
+  const bits = [eventType];
+  if (action) {
+    bits.push(action);
+  }
+  let out = bits.join(':');
+  if (issuePart) {
+    out += ` · ${issuePart}`;
+  }
+  if (pullRequestNumber != null) {
+    out += ` · PR #${pullRequestNumber}`;
+  }
+  return out.length > 500 ? `${out.slice(0, 497)}…` : out;
+}

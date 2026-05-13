@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from 'react';
@@ -27,7 +28,12 @@ import {
   useOrgMembers,
   type OrgMemberRow,
 } from '../../hooks/use-org-members';
-import { type OrgTaskRow, useOrgTasks } from '../../hooks/use-org-tasks';
+import {
+  parseGithubLinkedUser,
+  type OrgTaskGithubLinkedUser,
+  type OrgTaskRow,
+  useOrgTasks,
+} from '../../hooks/use-org-tasks';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 import { useToast } from '../../providers/ToastProvider';
 import { OrganizationIdCopyRow } from '../ui/OrganizationIdCopyRow';
@@ -98,6 +104,56 @@ function formatTaskDateTime(iso: string | null): string {
   } catch {
     return iso;
   }
+}
+
+type TaskGithubActivityRow = {
+  id: string;
+  occurredAt: string;
+  eventType: string;
+  action: string | null;
+  actorLogin: string | null;
+  pullRequestNumber: number | null;
+  summary: string;
+  linkedUser: OrgTaskGithubLinkedUser | null;
+};
+
+function parseOneGithubActivityRow(row: unknown): TaskGithubActivityRow {
+  if (!row || typeof row !== 'object' || !('id' in row)) {
+    throw new Error('Invalid activity row');
+  }
+  const r = row as Record<string, unknown>;
+  return {
+    id: String(r.id),
+    occurredAt: typeof r.occurredAt === 'string' ? r.occurredAt : '',
+    eventType: typeof r.eventType === 'string' ? r.eventType : '',
+    action:
+      typeof r.action === 'string'
+        ? r.action
+        : r.action === null
+          ? null
+          : null,
+    actorLogin:
+      typeof r.actorLogin === 'string'
+        ? r.actorLogin
+        : r.actorLogin === null
+          ? null
+          : null,
+    pullRequestNumber:
+      typeof r.pullRequestNumber === 'number' ? r.pullRequestNumber : null,
+    summary: typeof r.summary === 'string' ? r.summary : '',
+    linkedUser: parseGithubLinkedUser(r.linkedUser),
+  };
+}
+
+function parseGithubActivityEnvelope(json: unknown): TaskGithubActivityRow[] {
+  if (!json || typeof json !== 'object' || !('data' in json)) {
+    throw new Error('Invalid response shape');
+  }
+  const raw = (json as { data: unknown }).data;
+  if (!Array.isArray(raw)) {
+    throw new Error('Invalid response shape');
+  }
+  return raw.map(parseOneGithubActivityRow);
 }
 
 export function ProjectsPage() {
@@ -184,11 +240,33 @@ export function ProjectsPage() {
   const [taskGithubIssueOnCreate, setTaskGithubIssueOnCreate] = useState<
     Record<string, string>
   >({});
+  const [taskGithubPrOnCreate, setTaskGithubPrOnCreate] = useState<
+    Record<string, string>
+  >({});
   const [taskSubmitting, setTaskSubmitting] = useState(false);
   const [patchingTaskId, setPatchingTaskId] = useState<string | null>(null);
+  const activityFetchedRef = useRef<Set<string>>(new Set());
+  const [githubActivityByTask, setGithubActivityByTask] = useState<
+    Record<
+      string,
+      | { status: 'idle' }
+      | { status: 'loading' }
+      | { status: 'ok'; rows: TaskGithubActivityRow[] }
+      | { status: 'error'; message: string }
+    >
+  >({});
+  const [githubCheckHintByTask, setGithubCheckHintByTask] = useState<
+    Record<string, string>
+  >({});
   const [myTasksOnlyByProject, setMyTasksOnlyByProject] = useState<
     Record<string, boolean>
   >({});
+
+  useEffect(() => {
+    activityFetchedRef.current = new Set();
+    setGithubActivityByTask({});
+    setGithubCheckHintByTask({});
+  }, [organizationId, expandedProjectId]);
 
   const role = memberRole.status === 'ok' ? memberRole.role : null;
   const cliPanelRole =
@@ -237,6 +315,109 @@ export function ProjectsPage() {
       return false;
     },
     [role, currentUserId],
+  );
+
+  const loadGithubActivityForTask = useCallback(
+    async (projectId: string, taskId: string) => {
+      if (!organizationId) {
+        return;
+      }
+      setGithubActivityByTask((prev) => ({
+        ...prev,
+        [taskId]: { status: 'loading' },
+      }));
+      try {
+        const res = await apiFetch(
+          `/organizations/${organizationId}/projects/${projectId}/tasks/${taskId}/github/activity`,
+        );
+        if (!res.ok) {
+          throw new Error(await readApiErrorMessage(res));
+        }
+        const rows = parseGithubActivityEnvelope(await res.json());
+        setGithubActivityByTask((prev) => ({
+          ...prev,
+          [taskId]: { status: 'ok', rows },
+        }));
+      } catch (err: unknown) {
+        setGithubActivityByTask((prev) => ({
+          ...prev,
+          [taskId]: {
+            status: 'error',
+            message:
+              err instanceof Error ? err.message : 'Failed to load activity',
+          },
+        }));
+      }
+    },
+    [organizationId],
+  );
+
+  const fetchGithubCheckStatusForTask = useCallback(
+    async (projectId: string, taskId: string) => {
+      if (!organizationId) {
+        return;
+      }
+      setGithubCheckHintByTask((prev) => ({
+        ...prev,
+        [taskId]: 'Loading…',
+      }));
+      try {
+        const res = await apiFetch(
+          `/organizations/${organizationId}/projects/${projectId}/tasks/${taskId}/github/check-status`,
+        );
+        if (!res.ok) {
+          throw new Error(await readApiErrorMessage(res));
+        }
+        const json: unknown = await res.json();
+        if (!json || typeof json !== 'object' || !('data' in json)) {
+          throw new Error('Invalid response shape');
+        }
+        const d = (json as { data: unknown }).data;
+        if (!d || typeof d !== 'object' || !('ok' in d)) {
+          throw new Error('Invalid response shape');
+        }
+        const data = d as
+          | {
+              ok: true;
+              pullNumber: number;
+              combinedStatus: string | null;
+              headSha: string | null;
+              note: string | null;
+            }
+          | { ok: false; reason: string };
+        if (!data.ok) {
+          const reason = data.reason;
+          const msg =
+            reason === 'no_github_connection'
+              ? 'No GitHub connection on this project.'
+              : reason === 'no_pull_request_number'
+                ? 'No PR number yet. Set PR # on the task or trigger a webhook that references the issue.'
+                : reason;
+          setGithubCheckHintByTask((prev) => ({ ...prev, [taskId]: msg }));
+          return;
+        }
+        const status = data.combinedStatus ?? 'unknown';
+        const sha =
+          typeof data.headSha === 'string' && data.headSha.length > 0
+            ? data.headSha.slice(0, 7)
+            : null;
+        const suffix =
+          data.note === 'pat_or_pr_unavailable'
+            ? ' (GitHub status API unavailable — check PAT scopes and repo access.)'
+            : '';
+        setGithubCheckHintByTask((prev) => ({
+          ...prev,
+          [taskId]: `PR #${data.pullNumber}: combined status ${status}${sha ? ` @ ${sha}` : ''}${suffix}`,
+        }));
+      } catch (err: unknown) {
+        setGithubCheckHintByTask((prev) => ({
+          ...prev,
+          [taskId]:
+            err instanceof Error ? err.message : 'Failed to load check status',
+        }));
+      }
+    },
+    [organizationId],
   );
 
   const onCreateProject = async (e: FormEvent) => {
@@ -357,6 +538,7 @@ export function ProjectsPage() {
       priority?: string;
       deadline?: string;
       githubIssueNumber?: number;
+      githubPullRequestNumber?: number;
     } = { title };
     if (canCreateTasks && assignRaw.length > 0) {
       body.assigneeId = assignRaw;
@@ -375,6 +557,13 @@ export function ProjectsPage() {
         const n = parseInt(issueRaw, 10);
         if (Number.isFinite(n) && n > 0) {
           body.githubIssueNumber = n;
+        }
+      }
+      const prRaw = (taskGithubPrOnCreate[projectId] ?? '').trim();
+      if (prRaw.length > 0) {
+        const n = parseInt(prRaw, 10);
+        if (Number.isFinite(n) && n > 0) {
+          body.githubPullRequestNumber = n;
         }
       }
     }
@@ -397,6 +586,7 @@ export function ProjectsPage() {
       setTaskPriorityOnCreate((prev) => ({ ...prev, [projectId]: '' }));
       setTaskDeadlineOnCreate((prev) => ({ ...prev, [projectId]: '' }));
       setTaskGithubIssueOnCreate((prev) => ({ ...prev, [projectId]: '' }));
+      setTaskGithubPrOnCreate((prev) => ({ ...prev, [projectId]: '' }));
       bumpData();
       showToast('Task added', 'success');
     } catch (err: unknown) {
@@ -879,6 +1069,40 @@ export function ProjectsPage() {
                                                   <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                                                     {t.title}
                                                   </p>
+                                                  {t.assigneeId &&
+                                                  t.lastGithubLinkedUserId &&
+                                                  t.assigneeId !==
+                                                    t.lastGithubLinkedUserId ? (
+                                                    <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+                                                      Assignee (
+                                                      {(() => {
+                                                        const m =
+                                                          membersList?.find(
+                                                            (x) =>
+                                                              x.userId ===
+                                                              t.assigneeId,
+                                                          );
+                                                        return m
+                                                          ? memberLabel(m)
+                                                          : 'unknown member';
+                                                      })()}
+                                                      ) does not match the
+                                                      Foretrace user linked from
+                                                      the last GitHub webhook (
+                                                      {(() => {
+                                                        const gh =
+                                                          t.lastGithubLinkedUser;
+                                                        const who =
+                                                          gh &&
+                                                          (gh.displayName?.trim() ||
+                                                            gh.email?.trim() ||
+                                                            null);
+                                                        return who ?? 'unknown';
+                                                      })()}
+                                                      ). Confirm who is actively
+                                                      working this task.
+                                                    </p>
+                                                  ) : null}
                                                   {(() => {
                                                     const repoRaw =
                                                       p.githubRepositoryFullName;
@@ -891,9 +1115,18 @@ export function ProjectsPage() {
                                                       t.githubIssueNumber != null
                                                         ? `https://github.com/${repo}/issues/${t.githubIssueNumber}`
                                                         : null;
+                                                    const prUrl =
+                                                      repo.length > 0 &&
+                                                      t.lastGithubPullRequestNumber !=
+                                                        null
+                                                        ? `https://github.com/${repo}/pull/${t.lastGithubPullRequestNumber}`
+                                                        : null;
                                                     if (
                                                       !issueUrl &&
                                                       t.githubIssueNumber ==
+                                                        null &&
+                                                      !prUrl &&
+                                                      t.lastGithubPullRequestNumber ==
                                                         null &&
                                                       !t.lastGithubActivityAt
                                                     ) {
@@ -918,6 +1151,31 @@ export function ProjectsPage() {
                                                               Issue #
                                                               {t.githubIssueNumber}
                                                             </span>
+                                                          )
+                                                        ) : null}
+                                                        {t.lastGithubPullRequestNumber !=
+                                                        null ? (
+                                                          prUrl ? (
+                                                            <p>
+                                                              <a
+                                                                href={prUrl}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="font-medium text-accent-700 hover:underline dark:text-accent-400"
+                                                              >
+                                                                Linked PR #
+                                                                {
+                                                                  t.lastGithubPullRequestNumber
+                                                                }
+                                                              </a>
+                                                            </p>
+                                                          ) : (
+                                                            <p>
+                                                              Linked PR #
+                                                              {
+                                                                t.lastGithubPullRequestNumber
+                                                              }
+                                                            </p>
                                                           )
                                                         ) : null}
                                                         {t.lastGithubActivityAt ? (
@@ -945,6 +1203,137 @@ export function ProjectsPage() {
                                                             })()}
                                                           </p>
                                                         ) : null}
+                                                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                                                          <button
+                                                            type="button"
+                                                            className="rounded border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                                                            onClick={() => {
+                                                              void fetchGithubCheckStatusForTask(
+                                                                p.id,
+                                                                t.id,
+                                                              );
+                                                            }}
+                                                          >
+                                                            PR combined status
+                                                          </button>
+                                                          {githubCheckHintByTask[
+                                                            t.id
+                                                          ] ? (
+                                                            <span className="max-w-[min(100%,28rem)] text-[10px] text-zinc-500">
+                                                              {
+                                                                githubCheckHintByTask[
+                                                                  t.id
+                                                                ]
+                                                              }
+                                                            </span>
+                                                          ) : null}
+                                                        </div>
+                                                        <details
+                                                          className="pt-1"
+                                                          onToggle={(ev) => {
+                                                            const el =
+                                                              ev.currentTarget;
+                                                            if (!el.open) {
+                                                              return;
+                                                            }
+                                                            if (
+                                                              activityFetchedRef.current.has(
+                                                                t.id,
+                                                              )
+                                                            ) {
+                                                              return;
+                                                            }
+                                                            activityFetchedRef.current.add(
+                                                              t.id,
+                                                            );
+                                                            void loadGithubActivityForTask(
+                                                              p.id,
+                                                              t.id,
+                                                            );
+                                                          }}
+                                                        >
+                                                          <summary className="cursor-pointer text-[10px] font-semibold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
+                                                            Webhook delivery log
+                                                          </summary>
+                                                          <div className="mt-1 space-y-1 border-l border-zinc-200 pl-2 dark:border-zinc-700">
+                                                            {(() => {
+                                                              const st =
+                                                                githubActivityByTask[
+                                                                  t.id
+                                                                ];
+                                                              if (!st) {
+                                                                return (
+                                                                  <p className="text-[10px] text-zinc-500">
+                                                                    Open to load
+                                                                    recent
+                                                                    GitHub events
+                                                                    for this task.
+                                                                  </p>
+                                                                );
+                                                              }
+                                                              if (
+                                                                st.status ===
+                                                                'loading'
+                                                              ) {
+                                                                return (
+                                                                  <p className="text-[10px] text-zinc-500">
+                                                                    Loading…
+                                                                  </p>
+                                                                );
+                                                              }
+                                                              if (
+                                                                st.status ===
+                                                                'error'
+                                                              ) {
+                                                                return (
+                                                                  <p className="text-[10px] text-rose-600">
+                                                                    {st.message}
+                                                                  </p>
+                                                                );
+                                                              }
+                                                              if (
+                                                                st.rows.length ===
+                                                                0
+                                                              ) {
+                                                                return (
+                                                                  <p className="text-[10px] text-zinc-500">
+                                                                    No stored
+                                                                    deliveries yet.
+                                                                  </p>
+                                                                );
+                                                              }
+                                                              return st.rows.map(
+                                                                (row) => (
+                                                                  <div
+                                                                    key={row.id}
+                                                                    className="text-[10px] text-zinc-600 dark:text-zinc-400"
+                                                                  >
+                                                                    <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                                                                      {formatTaskDateTime(
+                                                                        row.occurredAt,
+                                                                      )}
+                                                                    </span>
+                                                                    {': '}
+                                                                    {row.eventType}
+                                                                    {row.action
+                                                                      ? ` / ${row.action}`
+                                                                      : ''}
+                                                                    {row.pullRequestNumber !=
+                                                                    null
+                                                                      ? ` · PR #${row.pullRequestNumber}`
+                                                                      : ''}
+                                                                    {row.actorLogin
+                                                                      ? ` · @${row.actorLogin}`
+                                                                      : ''}
+                                                                    <div className="text-zinc-500">
+                                                                      {row.summary}
+                                                                    </div>
+                                                                  </div>
+                                                                ),
+                                                              );
+                                                            })()}
+                                                          </div>
+                                                        </details>
                                                         <p className="text-[10px] leading-snug text-zinc-400 dark:text-zinc-500">
                                                           Activity comes from repo
                                                           webhooks that reference this
@@ -1287,6 +1676,70 @@ export function ProjectsPage() {
                                                             className="w-full min-w-0 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
                                                           />
                                                         </div>
+                                                        <div className="flex min-w-[7rem] flex-col gap-0.5">
+                                                          <label
+                                                            htmlFor={`gh-pr-${p.id}-${t.id}`}
+                                                            className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                                          >
+                                                            PR #
+                                                          </label>
+                                                          <input
+                                                            id={`gh-pr-${p.id}-${t.id}`}
+                                                            type="number"
+                                                            min={1}
+                                                            disabled={busy}
+                                                            defaultValue={
+                                                              t.lastGithubPullRequestNumber ??
+                                                              undefined
+                                                            }
+                                                            key={`gh-pr-${t.id}-${t.lastGithubPullRequestNumber ?? 'none'}`}
+                                                            onBlur={(e) => {
+                                                              const raw =
+                                                                e.target.value.trim();
+                                                              const prev =
+                                                                t.lastGithubPullRequestNumber;
+                                                              if (raw === '') {
+                                                                if (
+                                                                  prev != null
+                                                                ) {
+                                                                  void patchTaskFields(
+                                                                    p.id,
+                                                                    t.id,
+                                                                    {
+                                                                      githubPullRequestNumber:
+                                                                        null,
+                                                                    },
+                                                                  );
+                                                                }
+                                                                return;
+                                                              }
+                                                              const n = parseInt(
+                                                                raw,
+                                                                10,
+                                                              );
+                                                              if (
+                                                                !Number.isFinite(
+                                                                  n,
+                                                                ) ||
+                                                                n < 1
+                                                              ) {
+                                                                return;
+                                                              }
+                                                              if (n === prev) {
+                                                                return;
+                                                              }
+                                                              void patchTaskFields(
+                                                                p.id,
+                                                                t.id,
+                                                                {
+                                                                  githubPullRequestNumber:
+                                                                    n,
+                                                                },
+                                                              );
+                                                            }}
+                                                            className="w-full min-w-0 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                                                          />
+                                                        </div>
                                                       </div>
                                                     </div>
                                                   ) : null}
@@ -1451,28 +1904,53 @@ export function ProjectsPage() {
                                     />
                                   </div>
                                 </div>
-                                <div className="mt-2 max-w-xs flex flex-col gap-1">
-                                  <label
-                                    htmlFor={`new-task-gh-${p.id}`}
-                                    className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
-                                  >
-                                    GitHub issue # (optional)
-                                  </label>
-                                  <input
-                                    id={`new-task-gh-${p.id}`}
-                                    type="number"
-                                    min={1}
-                                    disabled={taskSubmitting}
-                                    value={taskGithubIssueOnCreate[p.id] ?? ''}
-                                    onChange={(e) =>
-                                      setTaskGithubIssueOnCreate((prev) => ({
-                                        ...prev,
-                                        [p.id]: e.target.value,
-                                      }))
-                                    }
-                                    placeholder="e.g. 42"
-                                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                                  />
+                                <div className="mt-2 grid max-w-lg gap-3 sm:grid-cols-2">
+                                  <div className="flex flex-col gap-1">
+                                    <label
+                                      htmlFor={`new-task-gh-${p.id}`}
+                                      className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                    >
+                                      GitHub issue # (optional)
+                                    </label>
+                                    <input
+                                      id={`new-task-gh-${p.id}`}
+                                      type="number"
+                                      min={1}
+                                      disabled={taskSubmitting}
+                                      value={taskGithubIssueOnCreate[p.id] ?? ''}
+                                      onChange={(e) =>
+                                        setTaskGithubIssueOnCreate((prev) => ({
+                                          ...prev,
+                                          [p.id]: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="e.g. 42"
+                                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                                    />
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <label
+                                      htmlFor={`new-task-gh-pr-${p.id}`}
+                                      className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                    >
+                                      GitHub PR # (optional)
+                                    </label>
+                                    <input
+                                      id={`new-task-gh-pr-${p.id}`}
+                                      type="number"
+                                      min={1}
+                                      disabled={taskSubmitting}
+                                      value={taskGithubPrOnCreate[p.id] ?? ''}
+                                      onChange={(e) =>
+                                        setTaskGithubPrOnCreate((prev) => ({
+                                          ...prev,
+                                          [p.id]: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="e.g. 7"
+                                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                                    />
+                                  </div>
                                 </div>
                               </>
                             </form>

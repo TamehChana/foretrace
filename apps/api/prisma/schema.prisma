@@ -64,6 +64,7 @@ model User {
   tasksOwned       Task[]           @relation("TaskAssignee")
   tasksLastGithubActivity Task[]    @relation("TaskLastGithubLinkedUser")
   githubUserLinks  GitHubUserLink[]
+  taskGithubActivityLinks TaskGitHubActivity[] @relation("TaskGithubActivityLinkedUser")
   cliIngestTokens CliIngestToken[]
   auditLogs       AuditLog[]
 }
@@ -197,6 +198,8 @@ model Task {
   lastGithubActorLogin   String?
   /// When the webhook actor’s GitHub login matches a `GitHubUserLink` for this project’s repo.
   lastGithubLinkedUserId String?      @db.Uuid
+  /// Last pull_request number seen on a webhook that matched this task (via issue refs).
+  lastGithubPullRequestNumber Int?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -206,11 +209,32 @@ model Task {
   lastGithubLinkedUser   User?                @relation("TaskLastGithubLinkedUser", fields: [lastGithubLinkedUserId], references: [id], onDelete: SetNull)
   terminalIngestBatches  TerminalIngestBatch[]
   terminalIncidents      TerminalIncident[]
+  githubActivities       TaskGitHubActivity[]
 
   @@index([projectId])
   @@index([assigneeId])
   @@index([deadline])
   @@index([projectId, githubIssueNumber])
+}
+
+model TaskGitHubActivity {
+  id                 String   @id @default(uuid()) @db.Uuid
+  taskId             String   @db.Uuid
+  /// GitHub `X-GitHub-Delivery` — idempotent per task when GitHub retries.
+  githubDeliveryId   String
+  occurredAt         DateTime @default(now())
+  eventType          String
+  action             String?
+  actorLogin         String?
+  linkedUserId       String?  @db.Uuid
+  pullRequestNumber  Int?
+  summary            String   @db.VarChar(500)
+
+  task       Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  linkedUser User? @relation("TaskGithubActivityLinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  @@unique([taskId, githubDeliveryId])
+  @@index([taskId, occurredAt(sort: Desc)])
 }
 
 /// Project-scoped secret for the Foretrace CLI (`Authorization: Bearer ft_ck_...`). Only a SHA-256 digest is stored.

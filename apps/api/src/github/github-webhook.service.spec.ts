@@ -26,7 +26,11 @@ describe('GithubWebhookService', () => {
   function makeService(prisma: {
     gitHubConnection: { findUnique: jest.Mock };
     gitHubUserLink: { findUnique: jest.Mock };
-    task: { updateMany: jest.Mock };
+    task: {
+      updateMany: jest.Mock;
+      findMany: jest.Mock;
+    };
+    taskGitHubActivity: { createMany: jest.Mock };
     $transaction: jest.Mock;
   }) {
     const projectSignals = {
@@ -37,6 +41,10 @@ describe('GithubWebhookService', () => {
 
   it('sets lastGithubLinkedUserId when a GitHub user link exists', async () => {
     const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const findMany = jest
+      .fn()
+      .mockResolvedValue([{ id: 'ffffffff-ffff-ffff-ffff-ffffffffffff' }]);
+    const createMany = jest.fn().mockResolvedValue({ count: 1 });
     const txGitHubWebhookEvent = { create: jest.fn() };
     const txGitHubConnection = { update: jest.fn() };
     const prisma = {
@@ -51,7 +59,8 @@ describe('GithubWebhookService', () => {
       gitHubUserLink: {
         findUnique: jest.fn().mockResolvedValue({ userId: linkedUserId }),
       },
-      task: { updateMany },
+      task: { updateMany, findMany },
+      taskGitHubActivity: { createMany },
       $transaction: jest.fn(async (cb: (tx: unknown) => Promise<void>) => {
         await cb({
           gitHubWebhookEvent: txGitHubWebhookEvent,
@@ -93,10 +102,24 @@ describe('GithubWebhookService', () => {
         lastGithubActorLogin: 'devperson',
       }),
     });
+    expect(findMany).toHaveBeenCalled();
+    expect(createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            taskId: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+            githubDeliveryId: 'del-1',
+          }),
+        ]),
+        skipDuplicates: true,
+      }),
+    );
   });
 
   it('sets lastGithubLinkedUserId null when no user link exists', async () => {
     const updateMany = jest.fn().mockResolvedValue({ count: 0 });
+    const findMany = jest.fn().mockResolvedValue([]);
+    const createMany = jest.fn();
     const prisma = {
       gitHubConnection: {
         findUnique: jest.fn().mockResolvedValue({
@@ -109,7 +132,8 @@ describe('GithubWebhookService', () => {
       gitHubUserLink: {
         findUnique: jest.fn().mockResolvedValue(null),
       },
-      task: { updateMany },
+      task: { updateMany, findMany },
+      taskGitHubActivity: { createMany },
       $transaction: jest.fn(async (cb: (tx: unknown) => Promise<void>) => {
         await cb({
           gitHubWebhookEvent: { create: jest.fn() },
@@ -142,6 +166,8 @@ describe('GithubWebhookService', () => {
         lastGithubActorLogin: 'unknown',
       }),
     });
+    expect(findMany).toHaveBeenCalled();
+    expect(createMany).not.toHaveBeenCalled();
   });
 
   it('throws when signature is invalid', async () => {
@@ -160,7 +186,11 @@ describe('GithubWebhookService', () => {
         }),
       },
       gitHubUserLink: { findUnique: jest.fn() },
-      task: { updateMany: jest.fn() },
+      task: {
+        updateMany: jest.fn(),
+        findMany: jest.fn(),
+      },
+      taskGitHubActivity: { createMany: jest.fn() },
       $transaction: jest.fn(),
     };
     const service = makeService(prisma);
@@ -189,7 +219,8 @@ describe('GithubWebhookService', () => {
     const service = makeService({
       gitHubConnection: { findUnique: jest.fn() },
       gitHubUserLink: { findUnique: jest.fn() },
-      task: { updateMany: jest.fn() },
+      task: { updateMany: jest.fn(), findMany: jest.fn() },
+      taskGitHubActivity: { createMany: jest.fn() },
       $transaction: jest.fn(),
     });
 

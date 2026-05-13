@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -70,6 +71,67 @@ export class TasksController {
       organizationId,
       req.user!.id,
       dto,
+    );
+    return { data };
+  }
+
+  @Get(':taskId/github/activity')
+  @UseGuards(
+    OrganizationUuidParamGuard,
+    ProjectUuidParamGuard,
+    TaskUuidParamGuard,
+    AuthenticatedGuard,
+    RolesGuard,
+  )
+  @Roles()
+  async listGithubActivity(
+    @Param('organizationId') organizationId: string,
+    @Param('projectId') projectId: string,
+    @Param('taskId') taskId: string,
+    @Req() req: Request,
+  ): Promise<{
+    data: Awaited<ReturnType<TasksService['listTaskGithubActivity']>>;
+  }> {
+    const data = await this.tasksService.listTaskGithubActivity(
+      taskId,
+      projectId,
+      organizationId,
+      req.user!.id,
+    );
+    return { data };
+  }
+
+  @Get(':taskId/github/check-status')
+  @UseGuards(
+    OrganizationUuidParamGuard,
+    ProjectUuidParamGuard,
+    TaskUuidParamGuard,
+    AuthenticatedGuard,
+    RolesGuard,
+  )
+  @Roles()
+  async githubCheckStatus(
+    @Param('organizationId') organizationId: string,
+    @Param('projectId') projectId: string,
+    @Param('taskId') taskId: string,
+    @Query('pr') prRaw: string | undefined,
+    @Req() req: Request,
+  ): Promise<{
+    data: Awaited<ReturnType<TasksService['getTaskGithubCheckStatus']>>;
+  }> {
+    let prOverride: number | undefined;
+    if (prRaw?.trim()) {
+      const n = parseInt(prRaw.trim(), 10);
+      if (Number.isFinite(n) && n > 0) {
+        prOverride = n;
+      }
+    }
+    const data = await this.tasksService.getTaskGithubCheckStatus(
+      taskId,
+      projectId,
+      organizationId,
+      req.user!.id,
+      prOverride,
     );
     return { data };
   }

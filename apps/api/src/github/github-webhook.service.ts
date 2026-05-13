@@ -8,7 +8,11 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectSignalsService } from '../projects/project-signals.service';
-import { collectIssueReferencesFromGithubWebhook } from './github-webhook-issue-refs';
+import {
+  collectIssueReferencesFromGithubWebhook,
+  extractPullRequestNumber,
+  summarizeGithubWebhookTouch,
+} from './github-webhook-issue-refs';
 import {
   extractAction,
   extractActorLogin,
@@ -117,17 +121,50 @@ export class GithubWebhookService {
           }
         }
 
+        const prNum = extractPullRequestNumber(payloadJson, eventType);
+        const updateData = {
+          lastGithubActivityAt: now,
+          lastGithubActorLogin: actorLogin,
+          lastGithubLinkedUserId: linkedUserId,
+          ...(prNum != null ? { lastGithubPullRequestNumber: prNum } : {}),
+        };
+
         await this.prisma.task.updateMany({
           where: {
             projectId: connection.projectId,
             githubIssueNumber: { in: issueNums },
           },
-          data: {
-            lastGithubActivityAt: now,
-            lastGithubActorLogin: actorLogin,
-            lastGithubLinkedUserId: linkedUserId,
-          },
+          data: updateData,
         });
+
+        const summary = summarizeGithubWebhookTouch(
+          eventType,
+          action ?? undefined,
+          issueNums,
+          prNum,
+        );
+        const affectedTasks = await this.prisma.task.findMany({
+          where: {
+            projectId: connection.projectId,
+            githubIssueNumber: { in: issueNums },
+          },
+          select: { id: true },
+        });
+        if (affectedTasks.length > 0) {
+          await this.prisma.taskGitHubActivity.createMany({
+            data: affectedTasks.map((t) => ({
+              taskId: t.id,
+              githubDeliveryId: deliveryId,
+              eventType,
+              action: action ?? null,
+              actorLogin: actorLogin ?? null,
+              linkedUserId,
+              pullRequestNumber: prNum,
+              summary,
+            })),
+            skipDuplicates: true,
+          });
+        }
       }
 
       this.projectSignals.scheduleRefreshSnapshot(

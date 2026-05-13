@@ -165,4 +165,62 @@ export class GithubSignalRestEnricher {
       return null;
     }
   }
+
+  /**
+   * Aggregate Checks API state for a pull request head (`/commits/{sha}/status`).
+   */
+  async getPullRequestCombinedStatus(
+    repositoryFullName: string,
+    githubPatCiphertext: string | null,
+    pullNumber: number,
+  ): Promise<{ combinedStatus: string | null; headSha: string | null } | null> {
+    if (!githubPatCiphertext || pullNumber < 1) {
+      return null;
+    }
+    const token = decryptFromStorage(githubPatCiphertext);
+    if (!token) {
+      return null;
+    }
+    const parts = repositoryFullName.trim().toLowerCase().split('/');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      return null;
+    }
+    const [owner, repo] = parts;
+    const headers = {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    try {
+      const prRes = await fetch(
+        `${GITHUB_API}/repos/${owner}/${repo}/pulls/${pullNumber}`,
+        { headers },
+      );
+      if (!prRes.ok) {
+        return null;
+      }
+      const prJson = (await prRes.json()) as { head?: { sha?: string } };
+      const headSha =
+        typeof prJson.head?.sha === 'string' ? prJson.head.sha : null;
+      if (!headSha) {
+        return null;
+      }
+      const stRes = await fetch(
+        `${GITHUB_API}/repos/${owner}/${repo}/commits/${headSha}/status`,
+        { headers },
+      );
+      if (!stRes.ok) {
+        return { combinedStatus: null, headSha };
+      }
+      const st = (await stRes.json()) as { state?: string };
+      const combinedStatus =
+        typeof st.state === 'string' ? st.state : null;
+      return { combinedStatus, headSha };
+    } catch (e: unknown) {
+      this.log.warn(
+        `GitHub PR status fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return null;
+    }
+  }
 }

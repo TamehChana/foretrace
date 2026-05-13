@@ -7,6 +7,7 @@ import {
 import { Prisma, Role, TaskPriority, TaskStatus } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { GithubSignalRestEnricher } from './github-signal-rest-enricher';
 import { ProjectsService } from './projects.service';
 import type { CreateTaskDto } from './dto/create-task.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
@@ -16,6 +17,7 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projectsService: ProjectsService,
+    private readonly githubSignalRest: GithubSignalRestEnricher,
   ) {}
 
   private async assertAssigneeInOrg(
@@ -86,6 +88,7 @@ export class TasksService {
         assigneeId: true,
         createdById: true,
         githubIssueNumber: true,
+        lastGithubPullRequestNumber: true,
         lastGithubActivityAt: true,
         lastGithubActorLogin: true,
         lastGithubLinkedUserId: true,
@@ -139,6 +142,7 @@ export class TasksService {
         assigneeId: true,
         createdById: true,
         githubIssueNumber: true,
+        lastGithubPullRequestNumber: true,
         lastGithubActivityAt: true,
         lastGithubActorLogin: true,
         lastGithubLinkedUserId: true,
@@ -201,6 +205,10 @@ export class TasksService {
         ...(dto.githubIssueNumber !== undefined && dto.githubIssueNumber !== null
           ? { githubIssueNumber: dto.githubIssueNumber }
           : {}),
+        ...(dto.githubPullRequestNumber !== undefined &&
+        dto.githubPullRequestNumber !== null
+          ? { lastGithubPullRequestNumber: dto.githubPullRequestNumber }
+          : {}),
       },
       select: {
         id: true,
@@ -213,6 +221,7 @@ export class TasksService {
         assigneeId: true,
         createdById: true,
         githubIssueNumber: true,
+        lastGithubPullRequestNumber: true,
         lastGithubActivityAt: true,
         lastGithubActorLogin: true,
         lastGithubLinkedUserId: true,
@@ -257,6 +266,7 @@ export class TasksService {
     const requestedStatus = dto.status !== undefined;
     const requestedProgress = dto.progress !== undefined;
     const requestedGithubIssue = dto.githubIssueNumber !== undefined;
+    const requestedGithubPr = dto.githubPullRequestNumber !== undefined;
 
     const anyMetadataOrAssignment =
       requestedTitle ||
@@ -264,7 +274,8 @@ export class TasksService {
       requestedPriority ||
       requestedDeadline ||
       requestedAssignee ||
-      requestedGithubIssue;
+      requestedGithubIssue ||
+      requestedGithubPr;
 
     if (membership.role === Role.DEVELOPER) {
       const canUpdateStatusOrProgress =
@@ -300,6 +311,7 @@ export class TasksService {
       assigneeId?: string | null;
       progress?: number;
       githubIssueNumber?: number | null;
+      lastGithubPullRequestNumber?: number | null;
     } = {};
 
     if (dto.title !== undefined) {
@@ -327,6 +339,9 @@ export class TasksService {
     if (dto.githubIssueNumber !== undefined) {
       data.githubIssueNumber = dto.githubIssueNumber;
     }
+    if (dto.githubPullRequestNumber !== undefined) {
+      data.lastGithubPullRequestNumber = dto.githubPullRequestNumber;
+    }
 
     if (Object.keys(data).length === 0) {
       throw new BadRequestException('No updates provided');
@@ -346,6 +361,7 @@ export class TasksService {
         assigneeId: true,
         createdById: true,
         githubIssueNumber: true,
+        lastGithubPullRequestNumber: true,
         lastGithubActivityAt: true,
         lastGithubActorLogin: true,
         lastGithubLinkedUserId: true,
@@ -399,5 +415,92 @@ export class TasksService {
     await this.prisma.task.delete({
       where: { id: taskId },
     });
+  }
+
+  async listTaskGithubActivity(
+    taskId: string,
+    projectId: string,
+    organizationId: string,
+    viewerUserId: string,
+    limit = 30,
+  ) {
+    await this.getTask(taskId, projectId, organizationId, viewerUserId);
+    const take = Math.min(Math.max(limit, 1), 100);
+    return this.prisma.taskGitHubActivity.findMany({
+      where: { taskId },
+      select: {
+        id: true,
+        occurredAt: true,
+        eventType: true,
+        action: true,
+        actorLogin: true,
+        pullRequestNumber: true,
+        summary: true,
+        linkedUser: {
+          select: { id: true, displayName: true, email: true },
+        },
+      },
+      orderBy: { occurredAt: 'desc' },
+      take,
+    });
+  }
+
+  async getTaskGithubCheckStatus(
+    taskId: string,
+    projectId: string,
+    organizationId: string,
+    viewerUserId: string,
+    pullNumberOverride?: number,
+  ): Promise<
+    | {
+        ok: true;
+        pullNumber: number;
+        combinedStatus: string | null;
+        headSha: string | null;
+        note: 'pat_or_pr_unavailable' | null;
+      }
+    | { ok: false; reason: string }
+  > {
+    const task = await this.getTask(taskId, projectId, organizationId, viewerUserId);
+    const conn = await this.prisma.gitHubConnection.findUnique({
+      where: { projectId },
+      select: {
+        repositoryFullName: true,
+        githubPatCiphertext: true,
+      },
+    });
+    if (!conn) {
+      return { ok: false, reason: 'no_github_connection' };
+    }
+    const prNum =
+      pullNumberOverride != null &&
+      Number.isFinite(pullNumberOverride) &&
+      pullNumberOverride > 0
+        ? Math.trunc(pullNumberOverride)
+        : task.lastGithubPullRequestNumber;
+    if (prNum == null || prNum < 1) {
+      return { ok: false, reason: 'no_pull_request_number' };
+    }
+    const status = await this.githubSignalRest.getPullRequestCombinedStatus(
+      conn.repositoryFullName,
+      conn.githubPatCiphertext,
+      prNum,
+    );
+    if (!status) {
+      return {
+        ok: true,
+        pullNumber: prNum,
+        combinedStatus: null,
+        headSha: null,
+        note: 'pat_or_pr_unavailable',
+      };
+    }
+    return {
+      ok: true,
+      pullNumber: prNum,
+      combinedStatus: status.combinedStatus,
+      headSha: status.headSha,
+      note: null,
+    };
   }
 }

@@ -22,6 +22,8 @@ export type OrgTaskRow = {
   lastGithubActivityAt: string | null;
   lastGithubActorLogin: string | null;
   lastGithubLinkedUserId: string | null;
+  /** Last PR # seen on a webhook that matched this task (via issue refs). */
+  lastGithubPullRequestNumber: number | null;
   lastGithubLinkedUser: OrgTaskGithubLinkedUser | null;
   createdAt: string;
   updatedAt: string;
@@ -33,7 +35,7 @@ export type OrgTasksState =
   | { status: 'ok'; tasks: OrgTaskRow[] }
   | { status: 'error'; message: string };
 
-function parseGithubLinkedUser(
+export function parseGithubLinkedUser(
   raw: unknown,
 ): OrgTaskGithubLinkedUser | null {
   if (raw === null || raw === undefined) {
@@ -72,6 +74,7 @@ function parseList(json: unknown): OrgTaskRow[] {
       lastGithubActivityAt?: unknown;
       lastGithubActorLogin?: unknown;
       lastGithubLinkedUserId?: unknown;
+      lastGithubPullRequestNumber?: unknown;
       lastGithubLinkedUser?: unknown;
     };
     return {
@@ -119,6 +122,10 @@ function parseList(json: unknown): OrgTaskRow[] {
           : t.lastGithubLinkedUserId === null
             ? null
             : null,
+      lastGithubPullRequestNumber:
+        typeof t.lastGithubPullRequestNumber === 'number'
+          ? t.lastGithubPullRequestNumber
+          : null,
       lastGithubLinkedUser: parseGithubLinkedUser(t.lastGithubLinkedUser),
       createdAt: String(t.createdAt),
       updatedAt: String(t.updatedAt),
