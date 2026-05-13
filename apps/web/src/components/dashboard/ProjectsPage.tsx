@@ -196,6 +196,7 @@ export function ProjectsPage() {
       ? (role as 'ADMIN' | 'PM' | 'DEVELOPER')
       : null;
   const canManageProjects = role === 'ADMIN' || role === 'PM';
+  const canCreateTasks = role === 'ADMIN';
   const canReassignTasks = role === 'ADMIN' || role === 'PM';
   const canInvite = role === 'ADMIN' || role === 'PM';
   const currentUserId =
@@ -357,10 +358,10 @@ export function ProjectsPage() {
       deadline?: string;
       githubIssueNumber?: number;
     } = { title };
-    if (canReassignTasks && assignRaw.length > 0) {
+    if (canCreateTasks && assignRaw.length > 0) {
       body.assigneeId = assignRaw;
     }
-    if (canReassignTasks) {
+    if (canCreateTasks) {
       const pr = (taskPriorityOnCreate[projectId] ?? '').trim();
       if (pr.length > 0) {
         body.priority = pr;
@@ -506,7 +507,7 @@ export function ProjectsPage() {
       <PageHeader
         eyebrow="Workspace"
         title="Projects"
-        description="Organization-scoped projects and tasks. Admins can add existing users as PM or developer; PMs and admins manage projects and archive them when done."
+        description="Organization-scoped projects and tasks. Admins create tasks and can add PMs or developers; PMs and admins manage projects and archive them when done."
         meta={
           <Link
             to="/"
@@ -766,10 +767,14 @@ export function ProjectsPage() {
                             </h3>
                             <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
                               <strong className="font-medium text-zinc-600 dark:text-zinc-400">
+                                Admins
+                              </strong>{' '}
+                              create tasks.{' '}
+                              <strong className="font-medium text-zinc-600 dark:text-zinc-400">
                                 PMs and admins
                               </strong>{' '}
-                              add tasks, set assignees, and manage schedule and
-                              details.{' '}
+                              set assignees, link GitHub issue numbers, and manage
+                              schedule and details.{' '}
                               <strong className="font-medium text-zinc-600 dark:text-zinc-400">
                                 Assignees
                               </strong>{' '}
@@ -940,6 +945,14 @@ export function ProjectsPage() {
                                                             })()}
                                                           </p>
                                                         ) : null}
+                                                        <p className="text-[10px] leading-snug text-zinc-400 dark:text-zinc-500">
+                                                          Activity comes from repo
+                                                          webhooks that reference this
+                                                          issue #. The name is who
+                                                          GitHub reported for that
+                                                          event — not proof it was the
+                                                          Foretrace assignee.
+                                                        </p>
                                                       </div>
                                                     );
                                                   })()}
@@ -1312,7 +1325,7 @@ export function ProjectsPage() {
                               })()
                             )}
                           </div>
-                          {canReassignTasks ? (
+                          {canCreateTasks ? (
                             <form
                               autoComplete="off"
                               className="mt-4 flex flex-col gap-3"
@@ -1465,9 +1478,10 @@ export function ProjectsPage() {
                             </form>
                           ) : (
                             <p className="mt-4 text-[12px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-                              Only a PM or organization admin can add tasks to
-                              this project. Your assigned work appears in the list
-                              above.
+                              Only an organization admin can add tasks to this
+                              project. Ask an admin to create work; PMs can still
+                              assign people and edit details on existing tasks.
+                              Your assigned work appears in the list above.
                             </p>
                           )}
                           {organizationId ? (
@@ -1513,7 +1527,7 @@ export function ProjectsPage() {
                                       incidents are visible to PMs and admins only.
                                       Tasks assigned to you, and unassigned tasks you
                                       created before this policy, are listed above.
-                                      Ask a PM or admin to add new tasks. Use CLI
+                                      Ask an admin to add new tasks. Use CLI
                                       tokens below for your own terminal ingest.
                                     </p>
                                   </div>

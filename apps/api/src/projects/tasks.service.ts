@@ -177,9 +177,9 @@ export class TasksService {
         'You are not a member of this organization.',
       );
     }
-    if (membership.role === Role.DEVELOPER) {
+    if (membership.role !== Role.ADMIN) {
       throw new ForbiddenException(
-        'Only PMs and admins can create tasks.',
+        'Only organization admins can create tasks.',
       );
     }
 

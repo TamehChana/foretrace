@@ -169,7 +169,8 @@ export function ProjectSignalsPanel(props: {
           </h3>
           <p className="mt-1 text-[11px] text-zinc-500">
             First slice of SRS section 7 — GitHub deliveries, terminal batches/incidents,
-            and task pressure. The API also recomputes after webhooks and CLI ingest
+            and task pressure. This is a <strong className="font-medium text-zinc-600 dark:text-zinc-400">project-wide</strong> rollup, not a per-developer feed and not CI pass/fail.
+            The API also recomputes after webhooks and CLI ingest
             (at most about once per minute per project). PM/admin can force refresh.
           </p>
         </div>

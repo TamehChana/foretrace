@@ -280,12 +280,15 @@ export function DocumentationPage() {
         </WorkflowStep>
 
         <WorkflowStep step={4} id="step-4" title="Add tasks (so Foretrace can measure real work)">
+          <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+            <strong className="text-zinc-800 dark:text-zinc-200">Organization admins</strong> create tasks. PMs can assign people and edit details on existing tasks.
+          </p>
           <ol className="list-decimal space-y-4 pl-5 marker:font-semibold marker:text-zinc-500">
             <li>
               With the project expanded, scroll to the <strong className="text-zinc-800 dark:text-zinc-200">tasks</strong> area.
             </li>
             <li>
-              Type a <strong>short title</strong> for the work (for example “Fix login bug”) in the add-task field and submit. Repeat for each real item you
+              As an <strong>admin</strong>, type a <strong>short title</strong> for the work (for example “Fix login bug”) in the add-task field and submit. Repeat for each real item you
               want to track.
             </li>
             <li>
