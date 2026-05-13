@@ -768,12 +768,14 @@ export function ProjectsPage() {
                               <strong className="font-medium text-zinc-600 dark:text-zinc-400">
                                 PMs and admins
                               </strong>{' '}
-                              set assignees and full details.{' '}
+                              add tasks, set assignees, and manage schedule and
+                              details.{' '}
                               <strong className="font-medium text-zinc-600 dark:text-zinc-400">
                                 Assignees
                               </strong>{' '}
-                              (and creators of unassigned tasks) update status
-                              and progress here. Deadlines feed{' '}
+                              update status and progress on tasks assigned to them
+                              (and on legacy unassigned tasks they originally
+                              created). Deadlines feed{' '}
                               <strong className="font-medium text-zinc-600 dark:text-zinc-400">
                                 Signals
                               </strong>
@@ -1310,42 +1312,42 @@ export function ProjectsPage() {
                               })()
                             )}
                           </div>
-                          <form
-                            autoComplete="off"
-                            className="mt-4 flex flex-col gap-3"
-                            onSubmit={(e) => {
-                              e.preventDefault();
-                              void createTask(p.id);
-                            }}
-                          >
-                            <div className="flex gap-2">
-                              <input
-                                name={`foretrace-task-title-${p.id}`}
-                                type="text"
-                                placeholder="New task title"
-                                value={taskTitleByProject[p.id] ?? ''}
-                                onChange={(e) =>
-                                  setTaskTitleByProject((prev) => ({
-                                    ...prev,
-                                    [p.id]: e.target.value,
-                                  }))
-                                }
-                                autoComplete="off"
-                                data-1p-ignore
-                                data-lpignore="true"
-                                data-bwignore
-                                className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-                                maxLength={300}
-                              />
-                              <button
-                                type="submit"
-                                disabled={taskSubmitting}
-                                className="shrink-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                              >
-                                Add
-                              </button>
-                            </div>
-                            {canReassignTasks ? (
+                          {canReassignTasks ? (
+                            <form
+                              autoComplete="off"
+                              className="mt-4 flex flex-col gap-3"
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                void createTask(p.id);
+                              }}
+                            >
+                              <div className="flex gap-2">
+                                <input
+                                  name={`foretrace-task-title-${p.id}`}
+                                  type="text"
+                                  placeholder="New task title"
+                                  value={taskTitleByProject[p.id] ?? ''}
+                                  onChange={(e) =>
+                                    setTaskTitleByProject((prev) => ({
+                                      ...prev,
+                                      [p.id]: e.target.value,
+                                    }))
+                                  }
+                                  autoComplete="off"
+                                  data-1p-ignore
+                                  data-lpignore="true"
+                                  data-bwignore
+                                  className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                                  maxLength={300}
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={taskSubmitting}
+                                  className="shrink-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                                >
+                                  Add
+                                </button>
+                              </div>
                               <div className="flex max-w-md flex-col gap-1">
                                 <label
                                   htmlFor={`new-task-assign-${p.id}`}
@@ -1380,88 +1382,94 @@ export function ProjectsPage() {
                                     ))}
                                 </select>
                               </div>
-                            ) : null}
-                            {canReassignTasks ? (
                               <>
                                 <div className="grid max-w-lg gap-3 sm:grid-cols-2">
-                                <div className="flex flex-col gap-1">
-                                  <label
-                                    htmlFor={`new-task-pri-${p.id}`}
-                                    className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
-                                  >
-                                    Priority (optional)
-                                  </label>
-                                  <select
-                                    id={`new-task-pri-${p.id}`}
-                                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                                    value={taskPriorityOnCreate[p.id] ?? ''}
-                                    disabled={taskSubmitting}
-                                    onChange={(e) =>
-                                      setTaskPriorityOnCreate((prev) => ({
-                                        ...prev,
-                                        [p.id]: e.target.value,
-                                      }))
-                                    }
-                                  >
-                                    <option value="">Default (medium)</option>
-                                    {TASK_PRIORITY_OPTIONS.map((opt) => (
-                                      <option
-                                        key={opt.value}
-                                        value={opt.value}
-                                      >
-                                        {opt.label}
+                                  <div className="flex flex-col gap-1">
+                                    <label
+                                      htmlFor={`new-task-pri-${p.id}`}
+                                      className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                    >
+                                      Priority (optional)
+                                    </label>
+                                    <select
+                                      id={`new-task-pri-${p.id}`}
+                                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                                      value={taskPriorityOnCreate[p.id] ?? ''}
+                                      disabled={taskSubmitting}
+                                      onChange={(e) =>
+                                        setTaskPriorityOnCreate((prev) => ({
+                                          ...prev,
+                                          [p.id]: e.target.value,
+                                        }))
+                                      }
+                                    >
+                                      <option value="">
+                                        Default (medium)
                                       </option>
-                                    ))}
-                                  </select>
+                                      {TASK_PRIORITY_OPTIONS.map((opt) => (
+                                        <option
+                                          key={opt.value}
+                                          value={opt.value}
+                                        >
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <label
+                                      htmlFor={`new-task-dl-${p.id}`}
+                                      className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                    >
+                                      Due date (optional)
+                                    </label>
+                                    <input
+                                      id={`new-task-dl-${p.id}`}
+                                      type="date"
+                                      disabled={taskSubmitting}
+                                      value={taskDeadlineOnCreate[p.id] ?? ''}
+                                      onChange={(e) =>
+                                        setTaskDeadlineOnCreate((prev) => ({
+                                          ...prev,
+                                          [p.id]: e.target.value,
+                                        }))
+                                      }
+                                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                                    />
+                                  </div>
                                 </div>
-                                <div className="flex flex-col gap-1">
+                                <div className="mt-2 max-w-xs flex flex-col gap-1">
                                   <label
-                                    htmlFor={`new-task-dl-${p.id}`}
+                                    htmlFor={`new-task-gh-${p.id}`}
                                     className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
                                   >
-                                    Due date (optional)
+                                    GitHub issue # (optional)
                                   </label>
                                   <input
-                                    id={`new-task-dl-${p.id}`}
-                                    type="date"
+                                    id={`new-task-gh-${p.id}`}
+                                    type="number"
+                                    min={1}
                                     disabled={taskSubmitting}
-                                    value={taskDeadlineOnCreate[p.id] ?? ''}
+                                    value={taskGithubIssueOnCreate[p.id] ?? ''}
                                     onChange={(e) =>
-                                      setTaskDeadlineOnCreate((prev) => ({
+                                      setTaskGithubIssueOnCreate((prev) => ({
                                         ...prev,
                                         [p.id]: e.target.value,
                                       }))
                                     }
+                                    placeholder="e.g. 42"
                                     className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                                   />
                                 </div>
-                              </div>
-                              <div className="mt-2 max-w-xs flex flex-col gap-1">
-                                <label
-                                  htmlFor={`new-task-gh-${p.id}`}
-                                  className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
-                                >
-                                  GitHub issue # (optional)
-                                </label>
-                                <input
-                                  id={`new-task-gh-${p.id}`}
-                                  type="number"
-                                  min={1}
-                                  disabled={taskSubmitting}
-                                  value={taskGithubIssueOnCreate[p.id] ?? ''}
-                                  onChange={(e) =>
-                                    setTaskGithubIssueOnCreate((prev) => ({
-                                      ...prev,
-                                      [p.id]: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="e.g. 42"
-                                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                                />
-                              </div>
                               </>
-                            ) : null}
-                          </form>
+                            </form>
+                          ) : (
+                            <p className="mt-4 text-[12px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                              Only a PM or organization admin can add tasks to
+                              this project. Your assigned work appears in the list
+                              above.
+                            </p>
+                          )}
                           {organizationId ? (
                             <>
                               {canManageProjects ? (
@@ -1504,9 +1512,9 @@ export function ProjectsPage() {
                                       settings, and organization-wide terminal
                                       incidents are visible to PMs and admins only.
                                       Tasks assigned to you, and unassigned tasks you
-                                      created, are listed above; new tasks you add stay
-                                      unassigned until a PM or admin assigns them. Use
-                                      CLI tokens below for your own terminal ingest.
+                                      created before this policy, are listed above.
+                                      Ask a PM or admin to add new tasks. Use CLI
+                                      tokens below for your own terminal ingest.
                                     </p>
                                   </div>
                                   {organizationId ? (

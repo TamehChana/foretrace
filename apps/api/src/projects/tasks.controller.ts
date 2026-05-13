@@ -58,7 +58,7 @@ export class TasksController {
     AuthenticatedGuard,
     RolesGuard,
   )
-  @Roles(Role.ADMIN, Role.PM, Role.DEVELOPER)
+  @Roles(Role.ADMIN, Role.PM)
   async create(
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,

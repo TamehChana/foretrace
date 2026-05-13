@@ -177,14 +177,9 @@ export class TasksService {
         'You are not a member of this organization.',
       );
     }
-    if (membership.role === Role.DEVELOPER && dto.assigneeId != null) {
-      throw new BadRequestException(
-        'Developers cannot assign tasks when creating them. A PM or admin will assign work.',
-      );
-    }
-    if (membership.role === Role.DEVELOPER && dto.githubIssueNumber != null) {
-      throw new BadRequestException(
-        'Only PMs and admins can link a task to a GitHub issue number.',
+    if (membership.role === Role.DEVELOPER) {
+      throw new ForbiddenException(
+        'Only PMs and admins can create tasks.',
       );
     }
 
@@ -203,9 +198,7 @@ export class TasksService {
         assigneeId: dto.assigneeId ?? null,
         progress: dto.progress !== undefined ? dto.progress : 0,
         createdById,
-        ...(membership.role !== Role.DEVELOPER &&
-        dto.githubIssueNumber !== undefined &&
-        dto.githubIssueNumber !== null
+        ...(dto.githubIssueNumber !== undefined && dto.githubIssueNumber !== null
           ? { githubIssueNumber: dto.githubIssueNumber }
           : {}),
       },
