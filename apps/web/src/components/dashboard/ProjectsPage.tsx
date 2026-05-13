@@ -196,7 +196,6 @@ export function ProjectsPage() {
       : null;
   const canManageProjects = role === 'ADMIN' || role === 'PM';
   const canReassignTasks = role === 'ADMIN' || role === 'PM';
-  const showAssignOnCreate = canReassignTasks || role === 'DEVELOPER';
   const canInvite = role === 'ADMIN' || role === 'PM';
   const currentUserId =
     snapshot.status === 'ready' && snapshot.user?.id
@@ -357,7 +356,7 @@ export function ProjectsPage() {
       deadline?: string;
       githubIssueNumber?: number;
     } = { title };
-    if (assignRaw.length > 0) {
+    if (canReassignTasks && assignRaw.length > 0) {
       body.assigneeId = assignRaw;
     }
     if (canReassignTasks) {
@@ -919,9 +918,23 @@ export function ProjectsPage() {
                                                             {formatTaskDateTime(
                                                               t.lastGithubActivityAt,
                                                             )}
-                                                            {t.lastGithubActorLogin
-                                                              ? ` (${t.lastGithubActorLogin})`
-                                                              : ''}
+                                                            {(() => {
+                                                              const gh =
+                                                                t.lastGithubLinkedUser;
+                                                              const who =
+                                                                gh &&
+                                                                (gh.displayName
+                                                                  ?.trim() ||
+                                                                  gh.email
+                                                                    ?.trim() ||
+                                                                  null);
+                                                              if (who) {
+                                                                return ` (${who})`;
+                                                              }
+                                                              return t.lastGithubActorLogin
+                                                                ? ` (@${t.lastGithubActorLogin})`
+                                                                : '';
+                                                            })()}
                                                           </p>
                                                         ) : null}
                                                       </div>
@@ -1331,15 +1344,13 @@ export function ProjectsPage() {
                                 Add
                               </button>
                             </div>
-                            {showAssignOnCreate ? (
+                            {canReassignTasks ? (
                               <div className="flex max-w-md flex-col gap-1">
                                 <label
                                   htmlFor={`new-task-assign-${p.id}`}
                                   className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
                                 >
-                                  {canReassignTasks
-                                    ? 'Assign when created (optional)'
-                                    : 'Assign when created (optional — you only)'}
+                                  Assign when created (optional)
                                 </label>
                                 <select
                                   id={`new-task-assign-${p.id}`}
@@ -1358,32 +1369,14 @@ export function ProjectsPage() {
                                 >
                                   <option value="">No assignee</option>
                                   {membersState.status === 'ok' &&
-                                    (canReassignTasks
-                                      ? membersState.members.map((m) => (
-                                          <option
-                                            key={m.userId}
-                                            value={m.userId}
-                                          >
-                                            {memberLabel(m)}
-                                          </option>
-                                        ))
-                                      : currentUserId
-                                        ? (() => {
-                                            const self =
-                                              membersState.members.find(
-                                                (m) =>
-                                                  m.userId === currentUserId,
-                                              );
-                                            return self ? (
-                                              <option
-                                                key={self.userId}
-                                                value={self.userId}
-                                              >
-                                                Me ({memberLabel(self)})
-                                              </option>
-                                            ) : null;
-                                          })()
-                                        : null)}
+                                    membersState.members.map((m) => (
+                                      <option
+                                        key={m.userId}
+                                        value={m.userId}
+                                      >
+                                        {memberLabel(m)}
+                                      </option>
+                                    ))}
                                 </select>
                               </div>
                             ) : null}
@@ -1508,9 +1501,10 @@ export function ProjectsPage() {
                                     Signals, delivery risk, GitHub connection
                                     settings, and organization-wide terminal
                                     incidents are visible to PMs and admins only.
-                                    Your assigned tasks are listed above; use
-                                    CLI tokens below for your own terminal
-                                    ingest.
+                                    Tasks assigned to you, and unassigned tasks you
+                                    created, are listed above; new tasks you add stay
+                                    unassigned until a PM or admin assigns them. Use
+                                    CLI tokens below for your own terminal ingest.
                                   </p>
                                 </div>
                               )}

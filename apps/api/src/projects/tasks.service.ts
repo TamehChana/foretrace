@@ -88,6 +88,10 @@ export class TasksService {
         githubIssueNumber: true,
         lastGithubActivityAt: true,
         lastGithubActorLogin: true,
+        lastGithubLinkedUserId: true,
+        lastGithubLinkedUser: {
+          select: { id: true, displayName: true, email: true },
+        },
         createdAt: true,
         updatedAt: true,
       },
@@ -137,6 +141,10 @@ export class TasksService {
         githubIssueNumber: true,
         lastGithubActivityAt: true,
         lastGithubActorLogin: true,
+        lastGithubLinkedUserId: true,
+        lastGithubLinkedUser: {
+          select: { id: true, displayName: true, email: true },
+        },
         createdAt: true,
         updatedAt: true,
       },
@@ -169,13 +177,9 @@ export class TasksService {
         'You are not a member of this organization.',
       );
     }
-    if (
-      membership.role === Role.DEVELOPER &&
-      dto.assigneeId &&
-      dto.assigneeId !== createdById
-    ) {
+    if (membership.role === Role.DEVELOPER && dto.assigneeId != null) {
       throw new BadRequestException(
-        'Developers may only assign new tasks to themselves or leave them unassigned.',
+        'Developers cannot assign tasks when creating them. A PM or admin will assign work.',
       );
     }
     if (membership.role === Role.DEVELOPER && dto.githubIssueNumber != null) {
@@ -218,6 +222,10 @@ export class TasksService {
         githubIssueNumber: true,
         lastGithubActivityAt: true,
         lastGithubActorLogin: true,
+        lastGithubLinkedUserId: true,
+        lastGithubLinkedUser: {
+          select: { id: true, displayName: true, email: true },
+        },
         createdAt: true,
         updatedAt: true,
       },
@@ -347,6 +355,10 @@ export class TasksService {
         githubIssueNumber: true,
         lastGithubActivityAt: true,
         lastGithubActorLogin: true,
+        lastGithubLinkedUserId: true,
+        lastGithubLinkedUser: {
+          select: { id: true, displayName: true, email: true },
+        },
         createdAt: true,
         updatedAt: true,
       },

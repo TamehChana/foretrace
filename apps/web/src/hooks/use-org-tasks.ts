@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../api-fetch';
 import { useAuthSession } from '../providers/AuthSessionProvider';
 
+export type OrgTaskGithubLinkedUser = {
+  id: string;
+  displayName: string | null;
+  email: string;
+};
+
 export type OrgTaskRow = {
   id: string;
   title: string;
@@ -15,6 +21,8 @@ export type OrgTaskRow = {
   githubIssueNumber: number | null;
   lastGithubActivityAt: string | null;
   lastGithubActorLogin: string | null;
+  lastGithubLinkedUserId: string | null;
+  lastGithubLinkedUser: OrgTaskGithubLinkedUser | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -24,6 +32,28 @@ export type OrgTasksState =
   | { status: 'loading' }
   | { status: 'ok'; tasks: OrgTaskRow[] }
   | { status: 'error'; message: string };
+
+function parseGithubLinkedUser(
+  raw: unknown,
+): OrgTaskGithubLinkedUser | null {
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+  if (typeof raw !== 'object' || !('id' in raw)) {
+    return null;
+  }
+  const u = raw as Record<string, unknown>;
+  return {
+    id: String(u.id),
+    displayName:
+      typeof u.displayName === 'string'
+        ? u.displayName
+        : u.displayName === null
+          ? null
+          : null,
+    email: typeof u.email === 'string' ? u.email : '',
+  };
+}
 
 function parseList(json: unknown): OrgTaskRow[] {
   if (!json || typeof json !== 'object' || !('data' in json)) {
@@ -41,6 +71,8 @@ function parseList(json: unknown): OrgTaskRow[] {
       githubIssueNumber?: unknown;
       lastGithubActivityAt?: unknown;
       lastGithubActorLogin?: unknown;
+      lastGithubLinkedUserId?: unknown;
+      lastGithubLinkedUser?: unknown;
     };
     return {
       id: t.id,
@@ -81,6 +113,13 @@ function parseList(json: unknown): OrgTaskRow[] {
           : t.lastGithubActorLogin === null
             ? null
             : null,
+      lastGithubLinkedUserId:
+        typeof t.lastGithubLinkedUserId === 'string'
+          ? t.lastGithubLinkedUserId
+          : t.lastGithubLinkedUserId === null
+            ? null
+            : null,
+      lastGithubLinkedUser: parseGithubLinkedUser(t.lastGithubLinkedUser),
       createdAt: String(t.createdAt),
       updatedAt: String(t.updatedAt),
     };

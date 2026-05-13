@@ -100,7 +100,23 @@ export class GithubWebhookService {
         eventType,
       );
       if (issueNums.length > 0) {
-        const actor = extractActorLogin(payloadJson, eventType);
+        let linkedUserId: string | null = null;
+        if (actorLogin) {
+          const normalizedLogin = actorLogin.trim().toLowerCase();
+          const link = await this.prisma.gitHubUserLink.findUnique({
+            where: {
+              connectionId_githubLogin: {
+                connectionId: connection.id,
+                githubLogin: normalizedLogin,
+              },
+            },
+            select: { userId: true },
+          });
+          if (link) {
+            linkedUserId = link.userId;
+          }
+        }
+
         await this.prisma.task.updateMany({
           where: {
             projectId: connection.projectId,
@@ -108,7 +124,8 @@ export class GithubWebhookService {
           },
           data: {
             lastGithubActivityAt: now,
-            lastGithubActorLogin: actor,
+            lastGithubActorLogin: actorLogin,
+            lastGithubLinkedUserId: linkedUserId,
           },
         });
       }
