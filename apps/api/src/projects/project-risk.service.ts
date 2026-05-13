@@ -139,6 +139,7 @@ export class ProjectRiskService {
       evaluationId: row.id,
       evaluationRunId: run.id,
       reasonCodes: reasons.map((r) => r.code),
+      aiSummary,
     });
 
     await this.audit.log({

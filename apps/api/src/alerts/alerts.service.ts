@@ -14,6 +14,34 @@ const RANK: Record<RiskLevel, number> = {
 
 const MEDIUM_RANK = RANK[RiskLevel.MEDIUM];
 
+/** First-line `VERDICT: TOKEN` from heuristic or OpenAI risk summaries. */
+export function parseRiskVerdictFromAiSummary(
+  text: string | null | undefined,
+): string | null {
+  if (!text || typeof text !== 'string') {
+    return null;
+  }
+  const first = text.trim().split(/\r?\n/)[0] ?? '';
+  const m = /^VERDICT:\s*([A-Z_]+)/i.exec(first);
+  return m ? m[1].toUpperCase() : null;
+}
+
+function aiSummaryBodyPreview(
+  text: string | null | undefined,
+  max = 420,
+): string | null {
+  if (!text || typeof text !== 'string') {
+    return null;
+  }
+  const lines = text.trim().split(/\r?\n/);
+  const rest = lines.length > 1 ? lines.slice(1).join('\n').trim() : text.trim();
+  if (!rest) {
+    return null;
+  }
+  const s = rest.slice(0, max);
+  return rest.length > max ? `${s}…` : s;
+}
+
 @Injectable()
 export class AlertsService {
   private readonly log = new Logger(AlertsService.name);
@@ -94,6 +122,8 @@ export class AlertsService {
     evaluationId: string;
     evaluationRunId?: string;
     reasonCodes: string[];
+    /** Full risk narrative (includes `VERDICT:` line when present). */
+    aiSummary?: string | null;
   }): Promise<void> {
     const nextR = RANK[input.nextLevel];
     if (nextR < MEDIUM_RANK) {
@@ -105,7 +135,11 @@ export class AlertsService {
       return;
     }
 
-    const summary = `Delivery risk for “${input.projectName}” is ${input.nextLevel} (score ${input.score}).`;
+    const verdict = parseRiskVerdictFromAiSummary(input.aiSummary);
+    const preview = aiSummaryBodyPreview(input.aiSummary);
+    const verdictPhrase = verdict ? ` AI verdict: ${verdict}.` : '';
+
+    const summary = `Delivery risk for “${input.projectName}” is ${input.nextLevel} (score ${input.score}).${verdictPhrase}`;
 
     const payload: Prisma.InputJsonValue = {
       kind: 'RISK_EVALUATION',
@@ -117,6 +151,8 @@ export class AlertsService {
       level: input.nextLevel,
       score: input.score,
       reasonCodes: input.reasonCodes,
+      ...(verdict ? { verdict } : {}),
+      ...(preview ? { aiSummaryPreview: preview } : {}),
     };
 
     await this.prisma.alert.create({
@@ -129,11 +165,13 @@ export class AlertsService {
       },
     });
 
-    void this.sendRiskAlertEmail(input, summary).catch((err: unknown) => {
-      this.log.warn(
-        `Risk alert email: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    });
+    void this.sendRiskAlertEmail(input, summary, verdict, preview).catch(
+      (err: unknown) => {
+        this.log.warn(
+          `Risk alert email: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      },
+    );
   }
 
   private async sendRiskAlertEmail(
@@ -145,6 +183,8 @@ export class AlertsService {
       reasonCodes: string[];
     },
     summary: string,
+    verdict: string | null,
+    preview: string | null,
   ): Promise<void> {
     if (!this.email.isConfigured()) {
       return;
@@ -160,15 +200,24 @@ export class AlertsService {
     if (to.length === 0) {
       return;
     }
-    const text = [
+    const lines: string[] = [
       summary,
       '',
       `Project: ${input.projectName}`,
       `Level: ${input.nextLevel}   Score: ${input.score}`,
-      `Reason codes: ${input.reasonCodes.join(', ') || '—'}`,
+    ];
+    if (verdict) {
+      lines.push(`Verdict: ${verdict}`);
+    }
+    lines.push(`Reason codes: ${input.reasonCodes.join(', ') || '—'}`);
+    if (preview) {
+      lines.push('', 'Summary:', preview);
+    }
+    lines.push(
       '',
       'Open Foretrace → Alerts to read the full in-app notification.',
-    ].join('\n');
+    );
+    const text = lines.join('\n');
     await this.email.sendMail({
       to,
       subject: `[Foretrace] ${summary.slice(0, 120)}`,

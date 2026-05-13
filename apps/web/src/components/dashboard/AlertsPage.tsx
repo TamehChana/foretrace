@@ -25,6 +25,21 @@ type AlertRow = {
   project: { name: string };
 };
 
+function riskAlertPayloadExtras(payload: unknown): {
+  verdict?: string;
+  preview?: string;
+} {
+  if (!payload || typeof payload !== 'object') {
+    return {};
+  }
+  const p = payload as Record<string, unknown>;
+  return {
+    verdict: typeof p.verdict === 'string' ? p.verdict : undefined,
+    preview:
+      typeof p.aiSummaryPreview === 'string' ? p.aiSummaryPreview : undefined,
+  };
+}
+
 function formatWhen(iso: string): string {
   try {
     return new Date(iso).toLocaleString(undefined, {
@@ -137,7 +152,7 @@ export function AlertsPage() {
       <PageHeader
         eyebrow="Delivery signals"
         title="Alerts"
-        description="Risk-driven notifications for your workspace. New items appear when a PM or admin runs Evaluate on a project and risk is at least Medium and has worsened or is first seen at that level."
+        description="Risk-driven notifications when a PM or admin runs Evaluate and delivery risk is at least Medium and has worsened (or is first seen at that level). New alerts include an AI verdict line and a short summary when available."
         meta={
           <Link
             to="/"
@@ -204,7 +219,9 @@ export function AlertsPage() {
             </div>
           ) : state.status === 'ok' ? (
             <ul className="max-w-3xl divide-y divide-zinc-100 rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-700 dark:bg-zinc-950/50">
-              {state.items.map((row) => (
+              {state.items.map((row) => {
+                const extras = riskAlertPayloadExtras(row.payload);
+                return (
                 <li
                   key={row.id}
                   className={`flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start sm:justify-between ${
@@ -215,6 +232,18 @@ export function AlertsPage() {
                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                       {row.summary}
                     </p>
+                    {extras.verdict ? (
+                      <p className="mt-1.5">
+                        <span className="inline-block rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200">
+                          {extras.verdict.replace(/_/g, ' ')}
+                        </span>
+                      </p>
+                    ) : null}
+                    {extras.preview ? (
+                      <p className="mt-2 whitespace-pre-wrap text-[12px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                        {extras.preview}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-[11px] text-zinc-500">
                       {row.project.name} · {formatWhen(row.createdAt)}
                       {row.readAt ? ` · Read ${formatWhen(row.readAt)}` : ''}
@@ -240,7 +269,8 @@ export function AlertsPage() {
                     </button>
                   ) : null}
                 </li>
-              ))}
+              );
+              })}
             </ul>
           ) : null}
         </div>
