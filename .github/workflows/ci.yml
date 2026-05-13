@@ -1,0 +1,30 @@
+# Unit + e2e tests for the API (no PostgreSQL required — e2e uses Prisma stub).
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate (API)
+        run: npm run db:generate -w @foretrace/api
+
+      - name: API unit tests
+        run: npm test -w @foretrace/api
+
+      - name: API e2e tests
+        run: npm run test:e2e -w @foretrace/api
