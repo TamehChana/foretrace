@@ -1,4 +1,5 @@
 # Unit + e2e tests for the API (no PostgreSQL required — e2e uses Prisma stub).
+# Builds @foretrace/shared first so Jest can resolve its dist entry (fresh npm ci has no dist/).
 name: CI
 
 on:
@@ -22,6 +23,9 @@ jobs:
 
       - name: Prisma generate (API)
         run: npm run db:generate -w @foretrace/api
+
+      - name: Build shared package
+        run: npm run build -w @foretrace/shared
 
       - name: API unit tests
         run: npm test -w @foretrace/api
