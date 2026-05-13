@@ -585,8 +585,8 @@ export function ProjectGitHubPanel(props: {
           </h4>
           <p className="mt-1 text-[12px] text-zinc-500">
             {canManage
-              ? 'Link a collaborator’s GitHub login to their Foretrace user ID (members only). Developers can view mappings.'
-              : 'Mappings are managed by PM and admin.'}
+              ? 'Link a collaborator’s GitHub login to their Foretrace user ID (members only). Developers can always map only their own login from the “Your GitHub login” card in the limited project view.'
+              : 'Mappings are managed by PM and admin. Developers map their own login from the limited project view.'}
           </p>
           {canManage ? (
             <div className="mt-2 space-y-1.5 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">

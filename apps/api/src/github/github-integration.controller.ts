@@ -150,10 +150,12 @@ export class GithubIntegrationController {
   async listUserLinks(
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
+    @Req() req: Request,
   ) {
     const data = await this.githubConnectionService.listUserLinks(
       projectId,
       organizationId,
+      req.user!.id,
     );
     return { data };
   }
@@ -166,17 +168,19 @@ export class GithubIntegrationController {
     AuthenticatedGuard,
     RolesGuard,
   )
-  @Roles(Role.ADMIN, Role.PM)
+  @Roles(Role.ADMIN, Role.PM, Role.DEVELOPER)
   async createUserLink(
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
     @Body() dto: CreateGitHubUserLinkDto,
+    @Req() req: Request,
   ) {
     const data = await this.githubConnectionService.addUserLink(
       projectId,
       organizationId,
       dto.githubLogin,
       dto.userId,
+      req.user!.id,
     );
     return { data };
   }
@@ -189,16 +193,18 @@ export class GithubIntegrationController {
     AuthenticatedGuard,
     RolesGuard,
   )
-  @Roles(Role.ADMIN, Role.PM)
+  @Roles(Role.ADMIN, Role.PM, Role.DEVELOPER)
   async deleteUserLink(
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
     @Param('linkId', new ParseUUIDPipe({ version: '4' })) linkId: string,
+    @Req() req: Request,
   ): Promise<void> {
     await this.githubConnectionService.removeUserLink(
       projectId,
       organizationId,
       linkId,
+      req.user!.id,
     );
   }
 }

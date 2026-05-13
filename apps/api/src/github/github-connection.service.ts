@@ -1,11 +1,12 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 
 import { AuditService } from '../audit/audit.service';
@@ -231,13 +232,36 @@ export class GithubConnectionService {
     return { ok: true as const };
   }
 
-  async listUserLinks(projectId: string, organizationId: string) {
+  async listUserLinks(
+    projectId: string,
+    organizationId: string,
+    viewerUserId: string,
+  ) {
     const conn = await this.getForProject(projectId, organizationId);
     if (!conn) {
       throw new NotFoundException('No GitHub connection for this project');
     }
+
+    const viewerMembership = await this.prisma.membership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: viewerUserId,
+          organizationId,
+        },
+      },
+      select: { role: true },
+    });
+    if (!viewerMembership) {
+      throw new ForbiddenException('You are not a member of this organization.');
+    }
+
+    const where: Prisma.GitHubUserLinkWhereInput = { connectionId: conn.id };
+    if (viewerMembership.role === Role.DEVELOPER) {
+      where.userId = viewerUserId;
+    }
+
     return this.prisma.gitHubUserLink.findMany({
-      where: { connectionId: conn.id },
+      where,
       select: {
         id: true,
         githubLogin: true,
@@ -257,10 +281,32 @@ export class GithubConnectionService {
     organizationId: string,
     githubLogin: string,
     userId: string,
+    actorUserId: string,
   ) {
     const conn = await this.getForProject(projectId, organizationId);
     if (!conn) {
       throw new NotFoundException('No GitHub connection for this project');
+    }
+
+    const actorMembership = await this.prisma.membership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: actorUserId,
+          organizationId,
+        },
+      },
+      select: { role: true },
+    });
+    if (!actorMembership) {
+      throw new ForbiddenException('You are not a member of this organization.');
+    }
+    if (
+      actorMembership.role === Role.DEVELOPER &&
+      userId !== actorUserId
+    ) {
+      throw new ForbiddenException(
+        'Developers may only link their own GitHub login to their Foretrace account.',
+      );
     }
 
     const membership = await this.prisma.membership.findUnique({
@@ -313,6 +359,7 @@ export class GithubConnectionService {
     projectId: string,
     organizationId: string,
     linkId: string,
+    actorUserId: string,
   ): Promise<void> {
     const conn = await this.getForProject(projectId, organizationId);
     if (!conn) {
@@ -324,6 +371,27 @@ export class GithubConnectionService {
     });
     if (!link) {
       throw new NotFoundException('User link not found');
+    }
+
+    const actorMembership = await this.prisma.membership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: actorUserId,
+          organizationId,
+        },
+      },
+      select: { role: true },
+    });
+    if (!actorMembership) {
+      throw new ForbiddenException('You are not a member of this organization.');
+    }
+    if (
+      actorMembership.role === Role.DEVELOPER &&
+      link.userId !== actorUserId
+    ) {
+      throw new ForbiddenException(
+        'Developers may only remove their own GitHub login mapping.',
+      );
     }
 
     await this.prisma.gitHubUserLink.delete({ where: { id: link.id } });

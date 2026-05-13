@@ -36,6 +36,7 @@ import { PageHeader } from '../ui/PageHeader';
 import { ProjectCliTokensPanel } from './ProjectCliTokensPanel';
 import { ProjectRiskPanel } from './ProjectRiskPanel';
 import { ProjectTerminalIncidentsPanel } from './ProjectTerminalIncidentsPanel';
+import { ProjectGithubSelfLinkCard } from './ProjectGithubSelfLinkCard';
 import { ProjectGitHubPanel } from './ProjectGitHubPanel';
 import { ProjectSignalsPanel } from './ProjectSignalsPanel';
 import { Skeleton } from '../ui/Skeleton';
@@ -1493,20 +1494,31 @@ export function ProjectsPage() {
                                   />
                                 </>
                               ) : (
-                                <div className="mt-4 rounded-xl border border-zinc-200/80 bg-zinc-50/90 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-900/50">
-                                  <p className="text-[12px] leading-relaxed text-zinc-600 dark:text-zinc-400">
-                                    <strong className="font-medium text-zinc-800 dark:text-zinc-200">
-                                      Limited project view.
-                                    </strong>{' '}
-                                    Signals, delivery risk, GitHub connection
-                                    settings, and organization-wide terminal
-                                    incidents are visible to PMs and admins only.
-                                    Tasks assigned to you, and unassigned tasks you
-                                    created, are listed above; new tasks you add stay
-                                    unassigned until a PM or admin assigns them. Use
-                                    CLI tokens below for your own terminal ingest.
-                                  </p>
-                                </div>
+                                <>
+                                  <div className="mt-4 rounded-xl border border-zinc-200/80 bg-zinc-50/90 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-900/50">
+                                    <p className="text-[12px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                                      <strong className="font-medium text-zinc-800 dark:text-zinc-200">
+                                        Limited project view.
+                                      </strong>{' '}
+                                      Signals, delivery risk, GitHub connection
+                                      settings, and organization-wide terminal
+                                      incidents are visible to PMs and admins only.
+                                      Tasks assigned to you, and unassigned tasks you
+                                      created, are listed above; new tasks you add stay
+                                      unassigned until a PM or admin assigns them. Use
+                                      CLI tokens below for your own terminal ingest.
+                                    </p>
+                                  </div>
+                                  {organizationId ? (
+                                    <ProjectGithubSelfLinkCard
+                                      organizationId={organizationId}
+                                      projectId={p.id}
+                                      currentUserId={currentUserId}
+                                      refreshKey={dataBump}
+                                      onRefresh={bumpData}
+                                    />
+                                  ) : null}
+                                </>
                               )}
                               <ProjectCliTokensPanel
                                 organizationId={organizationId}
