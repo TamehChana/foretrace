@@ -257,6 +257,8 @@ PM opens alert → reviews evidence timeline → takes action → subsequent eva
 - **FR-GH-04:** System stores normalized events and derived aggregates (e.g. last activity, PR ages).
 - **FR-GH-05:** GitHub user identity can be linked to application user (manual or OAuth-assisted).
 
+**Operational workflow (task ↔ GitHub issue):** For webhook-driven updates on a **specific Foretrace task**, the task must store the **GitHub issue number** for that connected repository, and payloads must reference that number (e.g. `#42` in commits or PR/issue text). PMs typically **create the issue in GitHub first**, copy its number into Foretrace, assign the **Foretrace task** to the developer, and ask developers to **link their GitHub login** so activity shows names. GitHub issue assignees are optional; **Foretrace assignee** defines ownership in-app.
+
 ### 6.3 Terminal Log Monitoring
 
 - **FR-TL-01:** Developer can authenticate CLI (project-scoped token).

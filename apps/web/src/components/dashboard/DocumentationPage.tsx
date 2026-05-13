@@ -15,6 +15,7 @@ const STEPS = [
   { id: 'step-3', label: '3 · Project' },
   { id: 'step-4', label: '4 · Tasks' },
   { id: 'step-5', label: '5 · GitHub' },
+  { id: 'github-issues-tasks', label: 'GitHub ↔ tasks' },
   { id: 'step-6', label: '6 · CLI / terminal' },
   { id: 'step-7', label: '7 · VS Code / Cursor extension' },
   { id: 'step-8', label: '8 · Signals & risk' },
@@ -303,6 +304,14 @@ export function DocumentationPage() {
             Each task row has an id in the system (another UUID). If you use the optional <Code>FORETRACE_TASK_ID</Code> in the CLI, it must be{' '}
             <strong>exactly</strong> that task’s id and the task must belong to <strong>this</strong> project—otherwise the server will reject the upload.
           </p>
+          <Tip>
+            If your team uses <strong>GitHub</strong> for code, the smoothest path is: create a <strong>real GitHub issue per task</strong> (or per stream of work),
+            then put that issue’s <strong>number</strong> on the matching Foretrace task after you connect the repo (see{' '}
+            <a href="#step-5" className="font-semibold text-accent-700 underline dark:text-accent-400">
+              step 5
+            </a>
+            ). That number is how webhooks know <em>which task</em> a commit or PR comment belongs to.
+          </Tip>
         </WorkflowStep>
 
         <WorkflowStep step={5} id="step-5" title="Optional: connect GitHub (admin or PM)">
@@ -333,9 +342,68 @@ export function DocumentationPage() {
               branch status). Use the smallest permission set your security team approves.
             </li>
             <li>
-              <strong>User mapping:</strong> link GitHub usernames to Foretrace accounts so activity lines up with people you know in the app.
+              <strong>User mapping:</strong> link GitHub usernames to Foretrace accounts so activity lines up with people you know in the app (details below).
             </li>
           </ol>
+
+          <h3
+            id="github-issues-tasks"
+            className="text-base font-semibold text-zinc-800 dark:text-zinc-200"
+          >
+            Create GitHub issues, then copy the issue number into Foretrace
+          </h3>
+          <p>
+            Foretrace matches GitHub <strong>webhooks</strong> to a task by the <strong>issue number</strong>: something in the event (for example{' '}
+            <Code>#42</Code> in a commit message or PR text) must match the <strong>GitHub issue #</strong> field saved on that task in the{' '}
+            <strong>same</strong> connected project. Without a real issue number in GitHub and the same number on the task, those automatic “this push belongs
+            to this task” updates will not attach.
+          </p>
+          <ol className="list-decimal space-y-4 pl-5 marker:font-semibold marker:text-zinc-500">
+            <li>
+              In GitHub, open the <strong>same repository</strong> you typed as <Code>owner/repo</Code> in Foretrace.
+            </li>
+            <li>
+              Go to <strong>Issues</strong> → <strong>New issue</strong>. Give it a clear title and description, then create it.
+            </li>
+            <li>
+              Note the <strong>issue number</strong> GitHub assigned (for example <Code>#42</Code> in the issue title line or in the browser URL). Every new
+              issue gets the next number in that repo—you cannot pick an arbitrary number.
+            </li>
+            <li>
+              <strong>Optional but tidy on GitHub:</strong> use <strong>Assignees</strong> on the GitHub issue for the developer who will do the work (Alice,
+              Paul, …). Foretrace does <strong>not</strong> require this for matching; it only helps your team read GitHub. <strong>Who owns the work in
+              Foretrace</strong> is the task’s <strong>Assign to</strong> field (PM/admin).
+            </li>
+            <li>
+              In Foretrace → <strong>Projects</strong> → expand the project → find the task for that work (or create it as an admin). Set <strong>GitHub issue
+              #</strong> to <strong>exactly</strong> that number (for example <Code>42</Code>). Set <strong>Assign to</strong> to the right developer.
+            </li>
+            <li>
+              Repeat for each developer: one GitHub issue per stream of work, one Foretrace task with that issue number and the right assignee. Example: three
+              issues in GitHub (#10, #11, #12) → three Foretrace tasks with those numbers → Alice, Paul, and Boris each assigned on their own task.
+            </li>
+            <li>
+              Ask each developer to open the project’s <strong>GitHub</strong> section and <strong>link their GitHub username</strong> to their Foretrace account.
+              Then when GitHub sends <Code>@theirlogin</Code>, Foretrace can show their <strong>name in the app</strong>. If someone skips linking, you still see
+              the raw GitHub login on activity.
+            </li>
+            <li>
+              Developers should reference the issue in GitHub when they work: for example commit messages like <Code>Fix login (#42)</Code> or PR titles/bodies
+              that include <Code>#42</Code>. That is what lets the webhook payload mention the same number Foretrace stored on the task.
+            </li>
+          </ol>
+          <Note title="Two different “who owns this?” ideas">
+            <p>
+              <strong>Foretrace assignee</strong> = whose task row this is for deadlines, risk, and permissions. <strong>GitHub assignee</strong> on the issue =
+              optional label inside GitHub only.
+            </p>
+            <p>
+              <strong>Who triggered a GitHub event</strong> comes from GitHub’s actor (for example the commit <Code>pusher</Code> or PR author). If that person
+              is not the Foretrace assignee, Foretrace may still show the activity on the task (because the <strong>issue numbers matched</strong>) and can warn
+              that the last linked GitHub user differs from the assignee—so the PM can notice pairing or handoffs.
+            </p>
+          </Note>
+
           <Tip>
             <strong className="text-zinc-800 dark:text-zinc-200">Quick checks when activity looks empty:</strong> in GitHub open the webhook’s{' '}
             <strong>Recent Deliveries</strong>—each row should be <strong>200</strong> (if not, fix URL, secret, or content type). Enable at least{' '}
