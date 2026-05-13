@@ -119,6 +119,25 @@ export function extractActorLogin(
 
   switch (eventType) {
     case 'push': {
+      const fromSender = login(body.sender);
+      if (fromSender) {
+        return fromSender;
+      }
+      const commits = body.commits;
+      if (Array.isArray(commits)) {
+        for (const c of commits) {
+          if (!c || typeof c !== 'object') {
+            continue;
+          }
+          const author = (c as { author?: unknown }).author;
+          if (author && typeof author === 'object') {
+            const u = (author as { username?: unknown }).username;
+            if (typeof u === 'string' && u.trim().length > 0) {
+              return u.toLowerCase();
+            }
+          }
+        }
+      }
       const p = body.pusher;
       if (!p || typeof p !== 'object') {
         return null;

@@ -10,6 +10,7 @@ export type OrgProjectRow = {
   createdAt: string;
   updatedAt: string;
   taskCount: number;
+  githubRepositoryFullName: string | null;
 };
 
 export type OrgProjectsState =
@@ -53,6 +54,7 @@ export function parseCreateProjectEnvelope(json: unknown): OrgProjectRow | null 
     updatedAt:
       typeof r.updatedAt === 'string' ? r.updatedAt : new Date().toISOString(),
     taskCount: 0,
+    githubRepositoryFullName: null,
   };
 }
 
@@ -68,7 +70,10 @@ function parseList(json: unknown): OrgProjectRow[] {
     if (!row || typeof row !== 'object' || !('id' in row && 'name' in row)) {
       throw new Error('Invalid project row');
     }
-    const r = row as OrgProjectRow & { taskCount?: unknown };
+    const r = row as OrgProjectRow & {
+      taskCount?: unknown;
+      githubRepositoryFullName?: unknown;
+    };
     return {
       id: r.id,
       name: String(r.name),
@@ -87,6 +92,12 @@ function parseList(json: unknown): OrgProjectRow[] {
       createdAt: String(r.createdAt),
       updatedAt: String(r.updatedAt),
       taskCount: typeof r.taskCount === 'number' ? r.taskCount : 0,
+      githubRepositoryFullName:
+        typeof r.githubRepositoryFullName === 'string'
+          ? r.githubRepositoryFullName
+          : r.githubRepositoryFullName === null
+            ? null
+            : null,
     };
   });
 }

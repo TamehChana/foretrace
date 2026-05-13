@@ -10,6 +10,7 @@ import {
   MinLength,
   Min,
   Max,
+  ValidateIf,
 } from 'class-validator';
 import { TaskPriority, TaskStatus } from '@prisma/client';
 
@@ -54,4 +55,12 @@ export class UpdateTaskDto {
   @Min(0)
   @Max(100)
   progress?: number;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  githubIssueNumber?: number | null;
 }

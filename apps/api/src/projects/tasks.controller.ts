@@ -40,8 +40,13 @@ export class TasksController {
   async list(
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
+    @Req() req: Request,
   ): Promise<{ data: Awaited<ReturnType<TasksService['listTasks']>> }> {
-    const data = await this.tasksService.listTasks(projectId, organizationId);
+    const data = await this.tasksService.listTasks(
+      projectId,
+      organizationId,
+      req.user!.id,
+    );
     return { data };
   }
 
@@ -82,11 +87,13 @@ export class TasksController {
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
     @Param('taskId') taskId: string,
+    @Req() req: Request,
   ): Promise<{ data: Awaited<ReturnType<TasksService['getTask']>> }> {
     const data = await this.tasksService.getTask(
       taskId,
       projectId,
       organizationId,
+      req.user!.id,
     );
     return { data };
   }

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Role, TaskPriority, TaskStatus } from '@prisma/client';
+import { Prisma, Role, TaskPriority, TaskStatus } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from './projects.service';
@@ -38,10 +38,43 @@ export class TasksService {
     }
   }
 
-  async listTasks(projectId: string, organizationId: string) {
+  private developerSeesTaskWhere(viewerUserId: string): Prisma.TaskWhereInput {
+    return {
+      OR: [
+        { assigneeId: viewerUserId },
+        { assigneeId: null, createdById: viewerUserId },
+      ],
+    };
+  }
+
+  async listTasks(
+    projectId: string,
+    organizationId: string,
+    viewerUserId: string,
+  ) {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
+    const membership = await this.prisma.membership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: viewerUserId,
+          organizationId,
+        },
+      },
+      select: { role: true },
+    });
+    if (!membership) {
+      throw new ForbiddenException(
+        'You are not a member of this organization.',
+      );
+    }
+
+    const where: Prisma.TaskWhereInput =
+      membership.role === Role.DEVELOPER
+        ? { projectId, ...this.developerSeesTaskWhere(viewerUserId) }
+        : { projectId };
+
     return this.prisma.task.findMany({
-      where: { projectId },
+      where,
       select: {
         id: true,
         title: true,
@@ -52,6 +85,9 @@ export class TasksService {
         progress: true,
         assigneeId: true,
         createdById: true,
+        githubIssueNumber: true,
+        lastGithubActivityAt: true,
+        lastGithubActorLogin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -63,10 +99,31 @@ export class TasksService {
     taskId: string,
     projectId: string,
     organizationId: string,
+    viewerUserId: string,
   ) {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
+    const membership = await this.prisma.membership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: viewerUserId,
+          organizationId,
+        },
+      },
+      select: { role: true },
+    });
+    if (!membership) {
+      throw new ForbiddenException(
+        'You are not a member of this organization.',
+      );
+    }
+
+    const where: Prisma.TaskWhereInput = { id: taskId, projectId };
+    if (membership.role === Role.DEVELOPER) {
+      Object.assign(where, this.developerSeesTaskWhere(viewerUserId));
+    }
+
     const task = await this.prisma.task.findFirst({
-      where: { id: taskId, projectId },
+      where,
       select: {
         id: true,
         title: true,
@@ -77,6 +134,9 @@ export class TasksService {
         progress: true,
         assigneeId: true,
         createdById: true,
+        githubIssueNumber: true,
+        lastGithubActivityAt: true,
+        lastGithubActorLogin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -118,6 +178,11 @@ export class TasksService {
         'Developers may only assign new tasks to themselves or leave them unassigned.',
       );
     }
+    if (membership.role === Role.DEVELOPER && dto.githubIssueNumber != null) {
+      throw new BadRequestException(
+        'Only PMs and admins can link a task to a GitHub issue number.',
+      );
+    }
 
     if (dto.assigneeId) {
       await this.assertAssigneeInOrg(dto.assigneeId, organizationId);
@@ -132,9 +197,13 @@ export class TasksService {
         status: dto.status ?? TaskStatus.TODO,
         deadline: dto.deadline ? new Date(dto.deadline) : null,
         assigneeId: dto.assigneeId ?? null,
-        progress:
-          dto.progress !== undefined ? dto.progress : 0,
+        progress: dto.progress !== undefined ? dto.progress : 0,
         createdById,
+        ...(membership.role !== Role.DEVELOPER &&
+        dto.githubIssueNumber !== undefined &&
+        dto.githubIssueNumber !== null
+          ? { githubIssueNumber: dto.githubIssueNumber }
+          : {}),
       },
       select: {
         id: true,
@@ -146,6 +215,9 @@ export class TasksService {
         progress: true,
         assigneeId: true,
         createdById: true,
+        githubIssueNumber: true,
+        lastGithubActivityAt: true,
+        lastGithubActorLogin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -159,7 +231,7 @@ export class TasksService {
     actorUserId: string,
     dto: UpdateTaskDto,
   ) {
-    const task = await this.getTask(taskId, projectId, organizationId);
+    const task = await this.getTask(taskId, projectId, organizationId, actorUserId);
 
     const membership = await this.prisma.membership.findUnique({
       where: {
@@ -183,13 +255,15 @@ export class TasksService {
     const requestedAssignee = dto.assigneeId !== undefined;
     const requestedStatus = dto.status !== undefined;
     const requestedProgress = dto.progress !== undefined;
+    const requestedGithubIssue = dto.githubIssueNumber !== undefined;
 
     const anyMetadataOrAssignment =
       requestedTitle ||
       requestedDescription ||
       requestedPriority ||
       requestedDeadline ||
-      requestedAssignee;
+      requestedAssignee ||
+      requestedGithubIssue;
 
     if (membership.role === Role.DEVELOPER) {
       const canUpdateStatusOrProgress =
@@ -224,6 +298,7 @@ export class TasksService {
       deadline?: Date | null;
       assigneeId?: string | null;
       progress?: number;
+      githubIssueNumber?: number | null;
     } = {};
 
     if (dto.title !== undefined) {
@@ -248,6 +323,9 @@ export class TasksService {
     if (dto.progress !== undefined) {
       data.progress = dto.progress;
     }
+    if (dto.githubIssueNumber !== undefined) {
+      data.githubIssueNumber = dto.githubIssueNumber;
+    }
 
     if (Object.keys(data).length === 0) {
       throw new BadRequestException('No updates provided');
@@ -266,6 +344,9 @@ export class TasksService {
         progress: true,
         assigneeId: true,
         createdById: true,
+        githubIssueNumber: true,
+        lastGithubActivityAt: true,
+        lastGithubActorLogin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -282,7 +363,12 @@ export class TasksService {
     organizationId: string,
     actorUserId: string,
   ) {
-    const task = await this.getTask(taskId, projectId, organizationId);
+    const task = await this.getTask(
+      taskId,
+      projectId,
+      organizationId,
+      actorUserId,
+    );
     const membership = await this.prisma.membership.findUnique({
       where: {
         userId_organizationId: {

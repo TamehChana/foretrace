@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Prisma, Role } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -16,17 +17,45 @@ export class TerminalIncidentsService {
   async listForProject(
     organizationId: string,
     projectId: string,
+    viewerUserId: string,
     limit?: number,
   ) {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
+    const membership = await this.prisma.membership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: viewerUserId,
+          organizationId,
+        },
+      },
+      select: { role: true },
+    });
+    if (!membership) {
+      throw new ForbiddenException(
+        'You are not a member of this organization.',
+      );
+    }
+
     const raw =
       typeof limit === 'number' && Number.isFinite(limit)
         ? Math.trunc(limit)
         : DEFAULT_LIMIT;
     const take = Math.min(Math.max(raw, 1), MAX_LIMIT);
 
+    const where: Prisma.TerminalIncidentWhereInput = {
+      organizationId,
+      projectId,
+    };
+    if (membership.role === Role.DEVELOPER) {
+      where.OR = [
+        { taskId: null },
+        { task: { assigneeId: viewerUserId } },
+        { task: { assigneeId: null, createdById: viewerUserId } },
+      ];
+    }
+
     return this.prisma.terminalIncident.findMany({
-      where: { organizationId, projectId },
+      where,
       select: {
         id: true,
         category: true,

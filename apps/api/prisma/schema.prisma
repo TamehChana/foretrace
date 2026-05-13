@@ -190,6 +190,10 @@ model Task {
   progress    Int          @default(0)
   assigneeId  String?      @db.Uuid
   createdById String       @db.Uuid
+  /// When set, matches `repository` issue number for this project’s linked GitHub repo.
+  githubIssueNumber      Int?
+  lastGithubActivityAt   DateTime?
+  lastGithubActorLogin   String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -202,6 +206,7 @@ model Task {
   @@index([projectId])
   @@index([assigneeId])
   @@index([deadline])
+  @@index([projectId, githubIssueNumber])
 }
 
 /// Project-scoped secret for the Foretrace CLI (`Authorization: Bearer ft_ck_...`). Only a SHA-256 digest is stored.

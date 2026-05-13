@@ -1,9 +1,5 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import type { Role } from '@prisma/client';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, Role } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 
 import { AuditService } from '../audit/audit.service';
@@ -59,6 +55,7 @@ export class CliIngestTokenService {
   async listForProject(
     organizationId: string,
     projectId: string,
+    viewerUserId: string,
   ): Promise<
     {
       id: string;
@@ -70,8 +67,24 @@ export class CliIngestTokenService {
     }[]
   > {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
+    const membership = await this.prisma.membership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: viewerUserId,
+          organizationId,
+        },
+      },
+      select: { role: true },
+    });
+    const where: Prisma.CliIngestTokenWhereInput = {
+      organizationId,
+      projectId,
+    };
+    if (membership?.role === Role.DEVELOPER) {
+      where.createdById = viewerUserId;
+    }
     return this.prisma.cliIngestToken.findMany({
-      where: { organizationId, projectId },
+      where,
       select: {
         id: true,
         name: true,

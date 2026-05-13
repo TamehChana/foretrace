@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectSignalsService } from '../projects/project-signals.service';
+import { collectIssueReferencesFromGithubWebhook } from './github-webhook-issue-refs';
 import {
   extractAction,
   extractActorLogin,
@@ -93,6 +94,25 @@ export class GithubWebhookService {
           data: { lastEventAt: now, ...aggregatePatch },
         });
       });
+
+      const issueNums = collectIssueReferencesFromGithubWebhook(
+        payloadJson,
+        eventType,
+      );
+      if (issueNums.length > 0) {
+        const actor = extractActorLogin(payloadJson, eventType);
+        await this.prisma.task.updateMany({
+          where: {
+            projectId: connection.projectId,
+            githubIssueNumber: { in: issueNums },
+          },
+          data: {
+            lastGithubActivityAt: now,
+            lastGithubActorLogin: actor,
+          },
+        });
+      }
+
       this.projectSignals.scheduleRefreshSnapshot(
         connection.projectId,
         connection.project.organizationId,

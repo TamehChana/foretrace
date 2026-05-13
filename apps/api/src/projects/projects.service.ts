@@ -15,6 +15,8 @@ export type ProjectListItem = {
   createdAt: Date;
   updatedAt: Date;
   taskCount: number;
+  /** Linked GitHub repo `owner/name` when a connection exists (for issue links in UI). */
+  githubRepositoryFullName: string | null;
 };
 
 @Injectable()
@@ -32,6 +34,9 @@ export class ProjectsService {
         createdAt: true,
         updatedAt: true,
         _count: { select: { tasks: true } },
+        githubConnection: {
+          select: { repositoryFullName: true },
+        },
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -43,6 +48,8 @@ export class ProjectsService {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       taskCount: row._count.tasks,
+      githubRepositoryFullName:
+        row.githubConnection?.repositoryFullName ?? null,
     }));
   }
 

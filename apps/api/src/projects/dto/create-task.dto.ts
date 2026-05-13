@@ -54,4 +54,11 @@ export class CreateTaskDto {
   @Min(0)
   @Max(100)
   progress?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  githubIssueNumber?: number;
 }

@@ -85,6 +85,20 @@ function dateInputToDeadlineIso(yyyyMmDd: string): string {
   return `${trimmed}T12:00:00.000Z`;
 }
 
+function formatTaskDateTime(iso: string | null): string {
+  if (!iso) {
+    return '';
+  }
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 export function ProjectsPage() {
   const organizations = useOrganizations();
   const { snapshot, openAuthModal, bumpWorkspaceList } = useAuthSession();
@@ -164,6 +178,9 @@ export function ProjectsPage() {
     Record<string, string>
   >({});
   const [taskDeadlineOnCreate, setTaskDeadlineOnCreate] = useState<
+    Record<string, string>
+  >({});
+  const [taskGithubIssueOnCreate, setTaskGithubIssueOnCreate] = useState<
     Record<string, string>
   >({});
   const [taskSubmitting, setTaskSubmitting] = useState(false);
@@ -338,6 +355,7 @@ export function ProjectsPage() {
       assigneeId?: string;
       priority?: string;
       deadline?: string;
+      githubIssueNumber?: number;
     } = { title };
     if (assignRaw.length > 0) {
       body.assigneeId = assignRaw;
@@ -350,6 +368,13 @@ export function ProjectsPage() {
       const dl = (taskDeadlineOnCreate[projectId] ?? '').trim();
       if (dl.length > 0) {
         body.deadline = dateInputToDeadlineIso(dl);
+      }
+      const issueRaw = (taskGithubIssueOnCreate[projectId] ?? '').trim();
+      if (issueRaw.length > 0) {
+        const n = parseInt(issueRaw, 10);
+        if (Number.isFinite(n) && n > 0) {
+          body.githubIssueNumber = n;
+        }
       }
     }
     setTaskSubmitting(true);
@@ -370,6 +395,7 @@ export function ProjectsPage() {
       setTaskAssignOnCreate((prev) => ({ ...prev, [projectId]: '' }));
       setTaskPriorityOnCreate((prev) => ({ ...prev, [projectId]: '' }));
       setTaskDeadlineOnCreate((prev) => ({ ...prev, [projectId]: '' }));
+      setTaskGithubIssueOnCreate((prev) => ({ ...prev, [projectId]: '' }));
       bumpData();
       showToast('Task added', 'success');
     } catch (err: unknown) {
@@ -846,6 +872,61 @@ export function ProjectsPage() {
                                                   <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                                                     {t.title}
                                                   </p>
+                                                  {(() => {
+                                                    const repoRaw =
+                                                      p.githubRepositoryFullName;
+                                                    const repo =
+                                                      typeof repoRaw === 'string'
+                                                        ? repoRaw.trim()
+                                                        : '';
+                                                    const issueUrl =
+                                                      repo.length > 0 &&
+                                                      t.githubIssueNumber != null
+                                                        ? `https://github.com/${repo}/issues/${t.githubIssueNumber}`
+                                                        : null;
+                                                    if (
+                                                      !issueUrl &&
+                                                      t.githubIssueNumber ==
+                                                        null &&
+                                                      !t.lastGithubActivityAt
+                                                    ) {
+                                                      return null;
+                                                    }
+                                                    return (
+                                                      <div className="space-y-0.5 text-[11px] text-zinc-600 dark:text-zinc-400">
+                                                        {t.githubIssueNumber !=
+                                                        null ? (
+                                                          issueUrl ? (
+                                                            <a
+                                                              href={issueUrl}
+                                                              target="_blank"
+                                                              rel="noreferrer"
+                                                              className="font-medium text-accent-700 hover:underline dark:text-accent-400"
+                                                            >
+                                                              GitHub issue #
+                                                              {t.githubIssueNumber}
+                                                            </a>
+                                                          ) : (
+                                                            <span>
+                                                              Issue #
+                                                              {t.githubIssueNumber}
+                                                            </span>
+                                                          )
+                                                        ) : null}
+                                                        {t.lastGithubActivityAt ? (
+                                                          <p className="text-zinc-500">
+                                                            Last GitHub activity:{' '}
+                                                            {formatTaskDateTime(
+                                                              t.lastGithubActivityAt,
+                                                            )}
+                                                            {t.lastGithubActorLogin
+                                                              ? ` (${t.lastGithubActorLogin})`
+                                                              : ''}
+                                                          </p>
+                                                        ) : null}
+                                                      </div>
+                                                    );
+                                                  })()}
                                                   {!canReassignTasks ? (
                                                     <p className="text-[11px] text-zinc-500">
                                                       {t.priority}
@@ -1113,6 +1194,70 @@ export function ProjectsPage() {
                                                             ) : null}
                                                           </div>
                                                         </div>
+                                                        <div className="flex min-w-[7rem] flex-col gap-0.5">
+                                                          <label
+                                                            htmlFor={`gh-issue-${p.id}-${t.id}`}
+                                                            className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                                          >
+                                                            Issue #
+                                                          </label>
+                                                          <input
+                                                            id={`gh-issue-${p.id}-${t.id}`}
+                                                            type="number"
+                                                            min={1}
+                                                            disabled={busy}
+                                                            defaultValue={
+                                                              t.githubIssueNumber ??
+                                                              undefined
+                                                            }
+                                                            key={`gh-${t.id}-${t.githubIssueNumber ?? 'none'}`}
+                                                            onBlur={(e) => {
+                                                              const raw =
+                                                                e.target.value.trim();
+                                                              const prev =
+                                                                t.githubIssueNumber;
+                                                              if (raw === '') {
+                                                                if (
+                                                                  prev != null
+                                                                ) {
+                                                                  void patchTaskFields(
+                                                                    p.id,
+                                                                    t.id,
+                                                                    {
+                                                                      githubIssueNumber:
+                                                                        null,
+                                                                    },
+                                                                  );
+                                                                }
+                                                                return;
+                                                              }
+                                                              const n = parseInt(
+                                                                raw,
+                                                                10,
+                                                              );
+                                                              if (
+                                                                !Number.isFinite(
+                                                                  n,
+                                                                ) ||
+                                                                n < 1
+                                                              ) {
+                                                                return;
+                                                              }
+                                                              if (n === prev) {
+                                                                return;
+                                                              }
+                                                              void patchTaskFields(
+                                                                p.id,
+                                                                t.id,
+                                                                {
+                                                                  githubIssueNumber:
+                                                                    n,
+                                                                },
+                                                              );
+                                                            }}
+                                                            className="w-full min-w-0 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                                                          />
+                                                        </div>
                                                       </div>
                                                     </div>
                                                   ) : null}
@@ -1243,7 +1388,8 @@ export function ProjectsPage() {
                               </div>
                             ) : null}
                             {canReassignTasks ? (
-                              <div className="grid max-w-lg gap-3 sm:grid-cols-2">
+                              <>
+                                <div className="grid max-w-lg gap-3 sm:grid-cols-2">
                                 <div className="flex flex-col gap-1">
                                   <label
                                     htmlFor={`new-task-pri-${p.id}`}
@@ -1296,31 +1442,78 @@ export function ProjectsPage() {
                                   />
                                 </div>
                               </div>
+                              <div className="mt-2 max-w-xs flex flex-col gap-1">
+                                <label
+                                  htmlFor={`new-task-gh-${p.id}`}
+                                  className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                >
+                                  GitHub issue # (optional)
+                                </label>
+                                <input
+                                  id={`new-task-gh-${p.id}`}
+                                  type="number"
+                                  min={1}
+                                  disabled={taskSubmitting}
+                                  value={taskGithubIssueOnCreate[p.id] ?? ''}
+                                  onChange={(e) =>
+                                    setTaskGithubIssueOnCreate((prev) => ({
+                                      ...prev,
+                                      [p.id]: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="e.g. 42"
+                                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                                />
+                              </div>
+                              </>
                             ) : null}
                           </form>
                           {organizationId ? (
                             <>
-                              <ProjectSignalsPanel
-                                organizationId={organizationId}
-                                projectId={p.id}
-                                canManage={canManageProjects}
-                                refreshKey={dataBump}
-                              />
-                              <ProjectRiskPanel
-                                organizationId={organizationId}
-                                projectId={p.id}
-                                canManage={canManageProjects}
-                                refreshKey={dataBump}
-                                onEvaluated={bumpData}
-                              />
-                              <ProjectGitHubPanel
-                                organizationId={organizationId}
-                                projectId={p.id}
-                                canManage={canManageProjects}
-                                currentUserId={currentUserId}
-                                refreshKey={dataBump}
-                                onRefresh={bumpData}
-                              />
+                              {canManageProjects ? (
+                                <>
+                                  <ProjectSignalsPanel
+                                    organizationId={organizationId}
+                                    projectId={p.id}
+                                    canManage={canManageProjects}
+                                    refreshKey={dataBump}
+                                  />
+                                  <ProjectRiskPanel
+                                    organizationId={organizationId}
+                                    projectId={p.id}
+                                    canManage={canManageProjects}
+                                    refreshKey={dataBump}
+                                    onEvaluated={bumpData}
+                                  />
+                                  <ProjectGitHubPanel
+                                    organizationId={organizationId}
+                                    projectId={p.id}
+                                    canManage={canManageProjects}
+                                    currentUserId={currentUserId}
+                                    refreshKey={dataBump}
+                                    onRefresh={bumpData}
+                                  />
+                                  <ProjectTerminalIncidentsPanel
+                                    organizationId={organizationId}
+                                    projectId={p.id}
+                                    refreshKey={dataBump}
+                                  />
+                                </>
+                              ) : (
+                                <div className="mt-4 rounded-xl border border-zinc-200/80 bg-zinc-50/90 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-900/50">
+                                  <p className="text-[12px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                                    <strong className="font-medium text-zinc-800 dark:text-zinc-200">
+                                      Limited project view.
+                                    </strong>{' '}
+                                    Signals, delivery risk, GitHub connection
+                                    settings, and organization-wide terminal
+                                    incidents are visible to PMs and admins only.
+                                    Your assigned tasks are listed above; use
+                                    CLI tokens below for your own terminal
+                                    ingest.
+                                  </p>
+                                </div>
+                              )}
                               <ProjectCliTokensPanel
                                 organizationId={organizationId}
                                 projectId={p.id}
@@ -1334,11 +1527,6 @@ export function ProjectsPage() {
                                 role={cliPanelRole}
                                 currentUserId={currentUserId}
                                 onRefresh={bumpData}
-                              />
-                              <ProjectTerminalIncidentsPanel
-                                organizationId={organizationId}
-                                projectId={p.id}
-                                refreshKey={dataBump}
                               />
                             </>
                           ) : null}

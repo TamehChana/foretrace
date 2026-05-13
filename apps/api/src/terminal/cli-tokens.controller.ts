@@ -66,8 +66,13 @@ export class CliTokensController {
   async list(
     @Param('organizationId') organizationId: string,
     @Param('projectId') projectId: string,
+    @Req() req: Request,
   ): Promise<{ data: Awaited<ReturnType<CliIngestTokenService['listForProject']>> }> {
-    const data = await this.cliTokens.listForProject(organizationId, projectId);
+    const data = await this.cliTokens.listForProject(
+      organizationId,
+      projectId,
+      req.user!.id,
+    );
     return { data };
   }
 

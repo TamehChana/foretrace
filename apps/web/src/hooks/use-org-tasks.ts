@@ -12,6 +12,9 @@ export type OrgTaskRow = {
   progress: number;
   assigneeId: string | null;
   createdById: string;
+  githubIssueNumber: number | null;
+  lastGithubActivityAt: string | null;
+  lastGithubActorLogin: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -34,7 +37,11 @@ function parseList(json: unknown): OrgTaskRow[] {
     if (!row || typeof row !== 'object' || !('id' in row && 'title' in row)) {
       throw new Error('Invalid task row');
     }
-    const t = row as OrgTaskRow;
+    const t = row as OrgTaskRow & {
+      githubIssueNumber?: unknown;
+      lastGithubActivityAt?: unknown;
+      lastGithubActorLogin?: unknown;
+    };
     return {
       id: t.id,
       title: String(t.title),
@@ -60,6 +67,20 @@ function parseList(json: unknown): OrgTaskRow[] {
             ? null
             : null,
       createdById: String(t.createdById),
+      githubIssueNumber:
+        typeof t.githubIssueNumber === 'number' ? t.githubIssueNumber : null,
+      lastGithubActivityAt:
+        typeof t.lastGithubActivityAt === 'string'
+          ? t.lastGithubActivityAt
+          : t.lastGithubActivityAt === null
+            ? null
+            : null,
+      lastGithubActorLogin:
+        typeof t.lastGithubActorLogin === 'string'
+          ? t.lastGithubActorLogin
+          : t.lastGithubActorLogin === null
+            ? null
+            : null,
       createdAt: String(t.createdAt),
       updatedAt: String(t.updatedAt),
     };
