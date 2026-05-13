@@ -53,6 +53,38 @@ const PROGRESS_OPTIONS = [
   100,
 ];
 
+const TASK_PRIORITY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'LOW', label: 'Low' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'HIGH', label: 'High' },
+  { value: 'CRITICAL', label: 'Critical' },
+];
+
+/** `yyyy-mm-dd` for `<input type="date" />` from API ISO deadline. */
+function deadlineToDateInput(iso: string | null): string {
+  if (!iso) {
+    return '';
+  }
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      return '';
+    }
+    return d.toISOString().slice(0, 10);
+  } catch {
+    return '';
+  }
+}
+
+/** Date-only from picker → ISO string the API accepts. */
+function dateInputToDeadlineIso(yyyyMmDd: string): string {
+  const trimmed = yyyyMmDd.trim();
+  if (!trimmed) {
+    return '';
+  }
+  return `${trimmed}T12:00:00.000Z`;
+}
+
 export function ProjectsPage() {
   const organizations = useOrganizations();
   const { snapshot, openAuthModal, bumpWorkspaceList } = useAuthSession();
@@ -126,6 +158,12 @@ export function ProjectsPage() {
   >({});
   /** Optional assignee user id when creating a task (per project). */
   const [taskAssignOnCreate, setTaskAssignOnCreate] = useState<
+    Record<string, string>
+  >({});
+  const [taskPriorityOnCreate, setTaskPriorityOnCreate] = useState<
+    Record<string, string>
+  >({});
+  const [taskDeadlineOnCreate, setTaskDeadlineOnCreate] = useState<
     Record<string, string>
   >({});
   const [taskSubmitting, setTaskSubmitting] = useState(false);
@@ -295,9 +333,24 @@ export function ProjectsPage() {
       return;
     }
     const assignRaw = (taskAssignOnCreate[projectId] ?? '').trim();
-    const body: { title: string; assigneeId?: string } = { title };
+    const body: {
+      title: string;
+      assigneeId?: string;
+      priority?: string;
+      deadline?: string;
+    } = { title };
     if (assignRaw.length > 0) {
       body.assigneeId = assignRaw;
+    }
+    if (canReassignTasks) {
+      const pr = (taskPriorityOnCreate[projectId] ?? '').trim();
+      if (pr.length > 0) {
+        body.priority = pr;
+      }
+      const dl = (taskDeadlineOnCreate[projectId] ?? '').trim();
+      if (dl.length > 0) {
+        body.deadline = dateInputToDeadlineIso(dl);
+      }
     }
     setTaskSubmitting(true);
     try {
@@ -315,6 +368,8 @@ export function ProjectsPage() {
       }
       setTaskTitleByProject((prev) => ({ ...prev, [projectId]: '' }));
       setTaskAssignOnCreate((prev) => ({ ...prev, [projectId]: '' }));
+      setTaskPriorityOnCreate((prev) => ({ ...prev, [projectId]: '' }));
+      setTaskDeadlineOnCreate((prev) => ({ ...prev, [projectId]: '' }));
       bumpData();
       showToast('Task added', 'success');
     } catch (err: unknown) {
@@ -791,12 +846,14 @@ export function ProjectsPage() {
                                                   <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                                                     {t.title}
                                                   </p>
-                                                  <p className="text-[11px] text-zinc-500">
-                                                    {t.priority}
-                                                    {t.deadline
-                                                      ? ` · due ${new Date(t.deadline).toLocaleDateString()}`
-                                                      : ''}
-                                                  </p>
+                                                  {!canReassignTasks ? (
+                                                    <p className="text-[11px] text-zinc-500">
+                                                      {t.priority}
+                                                      {t.deadline
+                                                        ? ` · due ${new Date(t.deadline).toLocaleDateString()}`
+                                                        : ''}
+                                                    </p>
+                                                  ) : null}
                                                   {!canReassignTasks ? (
                                                     <p className="text-[11px] text-zinc-600 dark:text-zinc-300">
                                                       <span className="font-medium text-zinc-500">
@@ -902,57 +959,161 @@ export function ProjectsPage() {
                                                     ) : null}
                                                   </div>
                                                   {canReassignTasks ? (
-                                                    <div className="flex w-full min-w-[12rem] flex-col gap-0.5 sm:w-56">
-                                                      <label
-                                                        htmlFor={`assign-${p.id}-${t.id}`}
-                                                        className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
-                                                      >
-                                                        Assign to
-                                                      </label>
-                                                      <select
-                                                        id={`assign-${p.id}-${t.id}`}
-                                                        className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 shadow-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                                                        value={t.assigneeId ?? ''}
-                                                        disabled={
-                                                          busy ||
-                                                          membersState.status !==
-                                                            'ok'
-                                                        }
-                                                        onChange={(e) => {
-                                                          const v =
-                                                            e.target.value.trim();
-                                                          const next =
-                                                            v.length > 0
-                                                              ? v
-                                                              : null;
-                                                          const prev =
-                                                            t.assigneeId ?? null;
-                                                          if (next === prev) {
-                                                            return;
+                                                    <div className="flex w-full flex-col gap-2 sm:max-w-md">
+                                                      <div className="flex w-full min-w-[12rem] flex-col gap-0.5 sm:w-56">
+                                                        <label
+                                                          htmlFor={`assign-${p.id}-${t.id}`}
+                                                          className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                                        >
+                                                          Assign to
+                                                        </label>
+                                                        <select
+                                                          id={`assign-${p.id}-${t.id}`}
+                                                          className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 shadow-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                                                          value={
+                                                            t.assigneeId ?? ''
                                                           }
-                                                          void patchTaskAssignee(
-                                                            p.id,
-                                                            t.id,
-                                                            next,
-                                                          );
-                                                        }}
-                                                      >
-                                                        <option value="">
-                                                          Unassigned
-                                                        </option>
-                                                        {membersState.status ===
-                                                          'ok' &&
-                                                          membersState.members.map(
-                                                            (m) => (
-                                                              <option
-                                                                key={m.userId}
-                                                                value={m.userId}
+                                                          disabled={
+                                                            busy ||
+                                                            membersState.status !==
+                                                              'ok'
+                                                          }
+                                                          onChange={(e) => {
+                                                            const v =
+                                                              e.target.value.trim();
+                                                            const next =
+                                                              v.length > 0
+                                                                ? v
+                                                                : null;
+                                                            const prev =
+                                                              t.assigneeId ??
+                                                              null;
+                                                            if (next === prev) {
+                                                              return;
+                                                            }
+                                                            void patchTaskAssignee(
+                                                              p.id,
+                                                              t.id,
+                                                              next,
+                                                            );
+                                                          }}
+                                                        >
+                                                          <option value="">
+                                                            Unassigned
+                                                          </option>
+                                                          {membersState.status ===
+                                                            'ok' &&
+                                                            membersState.members.map(
+                                                              (m) => (
+                                                                <option
+                                                                  key={m.userId}
+                                                                  value={
+                                                                    m.userId
+                                                                  }
+                                                                >
+                                                                  {memberLabel(
+                                                                    m,
+                                                                  )}
+                                                                </option>
+                                                              ),
+                                                            )}
+                                                        </select>
+                                                      </div>
+                                                      <div className="flex flex-wrap items-end gap-2">
+                                                        <div className="flex min-w-[7.5rem] flex-col gap-0.5">
+                                                          <label
+                                                            htmlFor={`pri-${p.id}-${t.id}`}
+                                                            className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                                          >
+                                                            Priority
+                                                          </label>
+                                                          <select
+                                                            id={`pri-${p.id}-${t.id}`}
+                                                            className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 shadow-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                                                            value={t.priority}
+                                                            disabled={busy}
+                                                            onChange={(e) => {
+                                                              void patchTaskFields(
+                                                                p.id,
+                                                                t.id,
+                                                                {
+                                                                  priority:
+                                                                    e.target
+                                                                      .value,
+                                                                },
+                                                              );
+                                                            }}
+                                                          >
+                                                            {TASK_PRIORITY_OPTIONS.map(
+                                                              (opt) => (
+                                                                <option
+                                                                  key={
+                                                                    opt.value
+                                                                  }
+                                                                  value={
+                                                                    opt.value
+                                                                  }
+                                                                >
+                                                                  {opt.label}
+                                                                </option>
+                                                              ),
+                                                            )}
+                                                          </select>
+                                                        </div>
+                                                        <div className="flex min-w-[10rem] flex-col gap-0.5">
+                                                          <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                                                            Due date
+                                                          </span>
+                                                          <div className="flex flex-wrap items-center gap-1.5">
+                                                            <input
+                                                              type="date"
+                                                              className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                                                              value={deadlineToDateInput(
+                                                                t.deadline,
+                                                              )}
+                                                              disabled={busy}
+                                                              onChange={(e) => {
+                                                                const v =
+                                                                  e.target.value;
+                                                                void patchTaskFields(
+                                                                  p.id,
+                                                                  t.id,
+                                                                  {
+                                                                    deadline:
+                                                                      v.length >
+                                                                      0
+                                                                        ? dateInputToDeadlineIso(
+                                                                            v,
+                                                                          )
+                                                                        : null,
+                                                                  },
+                                                                );
+                                                              }}
+                                                            />
+                                                            {t.deadline ? (
+                                                              <button
+                                                                type="button"
+                                                                disabled={
+                                                                  busy
+                                                                }
+                                                                onClick={() => {
+                                                                  void patchTaskFields(
+                                                                    p.id,
+                                                                    t.id,
+                                                                    {
+                                                                      deadline:
+                                                                        null,
+                                                                    },
+                                                                  );
+                                                                }}
+                                                                className="text-[10px] font-semibold text-zinc-500 underline hover:text-zinc-800 dark:hover:text-zinc-200"
                                                               >
-                                                                {memberLabel(m)}
-                                                              </option>
-                                                            ),
-                                                          )}
-                                                      </select>
+                                                                Clear
+                                                              </button>
+                                                            ) : null}
+                                                          </div>
+                                                        </div>
+                                                      </div>
                                                     </div>
                                                   ) : null}
                                                   {canDeleteThisTask(t) ? (
@@ -1079,6 +1240,61 @@ export function ProjectsPage() {
                                           })()
                                         : null)}
                                 </select>
+                              </div>
+                            ) : null}
+                            {canReassignTasks ? (
+                              <div className="grid max-w-lg gap-3 sm:grid-cols-2">
+                                <div className="flex flex-col gap-1">
+                                  <label
+                                    htmlFor={`new-task-pri-${p.id}`}
+                                    className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                  >
+                                    Priority (optional)
+                                  </label>
+                                  <select
+                                    id={`new-task-pri-${p.id}`}
+                                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                                    value={taskPriorityOnCreate[p.id] ?? ''}
+                                    disabled={taskSubmitting}
+                                    onChange={(e) =>
+                                      setTaskPriorityOnCreate((prev) => ({
+                                        ...prev,
+                                        [p.id]: e.target.value,
+                                      }))
+                                    }
+                                  >
+                                    <option value="">Default (medium)</option>
+                                    {TASK_PRIORITY_OPTIONS.map((opt) => (
+                                      <option
+                                        key={opt.value}
+                                        value={opt.value}
+                                      >
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label
+                                    htmlFor={`new-task-dl-${p.id}`}
+                                    className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                  >
+                                    Due date (optional)
+                                  </label>
+                                  <input
+                                    id={`new-task-dl-${p.id}`}
+                                    type="date"
+                                    disabled={taskSubmitting}
+                                    value={taskDeadlineOnCreate[p.id] ?? ''}
+                                    onChange={(e) =>
+                                      setTaskDeadlineOnCreate((prev) => ({
+                                        ...prev,
+                                        [p.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                                  />
+                                </div>
                               </div>
                             ) : null}
                           </form>
