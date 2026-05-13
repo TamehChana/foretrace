@@ -95,6 +95,30 @@ export class TasksService {
   ) {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
 
+    const membership = await this.prisma.membership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: createdById,
+          organizationId,
+        },
+      },
+      select: { role: true },
+    });
+    if (!membership) {
+      throw new ForbiddenException(
+        'You are not a member of this organization.',
+      );
+    }
+    if (
+      membership.role === Role.DEVELOPER &&
+      dto.assigneeId &&
+      dto.assigneeId !== createdById
+    ) {
+      throw new BadRequestException(
+        'Developers may only assign new tasks to themselves or leave them unassigned.',
+      );
+    }
+
     if (dto.assigneeId) {
       await this.assertAssigneeInOrg(dto.assigneeId, organizationId);
     }
@@ -132,9 +156,61 @@ export class TasksService {
     taskId: string,
     projectId: string,
     organizationId: string,
+    actorUserId: string,
     dto: UpdateTaskDto,
   ) {
-    await this.getTask(taskId, projectId, organizationId);
+    const task = await this.getTask(taskId, projectId, organizationId);
+
+    const membership = await this.prisma.membership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: actorUserId,
+          organizationId,
+        },
+      },
+      select: { role: true },
+    });
+    if (!membership) {
+      throw new ForbiddenException(
+        'You are not a member of this organization.',
+      );
+    }
+
+    const requestedTitle = dto.title !== undefined;
+    const requestedDescription = dto.description !== undefined;
+    const requestedPriority = dto.priority !== undefined;
+    const requestedDeadline = dto.deadline !== undefined;
+    const requestedAssignee = dto.assigneeId !== undefined;
+    const requestedStatus = dto.status !== undefined;
+    const requestedProgress = dto.progress !== undefined;
+
+    const anyMetadataOrAssignment =
+      requestedTitle ||
+      requestedDescription ||
+      requestedPriority ||
+      requestedDeadline ||
+      requestedAssignee;
+
+    if (membership.role === Role.DEVELOPER) {
+      const canUpdateStatusOrProgress =
+        task.assigneeId === actorUserId ||
+        (task.assigneeId === null && task.createdById === actorUserId);
+
+      if (anyMetadataOrAssignment) {
+        throw new ForbiddenException(
+          'Developers may only update task status and progress. Ask a PM or admin to change assignment, schedule, or details.',
+        );
+      }
+
+      if (
+        (requestedStatus || requestedProgress) &&
+        !canUpdateStatusOrProgress
+      ) {
+        throw new ForbiddenException(
+          'You may only update status or progress when this task is assigned to you, or when you created it and it is still unassigned.',
+        );
+      }
+    }
 
     if (dto.assigneeId) {
       await this.assertAssigneeInOrg(dto.assigneeId, organizationId);
@@ -171,6 +247,10 @@ export class TasksService {
     }
     if (dto.progress !== undefined) {
       data.progress = dto.progress;
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('No updates provided');
     }
 
     return this.prisma.task.update({

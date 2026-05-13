@@ -105,11 +105,13 @@ export class TasksController {
     @Param('projectId') projectId: string,
     @Param('taskId') taskId: string,
     @Body(new BodyDtoPipe(UpdateTaskDto)) dto: UpdateTaskDto,
+    @Req() req: Request,
   ): Promise<{ data: Awaited<ReturnType<TasksService['updateTask']>> }> {
     const data = await this.tasksService.updateTask(
       taskId,
       projectId,
       organizationId,
+      req.user!.id,
       dto,
     );
     return { data };

@@ -40,6 +40,19 @@ import { ProjectGitHubPanel } from './ProjectGitHubPanel';
 import { ProjectSignalsPanel } from './ProjectSignalsPanel';
 import { Skeleton } from '../ui/Skeleton';
 
+const TASK_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'TODO', label: 'To do' },
+  { value: 'IN_PROGRESS', label: 'In progress' },
+  { value: 'BLOCKED', label: 'Blocked' },
+  { value: 'DONE', label: 'Done' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+];
+
+const PROGRESS_OPTIONS = [
+  0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95,
+  100,
+];
+
 export function ProjectsPage() {
   const organizations = useOrganizations();
   const { snapshot, openAuthModal, bumpWorkspaceList } = useAuthSession();
@@ -116,7 +129,10 @@ export function ProjectsPage() {
     Record<string, string>
   >({});
   const [taskSubmitting, setTaskSubmitting] = useState(false);
-  const [assigningTaskId, setAssigningTaskId] = useState<string | null>(null);
+  const [patchingTaskId, setPatchingTaskId] = useState<string | null>(null);
+  const [myTasksOnlyByProject, setMyTasksOnlyByProject] = useState<
+    Record<string, boolean>
+  >({});
 
   const role = memberRole.status === 'ok' ? memberRole.role : null;
   const cliPanelRole =
@@ -124,8 +140,8 @@ export function ProjectsPage() {
       ? (role as 'ADMIN' | 'PM' | 'DEVELOPER')
       : null;
   const canManageProjects = role === 'ADMIN' || role === 'PM';
-  const canAssignTasks =
-    role === 'ADMIN' || role === 'PM' || role === 'DEVELOPER';
+  const canReassignTasks = role === 'ADMIN' || role === 'PM';
+  const showAssignOnCreate = canReassignTasks || role === 'DEVELOPER';
   const canInvite = role === 'ADMIN' || role === 'PM';
   const currentUserId =
     snapshot.status === 'ready' && snapshot.user?.id
@@ -146,6 +162,25 @@ export function ProjectsPage() {
       return false;
     },
     [currentUserId, role],
+  );
+
+  const canUpdateTaskExecution = useCallback(
+    (task: OrgTaskRow): boolean => {
+      if (!role || !currentUserId) {
+        return false;
+      }
+      if (role === 'ADMIN' || role === 'PM') {
+        return true;
+      }
+      if (role === 'DEVELOPER') {
+        return (
+          task.assigneeId === currentUserId ||
+          (task.assigneeId === null && task.createdById === currentUserId)
+        );
+      }
+      return false;
+    },
+    [role, currentUserId],
   );
 
   const onCreateProject = async (e: FormEvent) => {
@@ -300,7 +335,7 @@ export function ProjectsPage() {
     if (!organizationId) {
       return;
     }
-    setAssigningTaskId(taskId);
+    setPatchingTaskId(taskId);
     try {
       const res = await apiFetch(
         `/organizations/${organizationId}/projects/${projectId}/tasks/${taskId}`,
@@ -325,7 +360,40 @@ export function ProjectsPage() {
         'error',
       );
     } finally {
-      setAssigningTaskId(null);
+      setPatchingTaskId(null);
+    }
+  };
+
+  const patchTaskFields = async (
+    projectId: string,
+    taskId: string,
+    body: Record<string, unknown>,
+  ) => {
+    if (!organizationId) {
+      return;
+    }
+    setPatchingTaskId(taskId);
+    try {
+      const res = await apiFetch(
+        `/organizations/${organizationId}/projects/${projectId}/tasks/${taskId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!res.ok) {
+        showToast(await readApiErrorMessage(res), 'error');
+        return;
+      }
+      bumpData();
+    } catch (err: unknown) {
+      showToast(
+        err instanceof Error ? err.message : 'Request failed',
+        'error',
+      );
+    } finally {
+      setPatchingTaskId(null);
     }
   };
 
@@ -616,13 +684,19 @@ export function ProjectsPage() {
                               Tasks
                             </h3>
                             <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
-                              Pick an assignee from the list (including yourself).
-                              Task due dates roll into{' '}
+                              <strong className="font-medium text-zinc-600 dark:text-zinc-400">
+                                PMs and admins
+                              </strong>{' '}
+                              set assignees and full details.{' '}
+                              <strong className="font-medium text-zinc-600 dark:text-zinc-400">
+                                Assignees
+                              </strong>{' '}
+                              (and creators of unassigned tasks) update status
+                              and progress here. Deadlines feed{' '}
                               <strong className="font-medium text-zinc-600 dark:text-zinc-400">
                                 Signals
-                              </strong>{' '}
-                              below; GitHub, CLI, and terminal panels add live
-                              activity for this project.
+                              </strong>
+                              ; GitHub and CLI add activity when wired.
                             </p>
                             {membersState.status === 'error' ? (
                               <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
@@ -647,124 +721,273 @@ export function ProjectsPage() {
                                 Loading tasks…
                               </p>
                             ) : (
-                              <ul className="mt-2 space-y-2">
-                                {tasksState.tasks.map((t) => {
-                                  const membersList: OrgMemberRow[] | null =
-                                    membersState.status === 'ok'
-                                      ? membersState.members
-                                      : null;
-                                  const assigneeLine = (() => {
-                                    if (!t.assigneeId) {
-                                      return 'Unassigned';
-                                    }
-                                    const m = membersList?.find(
-                                      (x) => x.userId === t.assigneeId,
-                                    );
-                                    return m
-                                      ? memberLabel(m)
-                                      : 'Assigned (member list loading…)';
-                                  })();
-                                  return (
-                                    <li
-                                      key={t.id}
-                                      className="rounded-xl bg-zinc-50 px-3 py-2 dark:bg-zinc-950/80"
-                                    >
-                                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                        <div className="min-w-0 flex-1 space-y-1">
-                                          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                                            {t.title}
-                                          </p>
-                                          <p className="text-[11px] text-zinc-500">
-                                            {t.status} · {t.priority} · progress{' '}
-                                            {t.progress}%
-                                          </p>
-                                          {!canAssignTasks ? (
-                                            <p className="text-[11px] text-zinc-600 dark:text-zinc-300">
-                                              <span className="font-medium text-zinc-500">
-                                                Assignee:
-                                              </span>{' '}
-                                              {assigneeLine}
-                                            </p>
-                                          ) : null}
-                                        </div>
-                                        <div className="flex shrink-0 flex-col gap-2 sm:items-end sm:pl-2">
-                                          {canAssignTasks ? (
-                                            <div className="flex w-full min-w-[12rem] flex-col gap-0.5 sm:w-56">
-                                              <label
-                                                htmlFor={`assign-${p.id}-${t.id}`}
-                                                className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
-                                              >
-                                                Assign to
-                                              </label>
-                                              <select
-                                                id={`assign-${p.id}-${t.id}`}
-                                                className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 shadow-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                                                value={t.assigneeId ?? ''}
-                                                disabled={
-                                                  assigningTaskId === t.id ||
-                                                  membersState.status !== 'ok'
-                                                }
-                                                onChange={(e) => {
-                                                  const v =
-                                                    e.target.value.trim();
-                                                  const next =
-                                                    v.length > 0 ? v : null;
-                                                  const prev =
-                                                    t.assigneeId ?? null;
-                                                  if (next === prev) {
-                                                    return;
-                                                  }
-                                                  void patchTaskAssignee(
-                                                    p.id,
-                                                    t.id,
-                                                    next,
-                                                  );
-                                                }}
-                                              >
-                                                <option value="">
-                                                  Unassigned
-                                                </option>
-                                                {membersState.status ===
-                                                  'ok' &&
-                                                  membersState.members.map(
-                                                    (m) => (
-                                                      <option
-                                                        key={m.userId}
-                                                        value={m.userId}
-                                                      >
-                                                        {memberLabel(m)}
-                                                      </option>
-                                                    ),
-                                                  )}
-                                              </select>
-                                            </div>
-                                          ) : null}
-                                          {canDeleteThisTask(t) ? (
-                                            <button
-                                              type="button"
-                                              title={
-                                                role === 'DEVELOPER'
-                                                  ? 'Delete task (you created this)'
-                                                  : 'Delete task'
-                                              }
-                                              onClick={() => {
-                                                void deleteTask(p.id, t.id);
-                                              }}
-                                              className="self-end rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-rose-600 dark:hover:bg-zinc-800 dark:hover:text-rose-400"
+                              (() => {
+                                const visibleTasks =
+                                  myTasksOnlyByProject[p.id] && currentUserId
+                                    ? tasksState.tasks.filter(
+                                        (x) => x.assigneeId === currentUserId,
+                                      )
+                                    : tasksState.tasks;
+                                return (
+                                  <>
+                                    {tasksState.tasks.length > 0 &&
+                                    currentUserId ? (
+                                      <label className="mt-3 flex cursor-pointer items-center gap-2 text-[11px] text-zinc-600 dark:text-zinc-300">
+                                        <input
+                                          type="checkbox"
+                                          className="rounded border-zinc-300 text-zinc-800 dark:border-zinc-600 dark:bg-zinc-900"
+                                          checked={
+                                            myTasksOnlyByProject[p.id] ??
+                                            false
+                                          }
+                                          onChange={(e) =>
+                                            setMyTasksOnlyByProject(
+                                              (prev) => ({
+                                                ...prev,
+                                                [p.id]: e.target.checked,
+                                              }),
+                                            )
+                                          }
+                                        />
+                                        Show only tasks assigned to me
+                                      </label>
+                                    ) : null}
+                                    {visibleTasks.length === 0 ? (
+                                      <p className="mt-2 text-[12px] text-zinc-500">
+                                        {tasksState.tasks.length === 0
+                                          ? 'No tasks yet. Add one below.'
+                                          : 'No tasks assigned to you. Clear the filter or ask a PM to assign work.'}
+                                      </p>
+                                    ) : (
+                                      <ul className="mt-2 space-y-2">
+                                        {visibleTasks.map((t) => {
+                                          const membersList:
+                                            | OrgMemberRow[]
+                                            | null =
+                                            membersState.status === 'ok'
+                                              ? membersState.members
+                                              : null;
+                                          const assigneeLine = (() => {
+                                            if (!t.assigneeId) {
+                                              return 'Unassigned';
+                                            }
+                                            const m = membersList?.find(
+                                              (x) => x.userId === t.assigneeId,
+                                            );
+                                            return m
+                                              ? memberLabel(m)
+                                              : 'Assigned (member list loading…)';
+                                          })();
+                                          const exec =
+                                            canUpdateTaskExecution(t);
+                                          const busy = patchingTaskId === t.id;
+                                          return (
+                                            <li
+                                              key={t.id}
+                                              className="rounded-xl bg-zinc-50 px-3 py-2 dark:bg-zinc-950/80"
                                             >
-                                              <Trash2
-                                                size={14}
-                                                strokeWidth={2}
-                                                aria-hidden
-                                              />
-                                            </button>
-                                          ) : null}
-                                        </div>
-                                      </div>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
+                                              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                                <div className="min-w-0 flex-1 space-y-1">
+                                                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                                    {t.title}
+                                                  </p>
+                                                  <p className="text-[11px] text-zinc-500">
+                                                    {t.priority}
+                                                    {t.deadline
+                                                      ? ` · due ${new Date(t.deadline).toLocaleDateString()}`
+                                                      : ''}
+                                                  </p>
+                                                  {!canReassignTasks ? (
+                                                    <p className="text-[11px] text-zinc-600 dark:text-zinc-300">
+                                                      <span className="font-medium text-zinc-500">
+                                                        Assignee:
+                                                      </span>{' '}
+                                                      {assigneeLine}
+                                                    </p>
+                                                  ) : null}
+                                                </div>
+                                                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end lg:justify-end">
+                                                  <div className="flex flex-wrap items-end gap-2">
+                                                    <div className="flex min-w-[7.5rem] flex-col gap-0.5">
+                                                      <label
+                                                        htmlFor={`status-${p.id}-${t.id}`}
+                                                        className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                                      >
+                                                        Status
+                                                      </label>
+                                                      <select
+                                                        id={`status-${p.id}-${t.id}`}
+                                                        className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 shadow-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                                                        value={t.status}
+                                                        disabled={!exec || busy}
+                                                        onChange={(e) => {
+                                                          void patchTaskFields(
+                                                            p.id,
+                                                            t.id,
+                                                            {
+                                                              status:
+                                                                e.target.value,
+                                                            },
+                                                          );
+                                                        }}
+                                                      >
+                                                        {TASK_STATUS_OPTIONS.map(
+                                                          (opt) => (
+                                                            <option
+                                                              key={opt.value}
+                                                              value={opt.value}
+                                                            >
+                                                              {opt.label}
+                                                            </option>
+                                                          ),
+                                                        )}
+                                                      </select>
+                                                    </div>
+                                                    <div className="flex min-w-[6rem] flex-col gap-0.5">
+                                                      <label
+                                                        htmlFor={`prog-${p.id}-${t.id}`}
+                                                        className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                                      >
+                                                        Progress
+                                                      </label>
+                                                      <select
+                                                        id={`prog-${p.id}-${t.id}`}
+                                                        className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 shadow-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                                                        value={t.progress}
+                                                        disabled={!exec || busy}
+                                                        onChange={(e) => {
+                                                          void patchTaskFields(
+                                                            p.id,
+                                                            t.id,
+                                                            {
+                                                              progress: Number(
+                                                                e.target.value,
+                                                              ),
+                                                            },
+                                                          );
+                                                        }}
+                                                      >
+                                                        {PROGRESS_OPTIONS.map(
+                                                          (n) => (
+                                                            <option
+                                                              key={n}
+                                                              value={n}
+                                                            >
+                                                              {n}%
+                                                            </option>
+                                                          ),
+                                                        )}
+                                                      </select>
+                                                    </div>
+                                                    {exec &&
+                                                    t.status !== 'DONE' &&
+                                                    t.status !== 'CANCELLED' ? (
+                                                      <button
+                                                        type="button"
+                                                        disabled={busy}
+                                                        onClick={() => {
+                                                          void patchTaskFields(
+                                                            p.id,
+                                                            t.id,
+                                                            {
+                                                              status: 'DONE',
+                                                              progress: 100,
+                                                            },
+                                                          );
+                                                        }}
+                                                        className="self-end rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-100 dark:hover:bg-emerald-900/80"
+                                                      >
+                                                        Mark done
+                                                      </button>
+                                                    ) : null}
+                                                  </div>
+                                                  {canReassignTasks ? (
+                                                    <div className="flex w-full min-w-[12rem] flex-col gap-0.5 sm:w-56">
+                                                      <label
+                                                        htmlFor={`assign-${p.id}-${t.id}`}
+                                                        className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                                                      >
+                                                        Assign to
+                                                      </label>
+                                                      <select
+                                                        id={`assign-${p.id}-${t.id}`}
+                                                        className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 shadow-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                                                        value={t.assigneeId ?? ''}
+                                                        disabled={
+                                                          busy ||
+                                                          membersState.status !==
+                                                            'ok'
+                                                        }
+                                                        onChange={(e) => {
+                                                          const v =
+                                                            e.target.value.trim();
+                                                          const next =
+                                                            v.length > 0
+                                                              ? v
+                                                              : null;
+                                                          const prev =
+                                                            t.assigneeId ?? null;
+                                                          if (next === prev) {
+                                                            return;
+                                                          }
+                                                          void patchTaskAssignee(
+                                                            p.id,
+                                                            t.id,
+                                                            next,
+                                                          );
+                                                        }}
+                                                      >
+                                                        <option value="">
+                                                          Unassigned
+                                                        </option>
+                                                        {membersState.status ===
+                                                          'ok' &&
+                                                          membersState.members.map(
+                                                            (m) => (
+                                                              <option
+                                                                key={m.userId}
+                                                                value={m.userId}
+                                                              >
+                                                                {memberLabel(m)}
+                                                              </option>
+                                                            ),
+                                                          )}
+                                                      </select>
+                                                    </div>
+                                                  ) : null}
+                                                  {canDeleteThisTask(t) ? (
+                                                    <button
+                                                      type="button"
+                                                      title={
+                                                        role === 'DEVELOPER'
+                                                          ? 'Delete task (you created this)'
+                                                          : 'Delete task'
+                                                      }
+                                                      onClick={() => {
+                                                        void deleteTask(
+                                                          p.id,
+                                                          t.id,
+                                                        );
+                                                      }}
+                                                      className="self-end rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-rose-600 dark:hover:bg-zinc-800 dark:hover:text-rose-400"
+                                                    >
+                                                      <Trash2
+                                                        size={14}
+                                                        strokeWidth={2}
+                                                        aria-hidden
+                                                      />
+                                                    </button>
+                                                  ) : null}
+                                                </div>
+                                              </div>
+                                            </li>
+                                          );
+                                        })}
+                                      </ul>
+                                    )}
+                                  </>
+                                );
+                              })()
                             )}
                           </div>
                           <form
@@ -802,13 +1025,15 @@ export function ProjectsPage() {
                                 Add
                               </button>
                             </div>
-                            {canAssignTasks ? (
+                            {showAssignOnCreate ? (
                               <div className="flex max-w-md flex-col gap-1">
                                 <label
                                   htmlFor={`new-task-assign-${p.id}`}
                                   className="text-[10px] font-medium uppercase tracking-wide text-zinc-500"
                                 >
-                                  Assign when created (optional)
+                                  {canReassignTasks
+                                    ? 'Assign when created (optional)'
+                                    : 'Assign when created (optional — you only)'}
                                 </label>
                                 <select
                                   id={`new-task-assign-${p.id}`}
@@ -827,11 +1052,32 @@ export function ProjectsPage() {
                                 >
                                   <option value="">No assignee</option>
                                   {membersState.status === 'ok' &&
-                                    membersState.members.map((m) => (
-                                      <option key={m.userId} value={m.userId}>
-                                        {memberLabel(m)}
-                                      </option>
-                                    ))}
+                                    (canReassignTasks
+                                      ? membersState.members.map((m) => (
+                                          <option
+                                            key={m.userId}
+                                            value={m.userId}
+                                          >
+                                            {memberLabel(m)}
+                                          </option>
+                                        ))
+                                      : currentUserId
+                                        ? (() => {
+                                            const self =
+                                              membersState.members.find(
+                                                (m) =>
+                                                  m.userId === currentUserId,
+                                              );
+                                            return self ? (
+                                              <option
+                                                key={self.userId}
+                                                value={self.userId}
+                                              >
+                                                Me ({memberLabel(self)})
+                                              </option>
+                                            ) : null;
+                                          })()
+                                        : null)}
                                 </select>
                               </div>
                             ) : null}
