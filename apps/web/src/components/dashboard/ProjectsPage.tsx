@@ -401,10 +401,17 @@ export function ProjectsPage() {
           typeof data.headSha === 'string' && data.headSha.length > 0
             ? data.headSha.slice(0, 7)
             : null;
-        const suffix =
-          data.note === 'pat_or_pr_unavailable'
-            ? ' (GitHub status API unavailable — check PAT scopes and repo access.)'
-            : '';
+        let suffix = '';
+        if (data.note === 'pat_or_pr_unavailable') {
+          suffix =
+            ' (GitHub API unavailable: save a PAT on this project, or confirm FORETRACE_APP_SECRET decrypts it.)';
+        } else if (data.note === 'pr_not_readable') {
+          suffix =
+            ' (Could not read that PR with the saved PAT — wrong PR #, fork-only PR, or token lacks repo scope.)';
+        } else if (data.note === 'legacy_status_empty') {
+          suffix =
+            ' (PR head found; legacy /commits/…/status is empty — common for Checks-only repos; PAT may still be fine.)';
+        }
         setGithubCheckHintByTask((prev) => ({
           ...prev,
           [taskId]: `PR #${data.pullNumber}: combined status ${status}${sha ? ` @ ${sha}` : ''}${suffix}`,

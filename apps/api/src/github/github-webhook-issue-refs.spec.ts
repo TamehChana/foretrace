@@ -75,6 +75,16 @@ describe('github-webhook-issue-refs', () => {
   });
 
   describe('collectIssueReferencesFromGithubWebhook', () => {
+    it('parses issue number when GitHub sends it as a string', () => {
+      const nums = collectIssueReferencesFromGithubWebhook(
+        {
+          issue: { number: '7', title: 'x', body: null },
+        },
+        'issues',
+      );
+      expect(nums).toContain(7);
+    });
+
     it('collects hashes from push commit messages', () => {
       const nums = collectIssueReferencesFromGithubWebhook(
         {

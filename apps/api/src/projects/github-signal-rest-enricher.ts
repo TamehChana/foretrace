@@ -168,22 +168,45 @@ export class GithubSignalRestEnricher {
 
   /**
    * Aggregate Checks API state for a pull request head (`/commits/{sha}/status`).
+   * Always returns an object; inspect `detail` when `combinedStatus` is null.
    */
   async getPullRequestCombinedStatus(
     repositoryFullName: string,
     githubPatCiphertext: string | null,
     pullNumber: number,
-  ): Promise<{ combinedStatus: string | null; headSha: string | null } | null> {
+  ): Promise<{
+    combinedStatus: string | null;
+    headSha: string | null;
+    detail:
+      | 'ok'
+      | 'missing_pat'
+      | 'decrypt_failed'
+      | 'pull_request_not_found'
+      | 'pull_request_forbidden'
+      | 'status_unavailable';
+  }> {
     if (!githubPatCiphertext || pullNumber < 1) {
-      return null;
+      return {
+        combinedStatus: null,
+        headSha: null,
+        detail: 'missing_pat',
+      };
     }
     const token = decryptFromStorage(githubPatCiphertext);
     if (!token) {
-      return null;
+      return {
+        combinedStatus: null,
+        headSha: null,
+        detail: 'decrypt_failed',
+      };
     }
     const parts = repositoryFullName.trim().toLowerCase().split('/');
     if (parts.length !== 2 || !parts[0] || !parts[1]) {
-      return null;
+      return {
+        combinedStatus: null,
+        headSha: null,
+        detail: 'missing_pat',
+      };
     }
     const [owner, repo] = parts;
     const headers = {
@@ -196,31 +219,57 @@ export class GithubSignalRestEnricher {
         `${GITHUB_API}/repos/${owner}/${repo}/pulls/${pullNumber}`,
         { headers },
       );
+      if (prRes.status === 404) {
+        return {
+          combinedStatus: null,
+          headSha: null,
+          detail: 'pull_request_not_found',
+        };
+      }
       if (!prRes.ok) {
-        return null;
+        return {
+          combinedStatus: null,
+          headSha: null,
+          detail:
+            prRes.status === 401 || prRes.status === 403
+              ? 'pull_request_forbidden'
+              : 'pull_request_not_found',
+        };
       }
       const prJson = (await prRes.json()) as { head?: { sha?: string } };
       const headSha =
         typeof prJson.head?.sha === 'string' ? prJson.head.sha : null;
       if (!headSha) {
-        return null;
+        return {
+          combinedStatus: null,
+          headSha: null,
+          detail: 'pull_request_not_found',
+        };
       }
       const stRes = await fetch(
         `${GITHUB_API}/repos/${owner}/${repo}/commits/${headSha}/status`,
         { headers },
       );
       if (!stRes.ok) {
-        return { combinedStatus: null, headSha };
+        return {
+          combinedStatus: null,
+          headSha,
+          detail: 'status_unavailable',
+        };
       }
       const st = (await stRes.json()) as { state?: string };
       const combinedStatus =
         typeof st.state === 'string' ? st.state : null;
-      return { combinedStatus, headSha };
+      return { combinedStatus, headSha, detail: 'ok' };
     } catch (e: unknown) {
       this.log.warn(
         `GitHub PR status fetch failed: ${e instanceof Error ? e.message : String(e)}`,
       );
-      return null;
+      return {
+        combinedStatus: null,
+        headSha: null,
+        detail: 'pull_request_not_found',
+      };
     }
   }
 }

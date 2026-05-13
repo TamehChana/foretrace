@@ -58,6 +58,21 @@ describe('repositoryFullNameFromPayload', () => {
       ),
     ).toBe('org/service');
   });
+
+  it('falls back to repository nested on issue when root repository missing', () => {
+    expect(
+      repositoryFullNameFromPayload(
+        {
+          action: 'closed',
+          issue: {
+            number: 3,
+            repository: { full_name: 'acme/widget' },
+          },
+        },
+        'issues',
+      ),
+    ).toBe('acme/widget');
+  });
 });
 
 describe('normalizeRepositoryFullName', () => {

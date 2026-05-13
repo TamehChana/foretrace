@@ -129,13 +129,18 @@ export class GithubWebhookService {
           ...(prNum != null ? { lastGithubPullRequestNumber: prNum } : {}),
         };
 
-        await this.prisma.task.updateMany({
+        const touch = await this.prisma.task.updateMany({
           where: {
             projectId: connection.projectId,
             githubIssueNumber: { in: issueNums },
           },
           data: updateData,
         });
+        if (issueNums.length > 0 && touch.count === 0) {
+          this.log.warn(
+            `GitHub webhook ${deliveryId}: ${eventType} referenced issue number(s) [${issueNums.join(', ')}] but no task in project ${connection.projectId} has githubIssueNumber in that set`,
+          );
+        }
 
         const summary = summarizeGithubWebhookTouch(
           eventType,

@@ -59,6 +59,11 @@ export function collectIssueReferencesFromGithubWebhook(
       const num = (issue as { number?: unknown }).number;
       if (typeof num === 'number' && Number.isFinite(num) && num > 0) {
         ids.add(Math.trunc(num));
+      } else if (typeof num === 'string') {
+        const parsed = parseInt(num.trim(), 10);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          ids.add(parsed);
+        }
       }
       const title = (issue as { title?: unknown }).title;
       if (typeof title === 'string') {

@@ -84,6 +84,7 @@ export function repositoryFullNameFromPayload(
     nestedRepo(body, 'deployment_status'),
     nestedRepo(body, 'status'),
     nestedRepo(body, 'issue_comment'),
+    nestedRepo(body, 'issue'),
     nestedRepo(body, 'pull_request'),
   ];
 

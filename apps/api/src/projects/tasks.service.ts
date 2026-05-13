@@ -457,7 +457,11 @@ export class TasksService {
         pullNumber: number;
         combinedStatus: string | null;
         headSha: string | null;
-        note: 'pat_or_pr_unavailable' | null;
+        note:
+          | 'pat_or_pr_unavailable'
+          | 'pr_not_readable'
+          | 'legacy_status_empty'
+          | null;
       }
     | { ok: false; reason: string }
   > {
@@ -481,26 +485,32 @@ export class TasksService {
     if (prNum == null || prNum < 1) {
       return { ok: false, reason: 'no_pull_request_number' };
     }
-    const status = await this.githubSignalRest.getPullRequestCombinedStatus(
+    const st = await this.githubSignalRest.getPullRequestCombinedStatus(
       conn.repositoryFullName,
       conn.githubPatCiphertext,
       prNum,
     );
-    if (!status) {
-      return {
-        ok: true,
-        pullNumber: prNum,
-        combinedStatus: null,
-        headSha: null,
-        note: 'pat_or_pr_unavailable',
-      };
+    let note:
+      | 'pat_or_pr_unavailable'
+      | 'pr_not_readable'
+      | 'legacy_status_empty'
+      | null = null;
+    if (st.detail === 'missing_pat' || st.detail === 'decrypt_failed') {
+      note = 'pat_or_pr_unavailable';
+    } else if (
+      st.detail === 'pull_request_not_found' ||
+      st.detail === 'pull_request_forbidden'
+    ) {
+      note = 'pr_not_readable';
+    } else if (st.detail === 'status_unavailable') {
+      note = st.headSha ? 'legacy_status_empty' : 'pat_or_pr_unavailable';
     }
     return {
       ok: true,
       pullNumber: prNum,
-      combinedStatus: status.combinedStatus,
-      headSha: status.headSha,
-      note: null,
+      combinedStatus: st.combinedStatus,
+      headSha: st.headSha,
+      note,
     };
   }
 }

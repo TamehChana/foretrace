@@ -402,14 +402,22 @@ export function DocumentationPage() {
               is not the Foretrace assignee, Foretrace may still show the activity on the task (because the <strong>issue numbers matched</strong>) and can warn
               that the last linked GitHub user differs from the assignee—so the PM can notice pairing or handoffs.
             </p>
+            <p>
+              <strong>GitHub “closed / completed” vs Foretrace status:</strong> when webhooks match, Foretrace records <strong>last activity</strong> and rows in
+              the delivery log. It does <strong>not</strong> automatically set the Foretrace task to <strong>Done</strong>—your team still updates{' '}
+              <strong>Status</strong> in Foretrace when work is finished.
+            </p>
           </Note>
 
           <Tip>
             <strong className="text-zinc-800 dark:text-zinc-200">Quick checks when activity looks empty:</strong> in GitHub open the webhook’s{' '}
             <strong>Recent Deliveries</strong>—each row should be <strong>200</strong> (if not, fix URL, secret, or content type). Enable at least{' '}
-            <strong>Push</strong>, <strong>Pull requests</strong>, and <strong>Issues</strong> for the events Foretrace aggregates. To save an optional classic or
-            fine-grained <strong>PAT</strong> in Foretrace, the API host must have <Code>FORETRACE_APP_SECRET</Code> set (see your deploy docs), then use{' '}
-            <strong>Save PAT</strong> once and refresh <strong>Signals</strong>.
+            <strong>Push</strong>, <strong>Pull requests</strong>, and <strong>Issues</strong> (required for <strong>close / reopen / complete</strong> issue
+            events) so Foretrace receives them. Confirm the Foretrace task’s <strong>GitHub issue #</strong> equals the real issue number in{' '}
+            <strong>that same repo</strong> you connected. To save an optional classic or fine-grained <strong>PAT</strong> in Foretrace, the API host must have{' '}
+            <Code>FORETRACE_APP_SECRET</Code> set (see your deploy docs), then use <strong>Save PAT</strong> once and refresh <strong>Signals</strong>.{' '}
+            <strong>PR combined status</strong> needs a valid <strong>PR #</strong> and a PAT that can read pulls; “unknown” often means no PR yet, wrong PR number,
+            or GitHub’s legacy status endpoint is empty for that commit (Checks-only repos).
           </Tip>
         </WorkflowStep>
 
