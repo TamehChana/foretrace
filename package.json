@@ -12,6 +12,7 @@
     "lint": "turbo lint",
     "terminal:ingest": "node packages/cli/dist/cli.js ingest",
     "smoke:terminal-ingest": "node scripts/terminal-ingest-smoke.mjs",
+    "backfill:task-github-linked-user": "node scripts/backfill-task-last-github-linked-user.mjs",
     "sync-web-dist-root": "node scripts/sync-web-dist-root.mjs",
     "sync-web-vsix": "node scripts/sync-vsix-to-web-public.mjs",
     "build:vercel": "node scripts/vercel-deploy-web.mjs",
