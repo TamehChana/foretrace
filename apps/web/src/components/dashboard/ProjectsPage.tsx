@@ -1291,10 +1291,11 @@ export function ProjectsPage() {
                                                                   </p>
                                                                 );
                                                               }
-                                                              if (
-                                                                st.rows.length ===
-                                                                0
-                                                              ) {
+                                                              if (st.status !== 'ok') {
+                                                                return null;
+                                                              }
+                                                              const { rows } = st;
+                                                              if (rows.length === 0) {
                                                                 return (
                                                                   <p className="text-[10px] text-zinc-500">
                                                                     No stored
@@ -1302,8 +1303,8 @@ export function ProjectsPage() {
                                                                   </p>
                                                                 );
                                                               }
-                                                              return st.rows.map(
-                                                                (row) => (
+                                                              return rows.map(
+                                                                (row: TaskGithubActivityRow) => (
                                                                   <div
                                                                     key={row.id}
                                                                     className="text-[10px] text-zinc-600 dark:text-zinc-400"

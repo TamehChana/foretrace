@@ -95,6 +95,30 @@ describe('AppController (e2e)', () => {
       .expect(400);
   });
 
+  it('GET .../tasks/:taskId/github/activity without session returns 401', () => {
+    return request(httpServer())
+      .get(
+        `/organizations/${sampleOrgUuid}/projects/${sampleOrgUuid}/tasks/${sampleOrgUuid}/github/activity`,
+      )
+      .expect(401);
+  });
+
+  it('GET .../tasks/:taskId/github/check-status without session returns 401', () => {
+    return request(httpServer())
+      .get(
+        `/organizations/${sampleOrgUuid}/projects/${sampleOrgUuid}/tasks/${sampleOrgUuid}/github/check-status`,
+      )
+      .expect(401);
+  });
+
+  it('GET .../github/activity rejects invalid task UUID with 400', () => {
+    return request(httpServer())
+      .get(
+        `/organizations/${sampleOrgUuid}/projects/${sampleOrgUuid}/tasks/not-a-uuid/github/activity`,
+      )
+      .expect(400);
+  });
+
   it('POST /webhooks/github without delivery headers returns 400', () => {
     return request(httpServer())
       .post('/webhooks/github')
