@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronRight,
+  ExternalLink,
   FolderKanban,
   Plus,
   Trash2,
@@ -106,6 +107,86 @@ function formatTaskDateTime(iso: string | null): string {
   }
 }
 
+/** Calendar-day difference: local start-of-day vs deadline date (matches date-picker semantics). */
+function deadlineCalendarDiffDays(deadlineIso: string): number | null {
+  try {
+    const d = new Date(deadlineIso);
+    if (Number.isNaN(d.getTime())) {
+      return null;
+    }
+    const startOf = (x: Date) =>
+      new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const now = new Date();
+    return Math.round(
+      (startOf(d) - startOf(now)) / (24 * 60 * 60 * 1000),
+    );
+  } catch {
+    return null;
+  }
+}
+
+type DeadlineUrgency = 'none' | 'later' | 'week' | 'soon' | 'today' | 'overdue';
+
+function deadlineUrgency(deadlineIso: string | null): DeadlineUrgency {
+  if (!deadlineIso) {
+    return 'none';
+  }
+  const diff = deadlineCalendarDiffDays(deadlineIso);
+  if (diff === null) {
+    return 'none';
+  }
+  if (diff < 0) {
+    return 'overdue';
+  }
+  if (diff === 0) {
+    return 'today';
+  }
+  if (diff <= 3) {
+    return 'soon';
+  }
+  if (diff <= 7) {
+    return 'week';
+  }
+  return 'later';
+}
+
+function formatDeadlineCountdown(deadlineIso: string | null): string | null {
+  if (!deadlineIso) {
+    return null;
+  }
+  const diff = deadlineCalendarDiffDays(deadlineIso);
+  if (diff === null) {
+    return null;
+  }
+  if (diff < 0) {
+    const n = -diff;
+    return n === 1 ? 'Overdue 1 day' : `Overdue ${n} days`;
+  }
+  if (diff === 0) {
+    return 'Due today';
+  }
+  if (diff === 1) {
+    return 'Due tomorrow';
+  }
+  return `Due in ${diff} days`;
+}
+
+function deadlineCountdownClass(u: DeadlineUrgency): string {
+  switch (u) {
+    case 'overdue':
+      return 'text-rose-600 dark:text-rose-400';
+    case 'today':
+    case 'soon':
+      return 'text-amber-700 dark:text-amber-300';
+    case 'week':
+      return 'text-amber-800/90 dark:text-amber-200/90';
+    case 'later':
+      return 'text-zinc-500 dark:text-zinc-400';
+    default:
+      return 'text-zinc-500 dark:text-zinc-400';
+  }
+}
+
 type TaskGithubActivityRow = {
   id: string;
   occurredAt: string;
@@ -166,6 +247,16 @@ export function ProjectsPage() {
   const [dataBump, setDataBump] = useState(0);
   const bumpData = useCallback(() => {
     setDataBump((n) => n + 1);
+  }, []);
+
+  /** Re-render task deadline countdowns about once per minute without polling the API. */
+  const [countdownTick, setCountdownTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(
+      () => setCountdownTick((n) => n + 1),
+      60_000,
+    );
+    return () => window.clearInterval(id);
   }, []);
 
   const organizationId = useMemo(() => {
@@ -1209,52 +1300,99 @@ export function ProjectsPage() {
                                                         null
                                                         ? `https://github.com/${repo}/pull/${t.lastGithubPullRequestNumber}`
                                                         : null;
+                                                    const hasRepo =
+                                                      repo.length > 0;
+                                                    const hasIssue =
+                                                      t.githubIssueNumber !=
+                                                      null;
+                                                    const hasPr =
+                                                      t.lastGithubPullRequestNumber !=
+                                                      null;
+                                                    const hasActivity = Boolean(
+                                                      t.lastGithubActivityAt,
+                                                    );
                                                     if (
-                                                      !issueUrl &&
-                                                      t.githubIssueNumber ==
-                                                        null &&
-                                                      !prUrl &&
-                                                      t.lastGithubPullRequestNumber ==
-                                                        null &&
-                                                      !t.lastGithubActivityAt
+                                                      !hasRepo &&
+                                                      !hasIssue &&
+                                                      !hasPr &&
+                                                      !hasActivity
                                                     ) {
                                                       return null;
                                                     }
                                                     return (
-                                                      <div className="space-y-0.5 text-[11px] text-zinc-600 dark:text-zinc-400">
-                                                        {t.githubIssueNumber !=
-                                                        null ? (
+                                                      <div className="space-y-1.5 text-[11px] text-zinc-600 dark:text-zinc-400">
+                                                        <div className="flex flex-wrap items-center gap-1">
+                                                          {hasIssue ? (
+                                                            <span className="rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100">
+                                                              Issue linked
+                                                            </span>
+                                                          ) : hasRepo &&
+                                                            t.status !==
+                                                              'CANCELLED' ? (
+                                                            <span className="rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
+                                                              No issue #
+                                                            </span>
+                                                          ) : null}
+                                                          {hasPr ? (
+                                                            <span className="rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-950 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
+                                                              PR tracked
+                                                            </span>
+                                                          ) : null}
+                                                          {t.status ===
+                                                            'DONE' && hasIssue ? (
+                                                            <span className="rounded-md border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200">
+                                                              Task done
+                                                            </span>
+                                                          ) : null}
+                                                        </div>
+                                                        {hasIssue ? (
                                                           issueUrl ? (
                                                             <a
                                                               href={issueUrl}
                                                               target="_blank"
                                                               rel="noreferrer"
-                                                              className="font-medium text-accent-700 hover:underline dark:text-accent-400"
+                                                              className="inline-flex items-center gap-1 font-medium text-accent-700 hover:underline dark:text-accent-400"
                                                             >
-                                                              GitHub issue #
-                                                              {t.githubIssueNumber}
+                                                              <span>
+                                                                GitHub issue #
+                                                                {t.githubIssueNumber}
+                                                              </span>
+                                                              <ExternalLink
+                                                                className="h-3.5 w-3.5 shrink-0 opacity-80"
+                                                                aria-hidden
+                                                              />
                                                             </a>
                                                           ) : (
                                                             <span>
                                                               Issue #
-                                                              {t.githubIssueNumber}
+                                                              {t.githubIssueNumber}{' '}
+                                                              <span className="text-zinc-500">
+                                                                (link repo in
+                                                                GitHub panel to
+                                                                open)
+                                                              </span>
                                                             </span>
                                                           )
                                                         ) : null}
-                                                        {t.lastGithubPullRequestNumber !=
-                                                        null ? (
+                                                        {hasPr ? (
                                                           prUrl ? (
                                                             <p>
                                                               <a
                                                                 href={prUrl}
                                                                 target="_blank"
                                                                 rel="noreferrer"
-                                                                className="font-medium text-accent-700 hover:underline dark:text-accent-400"
+                                                                className="inline-flex items-center gap-1 font-medium text-accent-700 hover:underline dark:text-accent-400"
                                                               >
-                                                                Linked PR #
-                                                                {
-                                                                  t.lastGithubPullRequestNumber
-                                                                }
+                                                                <span>
+                                                                  Linked PR #
+                                                                  {
+                                                                    t.lastGithubPullRequestNumber
+                                                                  }
+                                                                </span>
+                                                                <ExternalLink
+                                                                  className="h-3.5 w-3.5 shrink-0 opacity-80"
+                                                                  aria-hidden
+                                                                />
                                                               </a>
                                                             </p>
                                                           ) : (
@@ -1454,11 +1592,29 @@ export function ProjectsPage() {
                                                     );
                                                   })()}
                                                   {!canReassignTasks ? (
-                                                    <p className="text-[11px] text-zinc-500">
-                                                      {t.priority}
-                                                      {t.deadline
-                                                        ? ` · due ${new Date(t.deadline).toLocaleDateString()}`
-                                                        : ''}
+                                                    <p
+                                                      className="text-[11px] text-zinc-500"
+                                                      data-countdown-tick={countdownTick}
+                                                    >
+                                                      <span>{t.priority}</span>
+                                                      {t.deadline ? (
+                                                        <>
+                                                          <span>{` · ${new Date(t.deadline).toLocaleDateString()}`}</span>
+                                                          {formatDeadlineCountdown(
+                                                            t.deadline,
+                                                          ) ? (
+                                                            <span
+                                                              className={`font-semibold ${deadlineCountdownClass(
+                                                                deadlineUrgency(
+                                                                  t.deadline,
+                                                                ),
+                                                              )}`}
+                                                            >
+                                                              {` · ${formatDeadlineCountdown(t.deadline)}`}
+                                                            </span>
+                                                          ) : null}
+                                                        </>
+                                                      ) : null}
                                                     </p>
                                                   ) : null}
                                                   {!canReassignTasks ? (
@@ -1719,6 +1875,27 @@ export function ProjectsPage() {
                                                               </button>
                                                             ) : null}
                                                           </div>
+                                                          {t.deadline &&
+                                                          formatDeadlineCountdown(
+                                                            t.deadline,
+                                                          ) ? (
+                                                            <p
+                                                              className={`mt-0.5 text-[10px] font-semibold ${deadlineCountdownClass(
+                                                                deadlineUrgency(
+                                                                  t.deadline,
+                                                                ),
+                                                              )}`}
+                                                              data-countdown-tick={
+                                                                countdownTick
+                                                              }
+                                                            >
+                                                              {
+                                                                formatDeadlineCountdown(
+                                                                  t.deadline,
+                                                                )
+                                                              }
+                                                            </p>
+                                                          ) : null}
                                                         </div>
                                                         <div className="flex min-w-[7rem] flex-col gap-0.5">
                                                           <label
