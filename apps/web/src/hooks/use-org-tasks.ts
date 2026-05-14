@@ -94,7 +94,16 @@ function parseList(json: unknown): OrgTaskRow[] {
           : t.deadline === null
             ? null
             : null,
-      progress: typeof t.progress === 'number' ? t.progress : 0,
+      progress: (() => {
+        if (typeof t.progress === 'number' && Number.isFinite(t.progress)) {
+          return Math.trunc(t.progress);
+        }
+        if (typeof t.progress === 'string') {
+          const n = parseInt(t.progress.trim(), 10);
+          return Number.isFinite(n) ? n : 0;
+        }
+        return 0;
+      })(),
       assigneeId:
         typeof t.assigneeId === 'string'
           ? t.assigneeId

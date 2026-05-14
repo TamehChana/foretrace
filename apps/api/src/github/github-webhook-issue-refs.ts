@@ -18,6 +18,16 @@ function gatherFromPullRequestLike(pr: unknown, into: Set<number>): void {
     return;
   }
   const p = pr as Record<string, unknown>;
+  /** Same numbering as issues on the repo; CI payloads often only list `number` + title. */
+  const prNum = p.number;
+  if (typeof prNum === 'number' && Number.isFinite(prNum) && prNum > 0) {
+    into.add(Math.trunc(prNum));
+  } else if (typeof prNum === 'string') {
+    const parsed = parseInt(prNum.trim(), 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      into.add(parsed);
+    }
+  }
   for (const key of ['title', 'body'] as const) {
     const v = p[key];
     if (typeof v === 'string') {
@@ -92,16 +102,7 @@ export function collectIssueReferencesFromGithubWebhook(
       }
     }
   } else if (eventType === 'pull_request') {
-    const pr = body.pull_request;
-    if (pr && typeof pr === 'object') {
-      const p = pr as Record<string, unknown>;
-      for (const key of ['title', 'body'] as const) {
-        const v = p[key];
-        if (typeof v === 'string') {
-          gatherHashesFromText(v, ids);
-        }
-      }
-    }
+    gatherFromPullRequestLike(body.pull_request, ids);
   } else if (eventType === 'issues' || eventType === 'issue_comment') {
     const issue = body.issue;
     if (issue && typeof issue === 'object') {
@@ -250,7 +251,9 @@ export function isPullRequestMergedClose(
   eventType: string,
   action: string | undefined,
 ): boolean {
-  if (eventType !== 'pull_request' || action !== 'closed') {
+  const a =
+    typeof action === 'string' ? action.trim().toLowerCase() : undefined;
+  if (eventType !== 'pull_request' || a !== 'closed') {
     return false;
   }
   if (!payload || typeof payload !== 'object') {

@@ -29,15 +29,33 @@ export type GithubIngestInput = {
   rawBody: Buffer;
 };
 
+function issuePayloadState(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const issue = (payload as Record<string, unknown>).issue;
+  if (!issue || typeof issue !== 'object') {
+    return null;
+  }
+  const s = (issue as { state?: unknown }).state;
+  return typeof s === 'string' ? s.toLowerCase() : null;
+}
+
 function taskProgressAndStatusFromGithubEvent(
   eventType: string,
   action: string | undefined,
   payload: unknown,
 ): { progress?: number; status?: TaskStatus } {
-  if (eventType === 'issues' && action === 'closed') {
+  const a =
+    typeof action === 'string' ? action.trim().toLowerCase() : undefined;
+  const issueState = eventType === 'issues' ? issuePayloadState(payload) : null;
+  if (
+    eventType === 'issues' &&
+    (a === 'closed' || (a === undefined && issueState === 'closed'))
+  ) {
     return { progress: 100, status: TaskStatus.DONE };
   }
-  if (eventType === 'issues' && action === 'reopened') {
+  if (eventType === 'issues' && a === 'reopened') {
     return { progress: 0, status: TaskStatus.IN_PROGRESS };
   }
   if (isPullRequestMergedClose(payload, eventType, action)) {

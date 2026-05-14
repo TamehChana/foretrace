@@ -140,7 +140,21 @@ describe('github-webhook-issue-refs', () => {
         'workflow_run',
       );
       const sorted = [...nums].sort((a, b) => a - b);
-      expect(sorted).toEqual([77, 78, 88, 89]);
+      expect(sorted).toEqual([1, 77, 78, 88, 89]);
+    });
+
+    it('includes pull_request.number even when title/body have no #refs', () => {
+      const nums = collectIssueReferencesFromGithubWebhook(
+        {
+          pull_request: {
+            number: 15,
+            title: 'Add feature',
+            body: 'No magic keywords here',
+          },
+        },
+        'pull_request',
+      );
+      expect([...nums].sort((a, b) => a - b)).toEqual([15]);
     });
   });
 
@@ -151,6 +165,16 @@ describe('github-webhook-issue-refs', () => {
           { action: 'closed', pull_request: { merged: true, number: 1 } },
           'pull_request',
           'closed',
+        ),
+      ).toBe(true);
+    });
+
+    it('detects merged PR close with mixed-case action', () => {
+      expect(
+        isPullRequestMergedClose(
+          { action: 'Closed', pull_request: { merged: true, number: 1 } },
+          'pull_request',
+          'Closed',
         ),
       ).toBe(true);
     });

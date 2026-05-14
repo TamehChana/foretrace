@@ -296,4 +296,65 @@ describe('GithubWebhookService', () => {
       }),
     });
   });
+
+  it('sets task done when merged PR number matches linked task (no #refs in title/body)', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const findMany = jest
+      .fn()
+      .mockResolvedValue([{ id: 'ffffffff-ffff-ffff-ffff-ffffffffffff' }]);
+    const createMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma = {
+      gitHubConnection: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: connectionId,
+          projectId,
+          webhookSecret: 's3cr3t',
+          project: { organizationId: orgId },
+        }),
+      },
+      gitHubUserLink: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      task: { updateMany, findMany, update: jest.fn() },
+      taskGitHubActivity: { createMany },
+      $transaction: jest.fn(async (cb: (tx: unknown) => Promise<void>) => {
+        await cb({
+          gitHubWebhookEvent: { create: jest.fn() },
+          gitHubConnection: { update: jest.fn() },
+        });
+      }),
+    };
+    const service = makeService(prisma);
+
+    const rawBody = Buffer.from(
+      JSON.stringify({
+        repository: { full_name: 'acme/widget' },
+        action: 'closed',
+        sender: { login: 'dev' },
+        pull_request: {
+          merged: true,
+          number: 15,
+          title: 'Implement widget',
+          body: '',
+        },
+      }),
+      'utf8',
+    );
+
+    await service.ingest({
+      deliveryId: 'del-pr-merge',
+      eventType: 'pull_request',
+      signature256: 'sha256=fake',
+      rawBody,
+    });
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { projectId, githubIssueNumber: { in: [15] } },
+      data: expect.objectContaining({
+        progress: 100,
+        status: TaskStatus.DONE,
+        lastGithubActorLogin: 'dev',
+      }),
+    });
+  });
 });
