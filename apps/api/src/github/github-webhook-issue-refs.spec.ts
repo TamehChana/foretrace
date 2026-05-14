@@ -1,6 +1,8 @@
 import {
   collectIssueReferencesFromGithubWebhook,
   extractPullRequestNumber,
+  extractWorkflowRunConclusion,
+  isPullRequestMergedClose,
   summarizeGithubWebhookTouch,
 } from './github-webhook-issue-refs';
 
@@ -139,6 +141,37 @@ describe('github-webhook-issue-refs', () => {
       );
       const sorted = [...nums].sort((a, b) => a - b);
       expect(sorted).toEqual([77, 78, 88, 89]);
+    });
+  });
+
+  describe('isPullRequestMergedClose and extractWorkflowRunConclusion', () => {
+    it('detects merged PR close', () => {
+      expect(
+        isPullRequestMergedClose(
+          { action: 'closed', pull_request: { merged: true, number: 1 } },
+          'pull_request',
+          'closed',
+        ),
+      ).toBe(true);
+    });
+
+    it('rejects unmerged PR close', () => {
+      expect(
+        isPullRequestMergedClose(
+          { action: 'closed', pull_request: { merged: false, number: 1 } },
+          'pull_request',
+          'closed',
+        ),
+      ).toBe(false);
+    });
+
+    it('reads workflow_run conclusion', () => {
+      expect(
+        extractWorkflowRunConclusion(
+          { workflow_run: { conclusion: 'success' } },
+          'workflow_run',
+        ),
+      ).toBe('success');
     });
   });
 });

@@ -4,13 +4,15 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, TaskStatus } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectSignalsService } from '../projects/project-signals.service';
 import {
   collectIssueReferencesFromGithubWebhook,
   extractPullRequestNumber,
+  extractWorkflowRunConclusion,
+  isPullRequestMergedClose,
   summarizeGithubWebhookTouch,
 } from './github-webhook-issue-refs';
 import {
@@ -26,6 +28,23 @@ export type GithubIngestInput = {
   signature256: string | undefined;
   rawBody: Buffer;
 };
+
+function taskProgressAndStatusFromGithubEvent(
+  eventType: string,
+  action: string | undefined,
+  payload: unknown,
+): { progress?: number; status?: TaskStatus } {
+  if (eventType === 'issues' && action === 'closed') {
+    return { progress: 100, status: TaskStatus.DONE };
+  }
+  if (eventType === 'issues' && action === 'reopened') {
+    return { progress: 0, status: TaskStatus.IN_PROGRESS };
+  }
+  if (isPullRequestMergedClose(payload, eventType, action)) {
+    return { progress: 100, status: TaskStatus.DONE };
+  }
+  return {};
+}
 
 @Injectable()
 export class GithubWebhookService {
@@ -122,11 +141,17 @@ export class GithubWebhookService {
         }
 
         const prNum = extractPullRequestNumber(payloadJson, eventType);
+        const progressPatch = taskProgressAndStatusFromGithubEvent(
+          eventType,
+          action,
+          payloadJson,
+        );
         const updateData = {
           lastGithubActivityAt: now,
           lastGithubActorLogin: actorLogin,
           lastGithubLinkedUserId: linkedUserId,
           ...(prNum != null ? { lastGithubPullRequestNumber: prNum } : {}),
+          ...progressPatch,
         };
 
         const touch = await this.prisma.task.updateMany({
@@ -140,6 +165,30 @@ export class GithubWebhookService {
           this.log.warn(
             `GitHub webhook ${deliveryId}: ${eventType} referenced issue number(s) [${issueNums.join(', ')}] but no task in project ${connection.projectId} has githubIssueNumber in that set`,
           );
+        }
+
+        if (
+          eventType === 'workflow_run' &&
+          action === 'completed' &&
+          issueNums.length > 0 &&
+          extractWorkflowRunConclusion(payloadJson, eventType) === 'success'
+        ) {
+          const tasksForBump = await this.prisma.task.findMany({
+            where: {
+              projectId: connection.projectId,
+              githubIssueNumber: { in: issueNums },
+            },
+            select: { id: true, progress: true },
+          });
+          for (const t of tasksForBump) {
+            const next = Math.min(100, t.progress + 10);
+            if (next !== t.progress) {
+              await this.prisma.task.update({
+                where: { id: t.id },
+                data: { progress: next },
+              });
+            }
+          }
         }
 
         const summary = summarizeGithubWebhookTouch(

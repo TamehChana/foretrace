@@ -6,6 +6,7 @@ jest.mock('./github-webhook-verify', () => ({
 }));
 
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { TaskStatus } from '@prisma/client';
 
 import { GithubWebhookService } from './github-webhook.service';
 
@@ -29,6 +30,7 @@ describe('GithubWebhookService', () => {
     task: {
       updateMany: jest.Mock;
       findMany: jest.Mock;
+      update?: jest.Mock;
     };
     taskGitHubActivity: { createMany: jest.Mock };
     $transaction: jest.Mock;
@@ -59,7 +61,7 @@ describe('GithubWebhookService', () => {
       gitHubUserLink: {
         findUnique: jest.fn().mockResolvedValue({ userId: linkedUserId }),
       },
-      task: { updateMany, findMany },
+      task: { updateMany, findMany, update: jest.fn() },
       taskGitHubActivity: { createMany },
       $transaction: jest.fn(async (cb: (tx: unknown) => Promise<void>) => {
         await cb({
@@ -132,7 +134,7 @@ describe('GithubWebhookService', () => {
       gitHubUserLink: {
         findUnique: jest.fn().mockResolvedValue(null),
       },
-      task: { updateMany, findMany },
+      task: { updateMany, findMany, update: jest.fn() },
       taskGitHubActivity: { createMany },
       $transaction: jest.fn(async (cb: (tx: unknown) => Promise<void>) => {
         await cb({
@@ -189,6 +191,7 @@ describe('GithubWebhookService', () => {
       task: {
         updateMany: jest.fn(),
         findMany: jest.fn(),
+        update: jest.fn(),
       },
       taskGitHubActivity: { createMany: jest.fn() },
       $transaction: jest.fn(),
@@ -219,7 +222,11 @@ describe('GithubWebhookService', () => {
     const service = makeService({
       gitHubConnection: { findUnique: jest.fn() },
       gitHubUserLink: { findUnique: jest.fn() },
-      task: { updateMany: jest.fn(), findMany: jest.fn() },
+      task: {
+        updateMany: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
       taskGitHubActivity: { createMany: jest.fn() },
       $transaction: jest.fn(),
     });
@@ -232,5 +239,61 @@ describe('GithubWebhookService', () => {
         rawBody: Buffer.from('{', 'utf8'),
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('sets task progress and status when GitHub issue is closed', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const findMany = jest
+      .fn()
+      .mockResolvedValue([{ id: 'ffffffff-ffff-ffff-ffff-ffffffffffff' }]);
+    const createMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma = {
+      gitHubConnection: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: connectionId,
+          projectId,
+          webhookSecret: 's3cr3t',
+          project: { organizationId: orgId },
+        }),
+      },
+      gitHubUserLink: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      task: { updateMany, findMany, update: jest.fn() },
+      taskGitHubActivity: { createMany },
+      $transaction: jest.fn(async (cb: (tx: unknown) => Promise<void>) => {
+        await cb({
+          gitHubWebhookEvent: { create: jest.fn() },
+          gitHubConnection: { update: jest.fn() },
+        });
+      }),
+    };
+    const service = makeService(prisma);
+
+    const rawBody = Buffer.from(
+      JSON.stringify({
+        repository: { full_name: 'acme/widget' },
+        action: 'closed',
+        sender: { login: 'RepoOwner' },
+        issue: { number: 12, title: 'Bug', body: 'desc' },
+      }),
+      'utf8',
+    );
+
+    await service.ingest({
+      deliveryId: 'del-issue-close',
+      eventType: 'issues',
+      signature256: 'sha256=fake',
+      rawBody,
+    });
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { projectId, githubIssueNumber: { in: [12] } },
+      data: expect.objectContaining({
+        progress: 100,
+        status: TaskStatus.DONE,
+        lastGithubActorLogin: 'repoowner',
+      }),
+    });
   });
 });

@@ -403,9 +403,12 @@ export function DocumentationPage() {
               that the last linked GitHub user differs from the assignee—so the PM can notice pairing or handoffs.
             </p>
             <p>
-              <strong>GitHub “closed / completed” vs Foretrace status:</strong> when webhooks match, Foretrace records <strong>last activity</strong> and rows in
-              the delivery log. It does <strong>not</strong> automatically set the Foretrace task to <strong>Done</strong>—your team still updates{' '}
-              <strong>Status</strong> in Foretrace when work is finished.
+              <strong>GitHub “closed / completed” and merged PRs:</strong> when a webhook matches a task by issue number, Foretrace sets{' '}
+              <strong>Progress</strong> to <strong>100%</strong> and <strong>Status</strong> to <strong>Done</strong> if GitHub sends an <strong>issues</strong>{' '}
+              <Code>closed</Code> action, or a <strong>pull_request</strong> <Code>closed</Code> with <Code>merged: true</Code> (and the PR body/title referenced that
+              issue). Reopening the issue on GitHub sets the task back to <strong>In progress</strong> with <strong>0%</strong> progress. A successful{' '}
+              <strong>workflow_run</strong> (<Code>completed</Code> + <Code>success</Code>) that still matches the issue bumps progress by up to 10 points (capped
+              at 100) without forcing Done—useful for CI passing before the issue is formally closed.
             </p>
           </Note>
 

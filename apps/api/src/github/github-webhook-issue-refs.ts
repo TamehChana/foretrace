@@ -244,6 +244,40 @@ export function extractPullRequestNumber(
   return null;
 }
 
+/** True when `pull_request` + `closed` represents a merged PR (not an abandoned close). */
+export function isPullRequestMergedClose(
+  payload: unknown,
+  eventType: string,
+  action: string | undefined,
+): boolean {
+  if (eventType !== 'pull_request' || action !== 'closed') {
+    return false;
+  }
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+  const pr = (payload as Record<string, unknown>).pull_request;
+  if (!pr || typeof pr !== 'object') {
+    return false;
+  }
+  return (pr as { merged?: unknown }).merged === true;
+}
+
+export function extractWorkflowRunConclusion(
+  payload: unknown,
+  eventType: string,
+): string | null {
+  if (eventType !== 'workflow_run' || !payload || typeof payload !== 'object') {
+    return null;
+  }
+  const run = (payload as Record<string, unknown>).workflow_run;
+  if (!run || typeof run !== 'object') {
+    return null;
+  }
+  const c = (run as { conclusion?: unknown }).conclusion;
+  return typeof c === 'string' ? c : null;
+}
+
 export function summarizeGithubWebhookTouch(
   eventType: string,
   action: string | undefined,
