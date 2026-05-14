@@ -116,8 +116,19 @@ export class GithubWebhookService {
     const actorLogin = extractActorLogin(payloadJson, eventType);
     const now = new Date();
     const aggregatePatch = this.aggregateUpdates(eventType, action);
+    const issueNums = collectIssueReferencesFromGithubWebhook(
+      payloadJson,
+      eventType,
+    );
+    const prNum = extractPullRequestNumber(payloadJson, eventType);
 
     try {
+      /**
+       * One transaction: GitHub may retry the same `X-GitHub-Delivery` after we
+       * already inserted `GitHubWebhookEvent`. Previously the event row committed
+       * before task updates; a retry then hit P2002 and returned early — tasks
+       * never received progress/status.
+       */
       await this.prisma.$transaction(async (tx) => {
         await tx.gitHubWebhookEvent.create({
           data: {
@@ -134,17 +145,15 @@ export class GithubWebhookService {
           where: { id: connection.id },
           data: { lastEventAt: now, ...aggregatePatch },
         });
-      });
 
-      const issueNums = collectIssueReferencesFromGithubWebhook(
-        payloadJson,
-        eventType,
-      );
-      if (issueNums.length > 0) {
+        if (issueNums.length === 0) {
+          return;
+        }
+
         let linkedUserId: string | null = null;
         if (actorLogin) {
           const normalizedLogin = actorLogin.trim().toLowerCase();
-          const link = await this.prisma.gitHubUserLink.findUnique({
+          const link = await tx.gitHubUserLink.findUnique({
             where: {
               connectionId_githubLogin: {
                 connectionId: connection.id,
@@ -158,7 +167,6 @@ export class GithubWebhookService {
           }
         }
 
-        const prNum = extractPullRequestNumber(payloadJson, eventType);
         const progressPatch = taskProgressAndStatusFromGithubEvent(
           eventType,
           action,
@@ -172,7 +180,7 @@ export class GithubWebhookService {
           ...progressPatch,
         };
 
-        const touch = await this.prisma.task.updateMany({
+        const touch = await tx.task.updateMany({
           where: {
             projectId: connection.projectId,
             githubIssueNumber: { in: issueNums },
@@ -185,13 +193,15 @@ export class GithubWebhookService {
           );
         }
 
+        const normalizedAction =
+          typeof action === 'string' ? action.trim().toLowerCase() : '';
         if (
           eventType === 'workflow_run' &&
-          action === 'completed' &&
+          normalizedAction === 'completed' &&
           issueNums.length > 0 &&
           extractWorkflowRunConclusion(payloadJson, eventType) === 'success'
         ) {
-          const tasksForBump = await this.prisma.task.findMany({
+          const tasksForBump = await tx.task.findMany({
             where: {
               projectId: connection.projectId,
               githubIssueNumber: { in: issueNums },
@@ -201,7 +211,7 @@ export class GithubWebhookService {
           for (const t of tasksForBump) {
             const next = Math.min(100, t.progress + 10);
             if (next !== t.progress) {
-              await this.prisma.task.update({
+              await tx.task.update({
                 where: { id: t.id },
                 data: { progress: next },
               });
@@ -215,7 +225,7 @@ export class GithubWebhookService {
           issueNums,
           prNum,
         );
-        const affectedTasks = await this.prisma.task.findMany({
+        const affectedTasks = await tx.task.findMany({
           where: {
             projectId: connection.projectId,
             githubIssueNumber: { in: issueNums },
@@ -223,7 +233,7 @@ export class GithubWebhookService {
           select: { id: true },
         });
         if (affectedTasks.length > 0) {
-          await this.prisma.taskGitHubActivity.createMany({
+          await tx.taskGitHubActivity.createMany({
             data: affectedTasks.map((t) => ({
               taskId: t.id,
               githubDeliveryId: deliveryId,
@@ -237,7 +247,7 @@ export class GithubWebhookService {
             skipDuplicates: true,
           });
         }
-      }
+      });
 
       this.projectSignals.scheduleRefreshSnapshot(
         connection.projectId,

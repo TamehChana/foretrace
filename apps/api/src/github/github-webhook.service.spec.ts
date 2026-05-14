@@ -67,6 +67,9 @@ describe('GithubWebhookService', () => {
         await cb({
           gitHubWebhookEvent: txGitHubWebhookEvent,
           gitHubConnection: txGitHubConnection,
+          gitHubUserLink: prisma.gitHubUserLink,
+          task: prisma.task,
+          taskGitHubActivity: prisma.taskGitHubActivity,
         });
       }),
     };
@@ -140,6 +143,9 @@ describe('GithubWebhookService', () => {
         await cb({
           gitHubWebhookEvent: { create: jest.fn() },
           gitHubConnection: { update: jest.fn() },
+          gitHubUserLink: prisma.gitHubUserLink,
+          task: prisma.task,
+          taskGitHubActivity: prisma.taskGitHubActivity,
         });
       }),
     };
@@ -265,6 +271,9 @@ describe('GithubWebhookService', () => {
         await cb({
           gitHubWebhookEvent: { create: jest.fn() },
           gitHubConnection: { update: jest.fn() },
+          gitHubUserLink: prisma.gitHubUserLink,
+          task: prisma.task,
+          taskGitHubActivity: prisma.taskGitHubActivity,
         });
       }),
     };
@@ -321,6 +330,9 @@ describe('GithubWebhookService', () => {
         await cb({
           gitHubWebhookEvent: { create: jest.fn() },
           gitHubConnection: { update: jest.fn() },
+          gitHubUserLink: prisma.gitHubUserLink,
+          task: prisma.task,
+          taskGitHubActivity: prisma.taskGitHubActivity,
         });
       }),
     };

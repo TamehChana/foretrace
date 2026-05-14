@@ -32,7 +32,8 @@ export class GithubWebhookController {
     @RawBody() rawBody: Buffer | undefined,
   ): Promise<{ ok: true }> {
     const delivery = typeof deliveryId === 'string' ? deliveryId.trim() : '';
-    const event = typeof eventType === 'string' ? eventType.trim() : '';
+    const event =
+      typeof eventType === 'string' ? eventType.trim().toLowerCase() : '';
     if (!delivery || !event) {
       throw new BadRequestException(
         'Missing X-GitHub-Delivery or X-GitHub-Event',
