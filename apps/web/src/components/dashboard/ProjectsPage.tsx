@@ -187,6 +187,27 @@ function deadlineCountdownClass(u: DeadlineUrgency): string {
   }
 }
 
+/** Matches project snapshot “due in 7d &lt;35% progress” plus any overdue active task. */
+function taskIsBehindSchedule(t: OrgTaskRow): boolean {
+  if (t.status === 'DONE' || t.status === 'CANCELLED') {
+    return false;
+  }
+  if (!t.deadline) {
+    return false;
+  }
+  const d = deadlineCalendarDiffDays(t.deadline);
+  if (d === null) {
+    return false;
+  }
+  if (d < 0) {
+    return true;
+  }
+  if (d <= 7) {
+    return t.progress < 35;
+  }
+  return false;
+}
+
 type TaskGithubActivityRow = {
   id: string;
   occurredAt: string;
@@ -1245,9 +1266,21 @@ export function ProjectsPage() {
                                             >
                                               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                                 <div className="min-w-0 flex-1 space-y-1">
-                                                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                                                    {t.title}
-                                                  </p>
+                                                  <div className="flex flex-wrap items-center gap-2">
+                                                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                                      {t.title}
+                                                    </p>
+                                                    {taskIsBehindSchedule(
+                                                      t,
+                                                    ) ? (
+                                                      <span
+                                                        className="shrink-0 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-100"
+                                                        title="Overdue, or deadline within 7 days with progress under 35%"
+                                                      >
+                                                        Behind schedule
+                                                      </span>
+                                                    ) : null}
+                                                  </div>
                                                   {t.assigneeId &&
                                                   t.lastGithubLinkedUserId &&
                                                   t.assigneeId !==

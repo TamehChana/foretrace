@@ -57,6 +57,42 @@ export class RiskInsightService {
     return 'WATCH';
   }
 
+  /** One plain-language line on calendar feasibility from snapshot task counts. */
+  private scheduleFeasibilityLine(
+    ctx: RiskInsightContext,
+  ): string | null {
+    const raw = ctx.signalEvidence?.tasks;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return null;
+    }
+    const t = raw as Record<string, unknown>;
+    const num = (k: string): number =>
+      typeof t[k] === 'number' && Number.isFinite(t[k] as number)
+        ? Math.trunc(t[k] as number)
+        : 0;
+    const overdue = num('overdueCount');
+    const d3 = num('dueWithin3DaysCount');
+    const low = num('dueSoonLowProgressCount');
+    const d7 = num('dueWithin7DaysCount');
+    const d47 = num('dueBetween4And7DaysCount');
+    if (overdue > 0) {
+      return `Calendar feasibility: ${overdue} active task(s) are already overdue — hitting the current plan without date or scope change is unlikely.`;
+    }
+    if (low > 0) {
+      return `Calendar feasibility: ${low} active task(s) due within 7 days remain under 35% progress${d7 > 0 ? ` (${d7} total due this week)` : ''} — delivery on time is doubtful unless velocity picks up.`;
+    }
+    if (d3 > 0) {
+      return `Calendar feasibility: ${d3} active task(s) land within 3 days — confirm owners and scope are realistic.`;
+    }
+    if (d47 > 0 && d7 > 0) {
+      return `Calendar feasibility: ${d7} task(s) due within a week (${d47} in the 4–7 day window); none flagged as critically behind on progress in this rollup.`;
+    }
+    if (d7 > 0) {
+      return `Calendar feasibility: ${d7} task(s) due within a week; monitor burn-down against deadlines.`;
+    }
+    return null;
+  }
+
   private heuristic(ctx: RiskInsightContext): string {
     const verdict = this.heuristicVerdict(ctx);
     const top = ctx.reasons
@@ -66,18 +102,45 @@ export class RiskInsightService {
       top.length > 0
         ? top.map((r) => `• ${r.detail}`).join('\n')
         : ctx.reasons.map((r) => `• ${r.detail}`).join('\n');
-    return [
+    const schedule = this.scheduleFeasibilityLine(ctx);
+    const lines = [
       `VERDICT: ${verdict}`,
       '',
       `Delivery risk is ${ctx.level} (score ${ctx.score}/100) for “${ctx.projectName}”.`,
       '',
       'Signals considered:',
       bullets,
+    ];
+    if (schedule) {
+      lines.push('', schedule);
+    }
+    lines.push(
       '',
       'Next: review overdue and imminent (≤3d) tasks, tasks due soon with low progress, check terminal friction by task and by CLI token owner, and align on GitHub activity if the repo is linked.',
-    ]
-      .join('\n')
-      .slice(0, 8000);
+    );
+    return lines.join('\n').slice(0, 8000);
+  }
+
+  private buildScheduleSummary(
+    evidence: Record<string, unknown> | undefined,
+  ): Record<string, number | null> | null {
+    const raw = evidence?.tasks;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return null;
+    }
+    const t = raw as Record<string, unknown>;
+    const num = (k: string): number | null => {
+      const v = t[k];
+      return typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : null;
+    };
+    return {
+      activeCount: num('activeCount'),
+      overdueCount: num('overdueCount'),
+      dueWithin7DaysCount: num('dueWithin7DaysCount'),
+      dueWithin3DaysCount: num('dueWithin3DaysCount'),
+      dueBetween4And7DaysCount: num('dueBetween4And7DaysCount'),
+      dueSoonLowProgressCount: num('dueSoonLowProgressCount'),
+    };
   }
 
   private openAiKey(): string | null {
@@ -103,17 +166,20 @@ export class RiskInsightService {
     const model = this.openAiModel();
     const system = [
       'You are a senior software delivery lead.',
-      'You receive JSON: rule-based risk (level, score, reasons) plus `signalEvidence` (tasks counts, GitHub rollup, terminal aggregates, task-linked terminal rows, per-user CLI token mint activity).',
+      'You receive JSON: rule-based risk (level, score, reasons), `scheduleSummary` (deadline-focused task counts from the latest snapshot), and full `signalEvidence` (tasks, GitHub rollup, terminal aggregates, task-linked terminal rows, per-user CLI token mint activity).',
+      'Always explicitly address schedule / landing feasibility using `scheduleSummary` when any of overdueCount, dueWithin3DaysCount, dueSoonLowProgressCount, or dueWithin7DaysCount is greater than zero (say whether on-time delivery looks realistic and what would change that).',
       'Do not invent facts not supported by the JSON. Do not mention secrets or tokens.',
       'Output plain text (no markdown headings).',
       'First line MUST be exactly one of: VERDICT: ON_TRACK | VERDICT: WATCH | VERDICT: ELEVATED_FRICTION | VERDICT: AT_RISK',
-      'Then 2–5 short sentences explaining why, citing concrete numbers from signalEvidence where possible.',
+      'Then 2–5 short sentences: merge rule reasons with scheduleSummary numbers; cite concrete counts.',
     ].join(' ');
+    const scheduleSummary = this.buildScheduleSummary(ctx.signalEvidence);
     const user = JSON.stringify({
       projectName: ctx.projectName,
       level: ctx.level,
       score: ctx.score,
       reasons: ctx.reasons,
+      scheduleSummary,
       signalEvidence: ctx.signalEvidence ?? {},
     });
     const controller = new AbortController();
