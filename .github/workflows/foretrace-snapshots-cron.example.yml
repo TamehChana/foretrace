@@ -1,0 +1,19 @@
+# Example: refresh Foretrace project signal snapshots on a schedule.
+# Copy to `.github/workflows/` and set repository secrets:
+#   FORETRACE_API_URL   — e.g. https://your-api.onrender.com (no trailing slash)
+#   FORETRACE_CRON_SECRET — same value as FORETRACE_CRON_SECRET on the API host
+#
+# name: foretrace-snapshots
+# on:
+#   schedule:
+#     - cron: '17 */6 * * *' # every 6 hours at :17
+# jobs:
+#   refresh:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: POST refresh-project-snapshots
+#         run: |
+#           curl -fsS -X POST \
+#             "${FORETRACE_API_URL}/internal/cron/refresh-project-snapshots?limit=100" \
+#             -H "X-Foretrace-Cron-Secret: ${FORETRACE_CRON_SECRET}" \
+#             -H "Accept: application/json"

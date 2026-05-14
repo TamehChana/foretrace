@@ -9,6 +9,10 @@
 
 - **`POST …/projects/:projectId/insights/analyze`** (Delivery risk panel → **Impact analysis**) calls **`ProjectImpactAnalyzerService`**: it refreshes the signal snapshot, attaches recent tasks and redacted terminal incident excerpts plus `scheduleSummary`, then either calls OpenAI (same `OPENAI_API_KEY`; model from `OPENAI_IMPACT_MODEL` or `OPENAI_RISK_MODEL`) or returns a **longer heuristic** text. The result is **not persisted** (on-demand inference only).
 
+- **`POST …/projects/:projectId/insight-feedback`** stores **thumbs** (`RISK_SUMMARY` vs `PROJECT_IMPACT_ANALYSIS`, `helpful` boolean) for future evaluation of narratives — not used for live scoring yet.
+
+- **`POST /internal/cron/refresh-project-snapshots`** (header **`X-Foretrace-Cron-Secret`** = env **`FORETRACE_CRON_SECRET`**) recomputes **persisted signal snapshots** for up to `?limit=` non-archived projects. See `.github/workflows/foretrace-snapshots-cron.example.yml`.
+
 This is intentionally small and synchronous so “Evaluate” stays predictable; heavy pipelines belong in a worker later.
 
 ## Where to train or extend
@@ -35,5 +39,6 @@ This is intentionally small and synchronous so “Evaluate” stays predictable;
 | `OPENAI_API_KEY` | Optional; enables LLM narrative path. |
 | `OPENAI_RISK_MODEL` | Optional; defaults to `gpt-4o-mini`. |
 | `OPENAI_IMPACT_MODEL` | Optional; model for impact analysis; defaults to `OPENAI_RISK_MODEL` then `gpt-4o-mini`. |
+| `FORETRACE_CRON_SECRET` | Optional; enables `POST /internal/cron/refresh-project-snapshots` when sent as `X-Foretrace-Cron-Secret`. |
 
 See also [`.env.example`](../.env.example) for mail and app secrets.

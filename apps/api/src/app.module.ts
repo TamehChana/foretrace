@@ -6,6 +6,7 @@ import { AuditModule } from './audit/audit.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { InternalCronController } from './internal/internal-cron.controller';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HttpLoggingInterceptor } from './common/interceptors/http-logging.interceptor';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -31,7 +32,7 @@ import { TerminalIngestModule } from './terminal/terminal-ingest.module';
     GithubModule,
     TerminalIngestModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, InternalCronController],
   providers: [
     AppService,
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -439,6 +439,42 @@ export class ProjectSignalsService {
       });
     });
   }
+
+  /**
+   * Refreshes persisted snapshots for many projects (cron / ops). Non-archived
+   * projects only; failures are collected so one bad project does not abort the batch.
+   */
+  async refreshAllSnapshots(opts?: { limit?: number }): Promise<{
+    attempted: number;
+    refreshed: number;
+    failures: { projectId: string; message: string }[];
+  }> {
+    const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 500);
+    const projects = await this.prisma.project.findMany({
+      where: { archivedAt: null },
+      select: { id: true, organizationId: true },
+      take: limit,
+      orderBy: { updatedAt: 'desc' },
+    });
+    const failures: { projectId: string; message: string }[] = [];
+    let refreshed = 0;
+    for (const p of projects) {
+      try {
+        await this.refreshSnapshot(p.id, p.organizationId);
+        refreshed += 1;
+      } catch (e: unknown) {
+        failures.push({
+          projectId: p.id,
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+    return {
+      attempted: projects.length,
+      refreshed,
+      failures,
+    };
+  }
 }
 
 /** Safe JSON for LLM prompts — strips raw terminal line payloads. */

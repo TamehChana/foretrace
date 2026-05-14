@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, ShieldAlert, Sparkles } from 'lucide-react';
+import { RefreshCw, ShieldAlert, Sparkles, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { formatApiErrorResponse } from '../../api-error-message';
 import { apiFetch } from '../../api-fetch';
 import { useToast } from '../../providers/ToastProvider';
@@ -199,6 +199,9 @@ export function ProjectRiskPanel(props: {
       }
     | { status: 'error'; message: string }
   >({ status: 'idle' });
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState<
+    'RISK_SUMMARY' | 'PROJECT_IMPACT_ANALYSIS' | null
+  >(null);
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
@@ -339,6 +342,39 @@ export function ProjectRiskPanel(props: {
     onEvaluated?.();
   }, [organizationId, projectId, showToast, onEvaluated]);
 
+  const submitInsightFeedback = useCallback(
+    async (
+      kind: 'RISK_SUMMARY' | 'PROJECT_IMPACT_ANALYSIS',
+      helpful: boolean,
+    ) => {
+      setFeedbackSubmitting(kind);
+      try {
+        const res = await apiFetch(
+          `/organizations/${organizationId}/projects/${projectId}/insight-feedback`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kind, helpful }),
+          },
+        );
+        const raw: unknown = await res.json().catch(() => null);
+        if (!res.ok) {
+          showToast(formatApiErrorResponse(raw, res.status), 'error');
+          return;
+        }
+        showToast('Thanks — feedback saved', 'success');
+      } catch (err: unknown) {
+        showToast(
+          err instanceof Error ? err.message : 'Failed to save feedback',
+          'error',
+        );
+      } finally {
+        setFeedbackSubmitting(null);
+      }
+    },
+    [organizationId, projectId, showToast],
+  );
+
   return (
     <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-950/60">
       <div className="flex items-start justify-between gap-2">
@@ -399,6 +435,33 @@ export function ProjectRiskPanel(props: {
           <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans text-[12px] leading-relaxed text-violet-950 dark:text-violet-100">
             {impactState.analysis}
           </pre>
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-violet-200/80 pt-2 dark:border-violet-800/60">
+            <span className="text-[10px] text-violet-800 dark:text-violet-200">
+              Was this impact read helpful?
+            </span>
+            <button
+              type="button"
+              disabled={feedbackSubmitting === 'PROJECT_IMPACT_ANALYSIS'}
+              onClick={() => {
+                void submitInsightFeedback('PROJECT_IMPACT_ANALYSIS', true);
+              }}
+              className="inline-flex items-center gap-0.5 rounded border border-violet-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-100 dark:hover:bg-violet-900"
+            >
+              <ThumbsUp size={11} aria-hidden />
+              Yes
+            </button>
+            <button
+              type="button"
+              disabled={feedbackSubmitting === 'PROJECT_IMPACT_ANALYSIS'}
+              onClick={() => {
+                void submitInsightFeedback('PROJECT_IMPACT_ANALYSIS', false);
+              }}
+              className="inline-flex items-center gap-0.5 rounded border border-violet-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-100 dark:hover:bg-violet-900"
+            >
+              <ThumbsDown size={11} aria-hidden />
+              No
+            </button>
+          </div>
         </div>
       ) : impactState.status === 'error' ? (
         <p className="mt-3 text-[12px] text-rose-600 dark:text-rose-400">
@@ -463,6 +526,34 @@ export function ProjectRiskPanel(props: {
               </pre>
             </div>
           ) : null}
+
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-100 bg-zinc-50/50 px-2 py-1.5 dark:border-zinc-800 dark:bg-zinc-900/40">
+            <span className="text-[10px] text-zinc-600 dark:text-zinc-400">
+              Was this risk evaluation helpful?
+            </span>
+            <button
+              type="button"
+              disabled={feedbackSubmitting === 'RISK_SUMMARY'}
+              onClick={() => {
+                void submitInsightFeedback('RISK_SUMMARY', true);
+              }}
+              className="inline-flex items-center gap-0.5 rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              <ThumbsUp size={11} aria-hidden />
+              Yes
+            </button>
+            <button
+              type="button"
+              disabled={feedbackSubmitting === 'RISK_SUMMARY'}
+              onClick={() => {
+                void submitInsightFeedback('RISK_SUMMARY', false);
+              }}
+              className="inline-flex items-center gap-0.5 rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              <ThumbsDown size={11} aria-hidden />
+              No
+            </button>
+          </div>
 
           <EvaluationHistorySection historyState={historyState} />
         </div>

@@ -51,6 +51,11 @@ enum AlertKind {
   RISK_EVALUATION
 }
 
+enum InsightFeedbackKind {
+  RISK_SUMMARY
+  PROJECT_IMPACT_ANALYSIS
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -67,6 +72,7 @@ model User {
   taskGithubActivityLinks TaskGitHubActivity[] @relation("TaskGithubActivityLinkedUser")
   cliIngestTokens CliIngestToken[]
   auditLogs       AuditLog[]
+  insightFeedbacks InsightFeedback[]
 }
 
 model Organization {
@@ -86,6 +92,7 @@ model Organization {
   riskEvaluationRuns       RiskEvaluationRun[]
   alerts                   Alert[]
   auditLogs                AuditLog[]
+  insightFeedbacks         InsightFeedback[]
 }
 
 model Membership {
@@ -122,6 +129,7 @@ model Project {
   riskEvaluation       ProjectRiskEvaluation?
   riskEvaluationRuns   RiskEvaluationRun[]
   alerts               Alert[]
+  insightFeedbacks     InsightFeedback[]
 
   @@index([organizationId])
 }
@@ -379,6 +387,25 @@ model Alert {
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([organizationId, readAt, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])
+}
+
+/// Thumbs on AI/heuristic narratives (risk + impact analysis) for future tuning.
+model InsightFeedback {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @db.Uuid
+  projectId      String              @db.Uuid
+  userId         String              @db.Uuid
+  kind           InsightFeedbackKind
+  helpful        Boolean
+  comment        String?             @db.VarChar(2000)
+  createdAt      DateTime            @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([projectId, kind, createdAt(sort: Desc)])
 }
 
 /// Immutable audit trail for security-sensitive actions (enterprise baseline).
