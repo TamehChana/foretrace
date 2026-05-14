@@ -23,7 +23,7 @@ function ShellBody({ children }: { children: ReactNode }) {
           <div className="mx-auto max-w-[1200px]">{children}</div>
         </div>
         <footer className="relative border-t border-zinc-200/70 px-5 py-4 text-center text-[11px] text-zinc-400 dark:border-zinc-800/80 dark:text-zinc-600">
-          Foretrace prototypes risk signals · Data shown is illustrative until backends connect.
+          Foretrace rolls up saved 24h signal snapshots on Overview; open a project for full detail and actions.
         </footer>
       </div>
     </div>

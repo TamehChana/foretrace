@@ -1,12 +1,15 @@
 import { Activity, BookOpen, Cpu, Layers } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { ApiHealthState } from '../../hooks/use-api-health';
+import { useAuthSession } from '../../providers/AuthSessionProvider';
+import { useOrganizationOverviewRollup } from '../../hooks/use-organization-overview-rollup';
 import type { OrganizationsState } from '../../hooks/use-organizations';
 import { PageHeader } from '../ui/PageHeader';
-import { ActivityEmptyState } from './ActivityEmptyState';
 import { ApiHealthPanel } from './ApiHealthPanel';
 import { MetricCard } from './MetricCard';
 import { OrganizationsPanel } from './OrganizationsPanel';
+import { OverviewActivityPanel } from './OverviewActivityPanel';
 import { RoadmapCard } from './RoadmapCard';
 
 function formatToday(): string {
@@ -18,6 +21,10 @@ function formatToday(): string {
   }).format(new Date());
 }
 
+function formatCount(n: number): string {
+  return n.toLocaleString();
+}
+
 export function OverviewPage({
   health,
   organizations,
@@ -25,6 +32,104 @@ export function OverviewPage({
   health: ApiHealthState;
   organizations: OrganizationsState;
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawOrgParam = searchParams.get('org');
+  const { workspaceListBump } = useAuthSession();
+
+  const organizationId = useMemo(() => {
+    if (organizations.status !== 'ok') {
+      return null;
+    }
+    const ids = organizations.items.map((o) => o.id);
+    if (ids.length === 0) {
+      return null;
+    }
+    if (rawOrgParam && ids.includes(rawOrgParam)) {
+      return rawOrgParam;
+    }
+    return ids[0] ?? null;
+  }, [organizations, rawOrgParam]);
+
+  const organizationName = useMemo(() => {
+    if (organizations.status !== 'ok' || !organizationId) {
+      return null;
+    }
+    return organizations.items.find((o) => o.id === organizationId)?.name ?? null;
+  }, [organizations, organizationId]);
+
+  useEffect(() => {
+    if (organizations.status !== 'ok') {
+      return;
+    }
+    const ids = organizations.items.map((o) => o.id);
+    if (ids.length === 0) {
+      if (rawOrgParam) {
+        setSearchParams({}, { replace: true });
+      }
+      return;
+    }
+    const valid =
+      rawOrgParam && ids.includes(rawOrgParam) ? rawOrgParam : ids[0];
+    if (!rawOrgParam || rawOrgParam !== valid) {
+      setSearchParams({ org: valid }, { replace: true });
+    }
+  }, [organizations, rawOrgParam, setSearchParams]);
+
+  const rollup = useOrganizationOverviewRollup(
+    organizationId,
+    organizationName,
+    workspaceListBump,
+  );
+
+  const metricsLoading =
+    organizations.status === 'loading' ||
+    (organizations.status === 'ok' &&
+      organizationId !== null &&
+      (rollup.status === 'loading' || rollup.status === 'idle'));
+
+  const showLiveMetrics =
+    organizations.status === 'ok' &&
+    organizationId !== null &&
+    organizationName !== null &&
+    rollup.status === 'ok';
+
+  const metricPlaceholder: string = (() => {
+    if (organizations.status === 'loading') {
+      return '…';
+    }
+    if (
+      organizations.status === 'signed_out' ||
+      organizations.status === 'error' ||
+      rollup.status === 'error'
+    ) {
+      return '—';
+    }
+    if (organizationId === null) {
+      return '—';
+    }
+    if (rollup.status === 'loading' || rollup.status === 'idle') {
+      return '…';
+    }
+    return '—';
+  })();
+
+  const taskValue = showLiveMetrics
+    ? formatCount(rollup.totals.taskPressure)
+    : metricPlaceholder;
+  const collabValue = showLiveMetrics
+    ? formatCount(rollup.totals.openCollabItems)
+    : metricPlaceholder;
+  const frictionValue = showLiveMetrics
+    ? formatCount(
+        rollup.totals.terminalIncidents24h + rollup.totals.terminalBatches24h,
+      )
+    : metricPlaceholder;
+
+  const rollupFoot =
+    showLiveMetrics && rollup.totals.projectsConsidered < rollup.totals.projectsInOrg
+      ? ` (${rollup.totals.projectsConsidered} of ${rollup.totals.projectsInOrg} projects in snapshot rollups)`
+      : '';
+
   return (
     <main>
       <PageHeader
@@ -35,7 +140,7 @@ export function OverviewPage({
             Foretrace fuses work planning, GitHub collaboration, and local developer friction into
             a single risk surface—so PMs see{' '}
             <span className="font-semibold text-zinc-800 dark:text-zinc-100">why</span> dates slip
-            before they’re committed in a status meeting.
+            before they're committed in a status meeting.
           </>
         }
         meta={
@@ -61,23 +166,26 @@ export function OverviewPage({
 
       <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard
-          title="Elevated task risk"
-          value="—"
-          subtitle="Tasks trending High or Critical with machine-readable reasons and recommended PM actions."
+          title="Task pressure"
+          value={taskValue}
+          valueLoading={metricsLoading && metricPlaceholder === '…'}
+          subtitle={`Overdue tasks plus due-soon / low-progress rows from the latest 24h snapshot per project${rollupFoot}.`}
           icon={Layers}
           enterDelayMs={0}
         />
         <MetricCard
-          title="Stale collaboration"
-          value="—"
-          subtitle="Commit cadence, PR age, and review stalls distilled for delivery managers."
+          title="Open collaboration"
+          value={collabValue}
+          valueLoading={metricsLoading && metricPlaceholder === '…'}
+          subtitle={`Open pull requests and issues (from the REST slice on each snapshot) summed across projects${rollupFoot}.`}
           icon={Activity}
           enterDelayMs={70}
         />
         <MetricCard
-          title="Technical friction"
-          value="—"
-          subtitle="Build / test / runtime bursts from the CLI, fingerprinted per task and engineer."
+          title="Terminal touches"
+          value={frictionValue}
+          valueLoading={metricsLoading && metricPlaceholder === '…'}
+          subtitle={`Terminal incidents plus ingest batches recorded in the 24h rollup window${rollupFoot}.`}
           icon={Cpu}
           enterDelayMs={140}
         />
@@ -85,8 +193,8 @@ export function OverviewPage({
 
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="animate-rise lg:col-span-7" style={{ animationDelay: '200ms' }}>
-          <h2 className="sr-only">Signal activity</h2>
-          <ActivityEmptyState />
+          <h2 className="sr-only">Workspace activity</h2>
+          <OverviewActivityPanel organizations={organizations} rollup={rollup} />
         </div>
         <div className="flex animate-rise flex-col gap-6 lg:col-span-5" style={{ animationDelay: '260ms' }}>
           <ApiHealthPanel state={health} />

@@ -7,9 +7,18 @@ type Props = {
   icon: LucideIcon;
   /** Stagger dashboard entrance; pairs with `.animate-rise` in global CSS */
   enterDelayMs?: number;
+  /** Pulse placeholder while aggregated metrics load */
+  valueLoading?: boolean;
 };
 
-export function MetricCard({ title, value, subtitle, icon: Icon, enterDelayMs = 0 }: Props) {
+export function MetricCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  enterDelayMs = 0,
+  valueLoading = false,
+}: Props) {
   return (
     <div
       className="animate-rise group relative overflow-hidden rounded-2xl border border-zinc-200/75 bg-white/90 p-[1px] shadow-sm shadow-zinc-900/[0.03] backdrop-blur-sm motion-safe:transition-[box-shadow,transform,border-color] motion-safe:hover:-translate-y-0.5 hover:border-accent-300/55 motion-safe:hover:shadow-lg motion-safe:hover:shadow-zinc-900/[0.06] dark:border-zinc-800/80 dark:bg-zinc-900/55 dark:shadow-black/40 dark:hover:border-accent-600/45 dark:motion-safe:hover:shadow-black/60"
@@ -29,7 +38,11 @@ export function MetricCard({ title, value, subtitle, icon: Icon, enterDelayMs = 
               <Icon size={19} strokeWidth={2} aria-hidden />
             </span>
           </div>
-          <p className="text-[2rem] font-semibold tabular-nums tracking-[-0.04em] leading-none text-zinc-950 dark:text-white">
+          <p
+            className={`text-[2rem] font-semibold tabular-nums tracking-[-0.04em] leading-none text-zinc-950 dark:text-white ${
+              valueLoading ? 'animate-pulse text-zinc-400 dark:text-zinc-500' : ''
+            }`}
+          >
             {value}
           </p>
           <p className="text-[13px] leading-relaxed text-zinc-600 dark:text-zinc-400">{subtitle}</p>

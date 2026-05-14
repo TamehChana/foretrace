@@ -58,7 +58,7 @@ export function parseCreateProjectEnvelope(json: unknown): OrgProjectRow | null 
   };
 }
 
-function parseList(json: unknown): OrgProjectRow[] {
+export function parseOrgProjectsList(json: unknown): OrgProjectRow[] {
   if (!json || typeof json !== 'object' || !('data' in json)) {
     throw new Error('Invalid response shape');
   }
@@ -162,7 +162,7 @@ export function useOrgProjects(
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
-        return parseList(await res.json());
+        return parseOrgProjectsList(await res.json());
       })
       .then((projects) => {
         if (!cancelled) {
