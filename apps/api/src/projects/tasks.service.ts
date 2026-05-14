@@ -540,6 +540,7 @@ export class TasksService {
         reason:
           | 'no_github_connection'
           | 'missing_github_pat'
+          | 'github_pat_decrypt_failed'
           | 'github_not_found'
           | 'github_forbidden'
           | 'github_bad_response'
@@ -593,8 +594,11 @@ export class TasksService {
       task.githubIssueNumber,
     );
     if (!view.ok) {
-      if (view.detail === 'missing_pat' || view.detail === 'decrypt_failed') {
+      if (view.detail === 'missing_pat') {
         return { ok: false, reason: 'missing_github_pat' };
+      }
+      if (view.detail === 'decrypt_failed') {
+        return { ok: false, reason: 'github_pat_decrypt_failed' };
       }
       if (view.detail === 'not_found') {
         return { ok: false, reason: 'github_not_found' };

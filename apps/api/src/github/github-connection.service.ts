@@ -10,7 +10,11 @@ import { Prisma, Role } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 
 import { AuditService } from '../audit/audit.service';
-import { encryptForStorage, isSecretConfigured } from '../crypto/app-secret-crypto';
+import {
+  decryptFromStorage,
+  encryptForStorage,
+  isSecretConfigured,
+} from '../crypto/app-secret-crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { normalizeRepositoryFullName } from './github-webhook-verify';
@@ -59,9 +63,12 @@ export class GithubConnectionService {
       return null;
     }
     const { githubPatCiphertext: _pat, ...rest } = row;
+    const patBlob = typeof _pat === 'string' && _pat.trim().length > 0;
+    const patUsable = patBlob && decryptFromStorage(_pat) !== null;
     return {
       ...rest,
-      hasGithubRestPat: Boolean(_pat),
+      hasGithubRestPat: patUsable,
+      githubPatReSaveSuggested: patBlob && !patUsable,
     };
   }
 

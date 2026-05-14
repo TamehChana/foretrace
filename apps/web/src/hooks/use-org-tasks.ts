@@ -95,11 +95,12 @@ function parseList(json: unknown): OrgTaskRow[] {
             ? null
             : null,
       progress: (() => {
-        if (typeof t.progress === 'number' && Number.isFinite(t.progress)) {
-          return Math.trunc(t.progress);
+        const p = t.progress as unknown;
+        if (typeof p === 'number' && Number.isFinite(p)) {
+          return Math.trunc(p);
         }
-        if (typeof t.progress === 'string') {
-          const n = parseInt(t.progress.trim(), 10);
+        if (typeof p === 'string') {
+          const n = parseInt(p.trim(), 10);
           return Number.isFinite(n) ? n : 0;
         }
         return 0;

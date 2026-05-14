@@ -714,7 +714,9 @@ export function ProjectsPage() {
         const messages: Record<string, string> = {
           no_github_connection: 'Link a GitHub repository to this project first.',
           missing_github_pat:
-            'Add a GitHub PAT on the project GitHub connection to read issue state, or redeliver the webhook from GitHub.',
+            'No GitHub PAT is stored for this project. Open Project → GitHub, paste a token, and Save PAT (or redeliver an issues/pull_request webhook from GitHub).',
+          github_pat_decrypt_failed:
+            'The saved GitHub PAT cannot be decrypted. Your API server’s FORETRACE_APP_SECRET likely changed since the PAT was saved — paste the PAT again under Project → GitHub and Save.',
           github_not_found:
             'GitHub had no issue/PR with that number in this repo. Check Issue #.',
           github_forbidden: 'GitHub rejected the token (scope or access).',

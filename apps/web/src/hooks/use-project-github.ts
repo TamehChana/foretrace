@@ -13,8 +13,10 @@ export type GithubRecentEventRow = {
 export type GithubConnectionView = {
   id: string;
   repositoryFullName: string;
-  /** True when a GitHub PAT is stored for REST enrichment (token is never returned). */
+  /** True when a GitHub PAT is stored and the API can decrypt it for REST calls. */
   hasGithubRestPat: boolean;
+  /** Ciphertext exists but decrypt failed (e.g. FORETRACE_APP_SECRET changed). */
+  githubPatReSaveSuggested: boolean;
   lastEventAt: string | null;
   lastPushAt: string | null;
   openPullRequestCount: number;
@@ -72,6 +74,7 @@ function parseSummary(json: unknown): ProjectGithubState {
     id: String(c.id),
     repositoryFullName: String(c.repositoryFullName),
     hasGithubRestPat: Boolean(c.hasGithubRestPat),
+    githubPatReSaveSuggested: Boolean(c.githubPatReSaveSuggested),
     lastEventAt:
       typeof c.lastEventAt === 'string'
         ? c.lastEventAt
