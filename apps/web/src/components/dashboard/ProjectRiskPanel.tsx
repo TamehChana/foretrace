@@ -324,7 +324,7 @@ export function ProjectRiskPanel(props: {
     const snapshotComputedAt =
       typeof d?.snapshotComputedAt === 'string' ? d.snapshotComputedAt : '';
     if (!analysis) {
-      const msg = 'Unexpected response from impact analysis';
+      const msg = 'Unexpected response from Trace Analyst';
       setImpactState({ status: 'error', message: msg });
       showToast(msg, 'error');
       return;
@@ -336,7 +336,7 @@ export function ProjectRiskPanel(props: {
       snapshotComputedAt,
     });
     showToast(
-      usedOpenAi ? 'Impact analysis ready (OpenAI)' : 'Impact analysis ready',
+      usedOpenAi ? 'Trace Analyst ready (OpenAI)' : 'Trace Analyst ready',
       'success',
     );
     onEvaluated?.();
@@ -387,15 +387,15 @@ export function ProjectRiskPanel(props: {
             Rule-based score from the 24h signal rollup (tasks, terminal, GitHub
             churn), plus an optional narrative (heuristic or OpenAI when
             configured). Evaluating refreshes signals first, then persists this
-            row. Use <span className="font-semibold">Impact analysis</span> for a
-            separate holistic read (tasks + incidents + rollup); it refreshes the
+            row. Use <span className="font-semibold">Trace Analyst</span> for a
+            separate narrative read (tasks + incidents + rollup); it refreshes the
             snapshot but does not persist — inference only, not model training.
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
           <button
             type="button"
-            title="Refresh signals and run an AI-style holistic impact read (OpenAI if configured)"
+            title="Refresh signals and run Trace Analyst (OpenAI if configured)"
             disabled={impactState.status === 'loading'}
             onClick={() => {
               void analyzeImpact();
@@ -403,7 +403,7 @@ export function ProjectRiskPanel(props: {
             className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-950 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-100 dark:hover:bg-violet-900/70"
           >
             <Sparkles size={12} strokeWidth={2} aria-hidden />
-            {impactState.status === 'loading' ? 'Analyzing…' : 'Impact analysis'}
+            {impactState.status === 'loading' ? 'Analyzing…' : 'Trace Analyst'}
           </button>
           {canManage ? (
             <button
@@ -425,7 +425,7 @@ export function ProjectRiskPanel(props: {
         <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2 dark:border-violet-900/60 dark:bg-violet-950/30">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h4 className="text-[11px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-200">
-              Project impact read
+              Trace Analyst read
             </h4>
             <span className="text-[10px] text-violet-700/90 dark:text-violet-300/90">
               {impactState.usedOpenAi ? 'OpenAI' : 'Heuristic'} · snapshot{' '}
@@ -437,7 +437,7 @@ export function ProjectRiskPanel(props: {
           </pre>
           <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-violet-200/80 pt-2 dark:border-violet-800/60">
             <span className="text-[10px] text-violet-800 dark:text-violet-200">
-              Was this impact read helpful?
+              Was this Trace Analyst read helpful?
             </span>
             <button
               type="button"
@@ -519,7 +519,7 @@ export function ProjectRiskPanel(props: {
           state.row.aiSummary.trim().length > 0 ? (
             <div className="rounded-lg border border-zinc-200 bg-zinc-50/90 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900/70">
               <h4 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-                PM insight
+                Trace Analyst — risk
               </h4>
               <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-sans text-[12px] leading-relaxed text-zinc-800 dark:text-zinc-200">
                 {state.row.aiSummary.trim()}

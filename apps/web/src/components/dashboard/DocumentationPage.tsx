@@ -586,6 +586,10 @@ export FORETRACE_PROJECT_ID="paste-project-uuid"
               computes a level and reasons, and saves a row in <strong>Evaluation history</strong>.
             </li>
             <li>
+              Optional: click <strong>Trace Analyst</strong> in the same panel for a narrative read across tasks, terminal incidents, and the signal rollup. That
+              run refreshes the snapshot but does not add a new evaluation row.
+            </li>
+            <li>
               Run <strong>Evaluate</strong> again whenever you want an updated score (for example after a big merge day).
             </li>
           </ol>

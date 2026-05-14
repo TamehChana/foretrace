@@ -19,7 +19,7 @@ export class ProjectInsightsController {
   constructor(private readonly impact: ProjectImpactAnalyzerService) {}
 
   /**
-   * Refreshes the signal snapshot, then returns a holistic narrative (OpenAI when
+   * Refreshes the signal snapshot, then returns a Trace Analyst narrative (OpenAI when
    * configured, otherwise a deterministic summary). Does not persist.
    */
   @Post('analyze')

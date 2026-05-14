@@ -2,12 +2,14 @@
 
 ## Current behavior
 
+**Trace Analyst** is the product name for Foretrace's on-demand narratives: delivery-risk summaries and the wider project read from the analyze endpoint.
+
 - Each risk evaluation can store an **`aiSummary`** (plain text) on the latest row and on each **history run**.
 - **`RiskInsightService`** builds that text in this order:
   1. If **`OPENAI_API_KEY`** is set, call OpenAI Chat Completions (`OPENAI_RISK_MODEL`, default `gpt-4o-mini`) with structured context (project name, level, score, reason rows).
   2. Otherwise (or if the API fails), use a **deterministic heuristic** from the same reason rows so PMs always see something readable.
 
-- **`POST …/projects/:projectId/insights/analyze`** (Delivery risk panel → **Impact analysis**) calls **`ProjectImpactAnalyzerService`**: it refreshes the signal snapshot, attaches recent tasks and redacted terminal incident excerpts plus `scheduleSummary`, then either calls OpenAI (same `OPENAI_API_KEY`; model from `OPENAI_IMPACT_MODEL` or `OPENAI_RISK_MODEL`) or returns a **longer heuristic** text. The result is **not persisted** (on-demand inference only).
+- **`POST …/projects/:projectId/insights/analyze`** (Delivery risk panel → **Trace Analyst** button) calls **`ProjectImpactAnalyzerService`**: it refreshes the signal snapshot, attaches recent tasks and redacted terminal incident excerpts plus `scheduleSummary`, then either calls OpenAI (same `OPENAI_API_KEY`; model from `OPENAI_IMPACT_MODEL` or `OPENAI_RISK_MODEL`) or returns a **longer heuristic** text. The result is **not persisted** (on-demand inference only).
 
 - **`POST …/projects/:projectId/insight-feedback`** stores **thumbs** (`RISK_SUMMARY` vs `PROJECT_IMPACT_ANALYSIS`, `helpful` boolean) for future evaluation of narratives — not used for live scoring yet.
 

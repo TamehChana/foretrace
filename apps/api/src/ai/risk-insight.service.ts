@@ -106,7 +106,7 @@ export class RiskInsightService {
     const lines = [
       `VERDICT: ${verdict}`,
       '',
-      `Delivery risk is ${ctx.level} (score ${ctx.score}/100) for “${ctx.projectName}”.`,
+      `Trace Analyst — delivery risk is ${ctx.level} (score ${ctx.score}/100) for “${ctx.projectName}”.`,
       '',
       'Signals considered:',
       bullets,
@@ -165,7 +165,7 @@ export class RiskInsightService {
     }
     const model = this.openAiModel();
     const system = [
-      'You are a senior software delivery lead.',
+      "You are Trace Analyst, Foretrace's delivery copilot.",
       'You receive JSON: rule-based risk (level, score, reasons), `scheduleSummary` (deadline-focused task counts from the latest snapshot), and full `signalEvidence` (tasks, GitHub rollup, terminal aggregates, task-linked terminal rows, per-user CLI token mint activity).',
       'Always explicitly address schedule / landing feasibility using `scheduleSummary` when any of overdueCount, dueWithin3DaysCount, dueSoonLowProgressCount, or dueWithin7DaysCount is greater than zero (say whether on-time delivery looks realistic and what would change that).',
       'Do not invent facts not supported by the JSON. Do not mention secrets or tokens.',

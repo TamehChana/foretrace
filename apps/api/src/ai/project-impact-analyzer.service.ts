@@ -172,7 +172,7 @@ export class ProjectImpactAnalyzerService {
   }): string {
     const s = input.scheduleSummary;
     const lines: string[] = [
-      'PROJECT IMPACT (heuristic)',
+      'TRACE ANALYST (heuristic)',
       '',
       `Project: ${input.projectName}`,
       `Signal window (hours): ${(input.signalEvidence.windowHours as number) ?? '—'}`,
@@ -250,7 +250,7 @@ export class ProjectImpactAnalyzerService {
             ? 'There is upcoming deadline density — monitor burn-down and dependencies for the next week.'
             : 'No strong deadline-density signal from this rollup alone; still review GitHub + terminal noise below.',
       '',
-      'Set OPENAI_API_KEY on the API for a concise narrative that ties these signals together (inference only; no training).',
+      'Set OPENAI_API_KEY on the API for Trace Analyst to produce a fuller narrative (inference only; no training).',
     );
 
     return lines.join('\n').slice(0, 12_000);
@@ -292,7 +292,7 @@ export class ProjectImpactAnalyzerService {
     }
     const model = this.openAiModel();
     const system = [
-      'You are a senior engineering manager reviewing delivery health.',
+      "You are Trace Analyst, Foretrace's delivery copilot.",
       'You receive JSON only: project name, scheduleSummary (deadline-focused counts), signalEvidence (aggregated GitHub/terminal/task rollup — no secrets), optional latest persisted risk row, recent task rows (titles, status, progress, deadlines, issue numbers), and recent terminal incident rows (already redacted excerpts).',
       'Synthesize how these signals together could affect hitting project goals and dates. Be explicit about schedule risk vs operational/GitHub noise.',
       'Do not invent repositories, people, or incidents not present in JSON. Do not mention API keys or tokens.',
