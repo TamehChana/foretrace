@@ -6,7 +6,7 @@ import {
 
 describe('github-webhook-issue-refs', () => {
   describe('extractPullRequestNumber', () => {
-    it('returns null for non pull_request events', () => {
+    it('returns null for events without PR linkage', () => {
       expect(
         extractPullRequestNumber(
           { pull_request: { number: 12 } },
@@ -33,13 +33,39 @@ describe('github-webhook-issue-refs', () => {
       ).toBe(42);
     });
 
-    it('returns null for non-numeric number', () => {
+    it('returns null for non-numeric pull_request.number', () => {
       expect(
         extractPullRequestNumber(
           { pull_request: { number: '7' } },
           'pull_request',
         ),
       ).toBeNull();
+    });
+
+    it('returns first PR number from workflow_run.pull_requests', () => {
+      expect(
+        extractPullRequestNumber(
+          {
+            workflow_run: {
+              pull_requests: [{ number: 8, title: 'x', body: null }],
+            },
+          },
+          'workflow_run',
+        ),
+      ).toBe(8);
+    });
+
+    it('returns first PR number from check_run.pull_requests', () => {
+      expect(
+        extractPullRequestNumber(
+          {
+            check_run: {
+              pull_requests: [{ number: 3, title: 't', body: null }],
+            },
+          },
+          'check_run',
+        ),
+      ).toBe(3);
     });
   });
 
@@ -93,6 +119,26 @@ describe('github-webhook-issue-refs', () => {
         'push',
       );
       expect(nums.sort((a, b) => a - b)).toEqual([44, 45]);
+    });
+
+    it('collects issue refs from workflow_run PR titles and merge commit body', () => {
+      const nums = collectIssueReferencesFromGithubWebhook(
+        {
+          workflow_run: {
+            head_commit: {
+              message:
+                'Merge pull request #1 from org/fix\n\nCloses #77 and relates to #78',
+            },
+            display_title: 'Merge pull request #1 from org/fix',
+            pull_requests: [
+              { number: 1, title: 'Fix widget (#88)', body: 'See also #89' },
+            ],
+          },
+        },
+        'workflow_run',
+      );
+      const sorted = [...nums].sort((a, b) => a - b);
+      expect(sorted).toEqual([77, 78, 88, 89]);
     });
   });
 });

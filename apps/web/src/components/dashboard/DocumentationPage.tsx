@@ -413,7 +413,10 @@ export function DocumentationPage() {
             <strong className="text-zinc-800 dark:text-zinc-200">Quick checks when activity looks empty:</strong> in GitHub open the webhook’s{' '}
             <strong>Recent Deliveries</strong>—each row should be <strong>200</strong> (if not, fix URL, secret, or content type). Enable at least{' '}
             <strong>Push</strong>, <strong>Pull requests</strong>, and <strong>Issues</strong> (required for <strong>close / reopen / complete</strong> issue
-            events) so Foretrace receives them. Confirm the Foretrace task’s <strong>GitHub issue #</strong> equals the real issue number in{' '}
+            events) so Foretrace receives them. <strong>GitHub Actions</strong> deliveries (<strong>workflow run</strong>, <strong>workflow job</strong>,{' '}
+            <strong>check suite</strong>, <strong>check run</strong>, <strong>deployment</strong>) are supported too: Foretrace scans commit messages, run titles,
+            and linked PR titles/bodies for <Code>#42</Code>-style references (same idea as <strong>push</strong> commits)—so CI can update a task when the PR or
+            commit text references the issue. Confirm the Foretrace task’s <strong>GitHub issue #</strong> equals the real issue number in{' '}
             <strong>that same repo</strong> you connected. To save an optional classic or fine-grained <strong>PAT</strong> in Foretrace, the API host must have{' '}
             <Code>FORETRACE_APP_SECRET</Code> set (see your deploy docs), then use <strong>Save PAT</strong> once and refresh <strong>Signals</strong>.{' '}
             <strong>PR combined status</strong> needs a valid <strong>PR #</strong> and a PAT that can read pulls; “unknown” often means no PR yet, wrong PR number,

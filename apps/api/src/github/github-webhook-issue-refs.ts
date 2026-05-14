@@ -13,6 +13,55 @@ function gatherHashesFromText(text: string, into: Set<number>): void {
   }
 }
 
+function gatherFromPullRequestLike(pr: unknown, into: Set<number>): void {
+  if (!pr || typeof pr !== 'object') {
+    return;
+  }
+  const p = pr as Record<string, unknown>;
+  for (const key of ['title', 'body'] as const) {
+    const v = p[key];
+    if (typeof v === 'string') {
+      gatherHashesFromText(v, into);
+    }
+  }
+}
+
+function gatherFromPullRequestsArray(prs: unknown, into: Set<number>): void {
+  if (!Array.isArray(prs)) {
+    return;
+  }
+  for (const pr of prs) {
+    gatherFromPullRequestLike(pr, into);
+  }
+}
+
+function gatherFromWorkflowRunLike(run: unknown, into: Set<number>): void {
+  if (!run || typeof run !== 'object') {
+    return;
+  }
+  const wr = run as Record<string, unknown>;
+  const head = wr.head_commit;
+  if (head && typeof head === 'object') {
+    const msg = (head as { message?: unknown }).message;
+    if (typeof msg === 'string') {
+      const lines = msg.split('\n');
+      let body = msg;
+      if (/^Merge pull request #\d+/i.test(lines[0] ?? '')) {
+        body = lines.slice(1).join('\n').trimStart();
+      }
+      gatherHashesFromText(body, into);
+    }
+  }
+  const displayTitle = wr.display_title;
+  if (
+    typeof displayTitle === 'string' &&
+    !/^Merge pull request #\d+/i.test(displayTitle.trim())
+  ) {
+    gatherHashesFromText(displayTitle, into);
+  }
+  gatherFromPullRequestsArray(wr.pull_requests, into);
+}
+
 export function collectIssueReferencesFromGithubWebhook(
   payload: unknown,
   eventType: string,
@@ -81,30 +130,117 @@ export function collectIssueReferencesFromGithubWebhook(
         gatherHashesFromText(cb, ids);
       }
     }
+  } else if (eventType === 'workflow_run') {
+    gatherFromWorkflowRunLike(body.workflow_run, ids);
+  } else if (eventType === 'workflow_job') {
+    if (body.workflow_run) {
+      gatherFromWorkflowRunLike(body.workflow_run, ids);
+    }
+    const job = body.workflow_job;
+    if (job && typeof job === 'object') {
+      const display = (job as { display_title?: unknown }).display_title;
+      if (
+        typeof display === 'string' &&
+        !/^Merge pull request #\d+/i.test(display.trim())
+      ) {
+        gatherHashesFromText(display, ids);
+      }
+    }
+  } else if (eventType === 'check_suite') {
+    gatherFromWorkflowRunLike(body.check_suite, ids);
+  } else if (eventType === 'check_run') {
+    const cr = body.check_run;
+    if (cr && typeof cr === 'object') {
+      gatherFromPullRequestsArray(
+        (cr as { pull_requests?: unknown }).pull_requests,
+        ids,
+      );
+    }
+  } else if (eventType === 'deployment' || eventType === 'deployment_status') {
+    const dep =
+      eventType === 'deployment_status'
+        ? (() => {
+            const ds = body.deployment_status;
+            if (ds && typeof ds === 'object') {
+              return (ds as { deployment?: unknown }).deployment;
+            }
+            return undefined;
+          })()
+        : body.deployment;
+    if (dep && typeof dep === 'object') {
+      const d = dep as Record<string, unknown>;
+      for (const key of ['description', 'environment'] as const) {
+        const v = d[key];
+        if (typeof v === 'string') {
+          gatherHashesFromText(v, ids);
+        }
+      }
+    }
   }
 
   return [...ids];
 }
 
-/** Pull request number from `pull_request` webhook payloads. */
+/** Pull request number from webhook payloads (PR events and CI payloads that list `pull_requests`). */
 export function extractPullRequestNumber(
   payload: unknown,
   eventType: string,
 ): number | null {
-  if (eventType !== 'pull_request') {
-    return null;
-  }
   if (!payload || typeof payload !== 'object') {
     return null;
   }
-  const pr = (payload as Record<string, unknown>).pull_request;
-  if (!pr || typeof pr !== 'object') {
+  const body = payload as Record<string, unknown>;
+
+  const firstPullNumberFrom = (obj: unknown): number | null => {
+    if (!obj || typeof obj !== 'object') {
+      return null;
+    }
+    const prs = (obj as { pull_requests?: unknown }).pull_requests;
+    if (!Array.isArray(prs) || prs.length === 0) {
+      return null;
+    }
+    const pr = prs[0];
+    if (!pr || typeof pr !== 'object') {
+      return null;
+    }
+    const n = (pr as { number?: unknown }).number;
+    if (typeof n === 'number' && Number.isFinite(n) && n > 0) {
+      return Math.trunc(n);
+    }
+    if (typeof n === 'string') {
+      const parsed = parseInt(n.trim(), 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+    return null;
+  };
+
+  if (eventType === 'pull_request') {
+    const pr = body.pull_request;
+    if (!pr || typeof pr !== 'object') {
+      return null;
+    }
+    const n = (pr as { number?: unknown }).number;
+    if (typeof n === 'number' && Number.isFinite(n) && n > 0) {
+      return Math.trunc(n);
+    }
     return null;
   }
-  const n = (pr as { number?: unknown }).number;
-  if (typeof n === 'number' && Number.isFinite(n) && n > 0) {
-    return Math.trunc(n);
+
+  if (eventType === 'workflow_run') {
+    return firstPullNumberFrom(body.workflow_run);
   }
+  if (eventType === 'workflow_job') {
+    return firstPullNumberFrom(body.workflow_run);
+  }
+  if (eventType === 'check_suite') {
+    return firstPullNumberFrom(body.check_suite);
+  }
+  if (eventType === 'check_run') {
+    return firstPullNumberFrom(body.check_run);
+  }
+
   return null;
 }
 
