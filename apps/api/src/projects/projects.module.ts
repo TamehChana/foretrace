@@ -9,6 +9,7 @@ import { ProjectUuidParamGuard } from '../common/project-uuid-param.guard';
 import { TaskUuidParamGuard } from '../common/task-uuid-param.guard';
 import { OrganizationUuidParamGuard } from '../organizations/organization-uuid-param.guard';
 import { ProjectImpactAnalyzerService } from '../ai/project-impact-analyzer.service';
+import { RiskMlService } from '../ml/risk-ml.service';
 import { InsightFeedbackController } from './insight-feedback.controller';
 import { InsightFeedbackService } from './insight-feedback.service';
 import { OrganizationInsightFeedbackController } from './organization-insight-feedback.controller';
@@ -39,6 +40,7 @@ import { TasksService } from './tasks.service';
     GithubSignalRestEnricher,
     ProjectSignalsService,
     ProjectRiskService,
+    RiskMlService,
     ProjectImpactAnalyzerService,
     InsightFeedbackService,
     TasksService,

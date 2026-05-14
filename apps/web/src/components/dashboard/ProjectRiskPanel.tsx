@@ -17,6 +17,7 @@ type RiskRow = {
   score: number;
   reasons: unknown;
   aiSummary?: string | null;
+  mlPrediction?: unknown;
   evaluatedAt: string;
 };
 
@@ -26,6 +27,7 @@ type RiskHistoryRow = {
   score: number;
   reasons: unknown;
   aiSummary?: string | null;
+  mlPrediction?: unknown;
   evaluatedAt: string;
 };
 
@@ -36,6 +38,31 @@ function isRiskLevel(v: unknown): v is RiskLevel {
     v === 'HIGH' ||
     v === 'CRITICAL'
   );
+}
+
+type MlRiskPrediction = {
+  modelVersion: string;
+  predictedLevel: RiskLevel;
+  deadlinePressureIndex: number;
+};
+
+function parseMlRiskPrediction(raw: unknown): MlRiskPrediction | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const o = raw as Record<string, unknown>;
+  const modelVersion =
+    typeof o.modelVersion === 'string' ? o.modelVersion : null;
+  const predictedLevel = o.predictedLevel;
+  const idx = o.deadlinePressureIndex;
+  if (!modelVersion || !isRiskLevel(predictedLevel) || typeof idx !== 'number' || !Number.isFinite(idx)) {
+    return null;
+  }
+  return {
+    modelVersion,
+    predictedLevel,
+    deadlinePressureIndex: Math.max(0, Math.min(1, idx)),
+  };
 }
 
 function parseReasons(raw: unknown): RiskReason[] {
@@ -114,6 +141,7 @@ function EvaluationHistorySection(props: {
                 <th className="px-2 py-1 font-medium">Score</th>
                 <th className="px-2 py-1 font-medium">Top reason</th>
                 <th className="px-2 py-1 font-medium">Insight</th>
+                <th className="px-2 py-1 font-medium">ML</th>
               </tr>
             </thead>
             <tbody>
@@ -123,6 +151,7 @@ function EvaluationHistorySection(props: {
                   typeof h.aiSummary === 'string' && h.aiSummary.trim().length > 0
                     ? h.aiSummary.trim()
                     : null;
+                const ml = parseMlRiskPrediction(h.mlPrediction);
                 return (
                   <tr
                     key={h.id}
@@ -157,6 +186,18 @@ function EvaluationHistorySection(props: {
                           ? `${insight.slice(0, 48)}…`
                           : insight
                         : '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-1 text-zinc-600 dark:text-zinc-400">
+                      {ml ? (
+                        <span title={`${ml.modelVersion} · slip index`}>
+                          {ml.predictedLevel}{' '}
+                          <span className="tabular-nums text-zinc-500">
+                            ({Math.round(ml.deadlinePressureIndex * 100)}%)
+                          </span>
+                        </span>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                   </tr>
                 );
@@ -264,6 +305,7 @@ export function ProjectRiskPanel(props: {
         score,
         reasons: o.reasons,
         aiSummary: aiSummary ?? undefined,
+        mlPrediction: o.mlPrediction,
         evaluatedAt,
       });
     }
@@ -504,6 +546,36 @@ export function ProjectRiskPanel(props: {
               {formatWhen(state.row.evaluatedAt)}
             </span>
           </div>
+          {(() => {
+            const ml = parseMlRiskPrediction(state.row.mlPrediction);
+            if (!ml) {
+              return null;
+            }
+            return (
+              <div className="rounded-lg border border-indigo-200/80 bg-indigo-50/50 px-3 py-2 dark:border-indigo-900/50 dark:bg-indigo-950/30">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-200">
+                  ML cross-check
+                </h4>
+                <p className="mt-1 text-[12px] text-indigo-950 dark:text-indigo-100">
+                  Predicted level{' '}
+                  <span className="font-semibold">{ml.predictedLevel}</span>
+                  {' · '}
+                  Deadline pressure index{' '}
+                  <span className="font-semibold tabular-nums">
+                    {(ml.deadlinePressureIndex * 100).toFixed(0)}%
+                  </span>
+                  <span className="text-[10px] font-normal text-indigo-800/80 dark:text-indigo-200/80">
+                    {' '}
+                    ({ml.modelVersion})
+                  </span>
+                </p>
+                <p className="mt-1 text-[10px] leading-snug text-indigo-900/85 dark:text-indigo-200/80">
+                  Rule-based score and level remain authoritative for alerts; ML is an additional signal (see
+                  docs/ML-RISK.md). Enable with FORETRACE_ML_RISK_ENABLED=1 on the API.
+                </p>
+              </div>
+            );
+          })()}
           <ul className="space-y-2 text-[12px] text-zinc-700 dark:text-zinc-300">
             {parseReasons(state.row.reasons).map((r) => (
               <li key={r.code} className="rounded-lg bg-zinc-50 px-2 py-1.5 dark:bg-zinc-900/80">

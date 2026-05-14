@@ -343,6 +343,8 @@ model ProjectRiskEvaluation {
   reasons        Json
   /// Optional human-facing narrative (heuristic and/or LLM). See `docs/AI.md`.
   aiSummary      String?   @db.Text
+  /// Optional ML head output (risk level softmax + deadline pressure index). See `docs/ML-RISK.md`.
+  mlPrediction   Json?
   evaluatedAt    DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -361,6 +363,7 @@ model RiskEvaluationRun {
   score          Int
   reasons        Json
   aiSummary      String?   @db.Text
+  mlPrediction   Json?
   evaluatedAt    DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

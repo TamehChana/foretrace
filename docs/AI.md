@@ -9,6 +9,8 @@
   1. If **`OPENAI_API_KEY`** is set, call OpenAI Chat Completions (`OPENAI_RISK_MODEL`, default `gpt-4o-mini`) with structured context (project name, level, score, reason rows, **`signalEvidence`** from the same snapshot used for scoring).
   2. Otherwise (or if the API fails), use a **deterministic heuristic** from the same inputs so PMs always see something readable.
 - Trace Analyst outputs use **fixed section headings** (e.g. VERDICT, EXECUTIVE READ, EVIDENCE, SCHEDULE, NEXT ACTIONS, CONFIDENCE on risk; parallel sections on the on-demand read) so the UI stays scannable.
+
+- **Risk ML (v1):** optional **multinomial + binary logistic** heads over normalized snapshot features; see [`docs/ML-RISK.md`](./ML-RISK.md).
 - **`POST …/projects/:projectId/insights/analyze`** (Delivery risk panel → **Trace Analyst** button) calls **`ProjectImpactAnalyzerService`**: it refreshes the signal snapshot, attaches recent tasks and redacted terminal incident excerpts plus `scheduleSummary`, then either calls OpenAI (same `OPENAI_API_KEY`; model from `OPENAI_IMPACT_MODEL` or `OPENAI_RISK_MODEL`) or returns a **longer heuristic** text. The result is **not persisted** (on-demand inference only).
 
 - **`POST …/projects/:projectId/insight-feedback`** stores **thumbs** (`RISK_SUMMARY` vs `PROJECT_IMPACT_ANALYSIS`, optional `comment`, `helpful` boolean) for future evaluation of narratives — not used for live scoring yet.
