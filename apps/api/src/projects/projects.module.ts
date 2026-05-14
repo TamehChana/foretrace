@@ -8,6 +8,8 @@ import { AuthModule } from '../auth/auth.module';
 import { ProjectUuidParamGuard } from '../common/project-uuid-param.guard';
 import { TaskUuidParamGuard } from '../common/task-uuid-param.guard';
 import { OrganizationUuidParamGuard } from '../organizations/organization-uuid-param.guard';
+import { ProjectImpactAnalyzerService } from '../ai/project-impact-analyzer.service';
+import { ProjectInsightsController } from './project-insights.controller';
 import { ProjectRiskController } from './project-risk.controller';
 import { ProjectRiskService } from './project-risk.service';
 import { GithubSignalRestEnricher } from './github-signal-rest-enricher';
@@ -25,12 +27,14 @@ import { TasksService } from './tasks.service';
     TasksController,
     ProjectSignalsController,
     ProjectRiskController,
+    ProjectInsightsController,
   ],
   providers: [
     ProjectsService,
     GithubSignalRestEnricher,
     ProjectSignalsService,
     ProjectRiskService,
+    ProjectImpactAnalyzerService,
     TasksService,
     OrganizationUuidParamGuard,
     ProjectUuidParamGuard,

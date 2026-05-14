@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, ShieldAlert } from 'lucide-react';
+import { RefreshCw, ShieldAlert, Sparkles } from 'lucide-react';
 import { formatApiErrorResponse } from '../../api-error-message';
 import { apiFetch } from '../../api-fetch';
 import { useToast } from '../../providers/ToastProvider';
@@ -188,6 +188,17 @@ export function ProjectRiskPanel(props: {
   const [historyState, setHistoryState] = useState<HistoryPanelState>({
     status: 'idle',
   });
+  const [impactState, setImpactState] = useState<
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | {
+        status: 'ok';
+        analysis: string;
+        usedOpenAi: boolean;
+        snapshotComputedAt: string;
+      }
+    | { status: 'error'; message: string }
+  >({ status: 'idle' });
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
@@ -261,6 +272,10 @@ export function ProjectRiskPanel(props: {
     void loadHistory();
   }, [load, loadHistory, refreshKey]);
 
+  useEffect(() => {
+    setImpactState({ status: 'idle' });
+  }, [organizationId, projectId, refreshKey]);
+
   const evaluate = useCallback(async () => {
     const res = await apiFetch(
       `/organizations/${organizationId}/projects/${projectId}/risk/evaluate`,
@@ -277,6 +292,53 @@ export function ProjectRiskPanel(props: {
     await loadHistory();
   }, [organizationId, projectId, load, loadHistory, showToast, onEvaluated]);
 
+  const analyzeImpact = useCallback(async () => {
+    setImpactState({ status: 'loading' });
+    const res = await apiFetch(
+      `/organizations/${organizationId}/projects/${projectId}/insights/analyze`,
+      { method: 'POST' },
+    );
+    const raw: unknown = await res.json().catch(() => null);
+    if (!res.ok) {
+      const msg = formatApiErrorResponse(raw, res.status);
+      setImpactState({ status: 'error', message: msg });
+      showToast(msg, 'error');
+      return;
+    }
+    const body = raw as {
+      data?: {
+        analysis?: unknown;
+        usedOpenAi?: unknown;
+        snapshotComputedAt?: unknown;
+      };
+    };
+    const d = body.data;
+    const analysis =
+      typeof d?.analysis === 'string' && d.analysis.trim().length > 0
+        ? d.analysis.trim()
+        : null;
+    const usedOpenAi = d?.usedOpenAi === true;
+    const snapshotComputedAt =
+      typeof d?.snapshotComputedAt === 'string' ? d.snapshotComputedAt : '';
+    if (!analysis) {
+      const msg = 'Unexpected response from impact analysis';
+      setImpactState({ status: 'error', message: msg });
+      showToast(msg, 'error');
+      return;
+    }
+    setImpactState({
+      status: 'ok',
+      analysis,
+      usedOpenAi,
+      snapshotComputedAt,
+    });
+    showToast(
+      usedOpenAi ? 'Impact analysis ready (OpenAI)' : 'Impact analysis ready',
+      'success',
+    );
+    onEvaluated?.();
+  }, [organizationId, projectId, showToast, onEvaluated]);
+
   return (
     <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-950/60">
       <div className="flex items-start justify-between gap-2">
@@ -289,23 +351,60 @@ export function ProjectRiskPanel(props: {
             Rule-based score from the 24h signal rollup (tasks, terminal, GitHub
             churn), plus an optional narrative (heuristic or OpenAI when
             configured). Evaluating refreshes signals first, then persists this
-            row.
+            row. Use <span className="font-semibold">Impact analysis</span> for a
+            separate holistic read (tasks + incidents + rollup); it refreshes the
+            snapshot but does not persist — inference only, not model training.
           </p>
         </div>
-        {canManage ? (
+        <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
           <button
             type="button"
-            title="Recompute risk from latest signals"
+            title="Refresh signals and run an AI-style holistic impact read (OpenAI if configured)"
+            disabled={impactState.status === 'loading'}
             onClick={() => {
-              void evaluate();
+              void analyzeImpact();
             }}
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-950 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-100 dark:hover:bg-violet-900/70"
           >
-            <RefreshCw size={12} strokeWidth={2} aria-hidden />
-            Evaluate
+            <Sparkles size={12} strokeWidth={2} aria-hidden />
+            {impactState.status === 'loading' ? 'Analyzing…' : 'Impact analysis'}
           </button>
-        ) : null}
+          {canManage ? (
+            <button
+              type="button"
+              title="Recompute risk from latest signals"
+              onClick={() => {
+                void evaluate();
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              <RefreshCw size={12} strokeWidth={2} aria-hidden />
+              Evaluate
+            </button>
+          ) : null}
+        </div>
       </div>
+
+      {impactState.status === 'ok' ? (
+        <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2 dark:border-violet-900/60 dark:bg-violet-950/30">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-200">
+              Project impact read
+            </h4>
+            <span className="text-[10px] text-violet-700/90 dark:text-violet-300/90">
+              {impactState.usedOpenAi ? 'OpenAI' : 'Heuristic'} · snapshot{' '}
+              {formatWhen(impactState.snapshotComputedAt)}
+            </span>
+          </div>
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans text-[12px] leading-relaxed text-violet-950 dark:text-violet-100">
+            {impactState.analysis}
+          </pre>
+        </div>
+      ) : impactState.status === 'error' ? (
+        <p className="mt-3 text-[12px] text-rose-600 dark:text-rose-400">
+          {impactState.message}
+        </p>
+      ) : null}
 
       {state.status === 'loading' || state.status === 'idle' ? (
         <Skeleton className="mt-3 h-20 w-full" />
