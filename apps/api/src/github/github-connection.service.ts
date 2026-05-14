@@ -64,11 +64,24 @@ export class GithubConnectionService {
     }
     const { githubPatCiphertext: _pat, ...rest } = row;
     const patBlob = typeof _pat === 'string' && _pat.trim().length > 0;
-    const patUsable = patBlob && decryptFromStorage(_pat) !== null;
+    const secretOk = isSecretConfigured();
+    let hasGithubRestPat = false;
+    let githubPatReSaveSuggested = false;
+    let githubPatBlockedNoApiSecret = false;
+    if (patBlob) {
+      if (!secretOk) {
+        githubPatBlockedNoApiSecret = true;
+      } else if (decryptFromStorage(_pat) !== null) {
+        hasGithubRestPat = true;
+      } else {
+        githubPatReSaveSuggested = true;
+      }
+    }
     return {
       ...rest,
-      hasGithubRestPat: patUsable,
-      githubPatReSaveSuggested: patBlob && !patUsable,
+      hasGithubRestPat,
+      githubPatReSaveSuggested,
+      githubPatBlockedNoApiSecret,
     };
   }
 

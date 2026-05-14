@@ -17,6 +17,8 @@ export type GithubConnectionView = {
   hasGithubRestPat: boolean;
   /** Ciphertext exists but decrypt failed (e.g. FORETRACE_APP_SECRET changed). */
   githubPatReSaveSuggested: boolean;
+  /** Ciphertext exists but API has no valid FORETRACE_APP_SECRET (min 16 chars). */
+  githubPatBlockedNoApiSecret: boolean;
   lastEventAt: string | null;
   lastPushAt: string | null;
   openPullRequestCount: number;
@@ -75,6 +77,7 @@ function parseSummary(json: unknown): ProjectGithubState {
     repositoryFullName: String(c.repositoryFullName),
     hasGithubRestPat: Boolean(c.hasGithubRestPat),
     githubPatReSaveSuggested: Boolean(c.githubPatReSaveSuggested),
+    githubPatBlockedNoApiSecret: Boolean(c.githubPatBlockedNoApiSecret),
     lastEventAt:
       typeof c.lastEventAt === 'string'
         ? c.lastEventAt

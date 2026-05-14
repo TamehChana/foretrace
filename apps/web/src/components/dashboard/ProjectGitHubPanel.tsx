@@ -375,7 +375,13 @@ export function ProjectGitHubPanel(props: {
             <span className="font-medium text-zinc-700 dark:text-zinc-300">
               Status:{' '}
             </span>
-            {conn.githubPatReSaveSuggested ? (
+            {conn.githubPatBlockedNoApiSecret ? (
+              <span className="text-amber-700 dark:text-amber-400">
+                A PAT is stored but the API cannot use it: set{' '}
+                <code className="text-[11px]">FORETRACE_APP_SECRET</code> (min 16
+                characters) on the API server, restart, then Save PAT again.
+              </span>
+            ) : conn.githubPatReSaveSuggested ? (
               <span className="text-amber-700 dark:text-amber-400">
                 PAT is stored but the API cannot decrypt it (usually{' '}
                 <code className="text-[11px]">FORETRACE_APP_SECRET</code> changed).
@@ -447,7 +453,9 @@ export function ProjectGitHubPanel(props: {
                   type="button"
                   disabled={
                     patClearBusy ||
-                    (!conn.hasGithubRestPat && !conn.githubPatReSaveSuggested)
+                    (!conn.hasGithubRestPat &&
+                      !conn.githubPatReSaveSuggested &&
+                      !conn.githubPatBlockedNoApiSecret)
                   }
                   className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
                   onClick={() => {

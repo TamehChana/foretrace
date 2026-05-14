@@ -541,6 +541,7 @@ export class TasksService {
           | 'no_github_connection'
           | 'missing_github_pat'
           | 'github_pat_decrypt_failed'
+          | 'foretrace_app_secret_not_configured'
           | 'github_not_found'
           | 'github_forbidden'
           | 'github_bad_response'
@@ -596,6 +597,9 @@ export class TasksService {
     if (!view.ok) {
       if (view.detail === 'missing_pat') {
         return { ok: false, reason: 'missing_github_pat' };
+      }
+      if (view.detail === 'app_secret_unconfigured') {
+        return { ok: false, reason: 'foretrace_app_secret_not_configured' };
       }
       if (view.detail === 'decrypt_failed') {
         return { ok: false, reason: 'github_pat_decrypt_failed' };

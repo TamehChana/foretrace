@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { decryptFromStorage } from '../crypto/app-secret-crypto';
+import { decryptFromStorage, isSecretConfigured } from '../crypto/app-secret-crypto';
 
 export type GithubRestEnrichment = {
   fetchedAt: string;
@@ -292,6 +292,7 @@ export class GithubSignalRestEnricher {
         ok: false;
         detail:
           | 'missing_pat'
+          | 'app_secret_unconfigured'
           | 'decrypt_failed'
           | 'invalid_repo'
           | 'not_found'
@@ -299,10 +300,17 @@ export class GithubSignalRestEnricher {
           | 'bad_response';
       }
   > {
-    if (!githubPatCiphertext || issueNumber < 1) {
+    const trimmedPat =
+      typeof githubPatCiphertext === 'string'
+        ? githubPatCiphertext.trim()
+        : '';
+    if (!trimmedPat || issueNumber < 1) {
       return { ok: false, detail: 'missing_pat' };
     }
-    const token = decryptFromStorage(githubPatCiphertext);
+    if (!isSecretConfigured()) {
+      return { ok: false, detail: 'app_secret_unconfigured' };
+    }
+    const token = decryptFromStorage(trimmedPat);
     if (!token) {
       return { ok: false, detail: 'decrypt_failed' };
     }

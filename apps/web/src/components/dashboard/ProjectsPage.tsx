@@ -716,7 +716,9 @@ export function ProjectsPage() {
           missing_github_pat:
             'No GitHub PAT is stored for this project. Open Project → GitHub, paste a token, and Save PAT (or redeliver an issues/pull_request webhook from GitHub).',
           github_pat_decrypt_failed:
-            'The saved GitHub PAT cannot be decrypted. Your API server’s FORETRACE_APP_SECRET likely changed since the PAT was saved — paste the PAT again under Project → GitHub and Save.',
+            'The PAT was saved with a different API secret than the server uses now. Set FORETRACE_APP_SECRET on the API to the same value used when you saved the token, or paste the PAT again under Project → GitHub and Save.',
+          foretrace_app_secret_not_configured:
+            'The API is missing FORETRACE_APP_SECRET (or it is under 16 characters). Set it on your API host, restart the API, then open Project → GitHub and Save PAT again.',
           github_not_found:
             'GitHub had no issue/PR with that number in this repo. Check Issue #.',
           github_forbidden: 'GitHub rejected the token (scope or access).',
