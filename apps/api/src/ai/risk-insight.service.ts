@@ -30,6 +30,7 @@ export class RiskInsightService {
   /**
    * When a full snapshot exists, pass it as `signalEvidence` (use
    * `compactProjectSignalEvidenceForAi`) so the model can fuse tasks, GitHub, and terminal.
+   * Callers should pass the same payload used for risk scoring so Trace Analyst matches rules.
    */
   async summarize(context: RiskInsightContext): Promise<string> {
     const llm = await this.tryOpenAi(context);
@@ -103,20 +104,36 @@ export class RiskInsightService {
         ? top.map((r) => `• ${r.detail}`).join('\n')
         : ctx.reasons.map((r) => `• ${r.detail}`).join('\n');
     const schedule = this.scheduleFeasibilityLine(ctx);
+    const hasEvidence =
+      ctx.signalEvidence &&
+      typeof ctx.signalEvidence === 'object' &&
+      Object.keys(ctx.signalEvidence as object).length > 0;
+    const confidence =
+      !hasEvidence || (ctx.reasons.length === 1 && ctx.reasons[0]?.code === 'BASELINE')
+        ? 'CONFIDENCE: MEDIUM (rule summary only; limited snapshot context)'
+        : 'CONFIDENCE: HIGH (full signal rollup attached)';
     const lines = [
       `VERDICT: ${verdict}`,
       '',
+      'EXECUTIVE READ',
       `Trace Analyst — delivery risk is ${ctx.level} (score ${ctx.score}/100) for “${ctx.projectName}”.`,
       '',
-      'Signals considered:',
+      'EVIDENCE',
       bullets,
     ];
     if (schedule) {
-      lines.push('', schedule);
+      lines.push('', 'SCHEDULE', schedule);
+    } else {
+      lines.push('', 'SCHEDULE', 'No acute schedule pressure surfaced in snapshot counts for this rollup window.');
     }
     lines.push(
       '',
-      'Next: review overdue and imminent (≤3d) tasks, tasks due soon with low progress, check terminal friction by task and by CLI token owner, and align on GitHub activity if the repo is linked.',
+      'NEXT ACTIONS',
+      '1. Review overdue and imminent (≤3d) tasks and owners.',
+      '2. Inspect tasks with low progress against near deadlines and terminal friction by task.',
+      '3. Align on GitHub activity and branch health if the repo is linked.',
+      '',
+      confidence,
     );
     return lines.join('\n').slice(0, 8000);
   }
@@ -169,9 +186,14 @@ export class RiskInsightService {
       'You receive JSON: rule-based risk (level, score, reasons), `scheduleSummary` (deadline-focused task counts from the latest snapshot), and full `signalEvidence` (tasks, GitHub rollup, terminal aggregates, task-linked terminal rows, per-user CLI token mint activity).',
       'Always explicitly address schedule / landing feasibility using `scheduleSummary` when any of overdueCount, dueWithin3DaysCount, dueSoonLowProgressCount, or dueWithin7DaysCount is greater than zero (say whether on-time delivery looks realistic and what would change that).',
       'Do not invent facts not supported by the JSON. Do not mention secrets or tokens.',
-      'Output plain text (no markdown headings).',
-      'First line MUST be exactly one of: VERDICT: ON_TRACK | VERDICT: WATCH | VERDICT: ELEVATED_FRICTION | VERDICT: AT_RISK',
-      'Then 2–5 short sentences: merge rule reasons with scheduleSummary numbers; cite concrete counts.',
+      'Output plain text only (no markdown # headings). Use the exact section labels below so the UI stays scannable.',
+      'Line 1 MUST be exactly one of: VERDICT: ON_TRACK | VERDICT: WATCH | VERDICT: ELEVATED_FRICTION | VERDICT: AT_RISK',
+      'Then use these sections in order, each title on its own line followed by content:',
+      'EXECUTIVE READ — 1–2 sentences tying verdict to the biggest delivery risk.',
+      'EVIDENCE — 2–4 short lines; merge `reasons` with concrete numbers from `scheduleSummary` and `signalEvidence` (GitHub / terminal) where relevant.',
+      'SCHEDULE — one short paragraph on dates and feasibility (or say "No acute schedule pressure in counts" if counts are all zero).',
+      'NEXT ACTIONS — numbered list 1.–3. of PM moves grounded in the JSON (task deadlines, terminal friction by task, GitHub churn).',
+      'CONFIDENCE — one line: CONFIDENCE: HIGH | CONFIDENCE: MEDIUM | CONFIDENCE: LOW based on how complete `signalEvidence` is (empty or sparse JSON → LOW or MEDIUM).',
     ].join(' ');
     const scheduleSummary = this.buildScheduleSummary(ctx.signalEvidence);
     const user = JSON.stringify({
@@ -194,7 +216,7 @@ export class RiskInsightService {
         body: JSON.stringify({
           model,
           temperature: 0.2,
-          max_tokens: 500,
+          max_tokens: 720,
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: user },

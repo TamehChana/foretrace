@@ -174,10 +174,10 @@ export class ProjectImpactAnalyzerService {
     const lines: string[] = [
       'TRACE ANALYST (heuristic)',
       '',
-      `Project: ${input.projectName}`,
-      `Signal window (hours): ${(input.signalEvidence.windowHours as number) ?? '—'}`,
+      'EXECUTIVE READ',
+      `Project “${input.projectName}” — synthesized from the latest signal snapshot, persisted risk row (if any), recent tasks, and terminal incident excerpts.`,
       '',
-      'Schedule rollup:',
+      'SCHEDULE ROLLUP',
       `• Active tasks: ${s.activeCount ?? 0}`,
       `• Overdue (active): ${s.overdueCount ?? 0}`,
       `• Due within 7 days: ${s.dueWithin7DaysCount ?? 0}`,
@@ -188,13 +188,15 @@ export class ProjectImpactAnalyzerService {
 
     if (input.latestRisk) {
       lines.push(
-        `Latest saved risk evaluation: ${input.latestRisk.level} (score ${input.latestRisk.score}), from ${input.latestRisk.evaluatedAt.toISOString()}.`,
-        '(Run “Evaluate” on the risk panel to refresh this before relying on it.)',
+        'LATEST SAVED RISK',
+        `${input.latestRisk.level} (score ${input.latestRisk.score}), from ${input.latestRisk.evaluatedAt.toISOString()}.`,
+        '(Run “Evaluate” on the risk panel to refresh before relying on it.)',
         '',
       );
     } else {
       lines.push(
-        'No persisted risk row yet — interpret raw signals only, or run Evaluate on the risk panel.',
+        'LATEST SAVED RISK',
+        'None yet — interpret raw signals only, or run Evaluate on the risk panel.',
         '',
       );
     }
@@ -207,7 +209,7 @@ export class ProjectImpactAnalyzerService {
     });
     if (overdueTasks.length > 0) {
       lines.push(
-        'Tasks that look overdue vs “now” (title / status / progress):',
+        'TASKS (overdue vs now)',
         ...overdueTasks.slice(0, 6).map(
           (t) =>
             `• ${t.title} — ${t.status} @ ${t.progress}%${t.githubIssueNumber != null ? ` (issue #${t.githubIssueNumber})` : ''}`,
@@ -217,7 +219,7 @@ export class ProjectImpactAnalyzerService {
     }
 
     if (input.incidentPack.length > 0) {
-      lines.push('Recent terminal incidents (redacted excerpts, newest first):');
+      lines.push('TERMINAL INCIDENTS (redacted excerpts, newest first)');
       for (const i of input.incidentPack.slice(0, 5)) {
         lines.push(
           `• [${i.category}] ${i.fingerprintShort} (×${i.occurrenceCount}) @ ${i.lastSeenAt}`,
@@ -232,23 +234,42 @@ export class ProjectImpactAnalyzerService {
       | undefined;
     if (term && typeof term === 'object') {
       lines.push(
-        'Terminal aggregates (window):',
+        'SIGNAL WINDOW',
+        `Hours: ${(input.signalEvidence.windowHours as number) ?? '—'}`,
+        '',
+        'TERMINAL AGGREGATES (window)',
         `• Incidents touched: ${term.incidentsTouchedInWindow ?? '—'}`,
         `• New fingerprints: ${term.newFingerprintsInWindow ?? '—'}`,
         `• Batches: ${term.batchesInWindow ?? '—'}`,
         '',
       );
+    } else if (
+      typeof input.signalEvidence.windowHours === 'number' &&
+      Number.isFinite(input.signalEvidence.windowHours)
+    ) {
+      lines.push(
+        'SIGNAL WINDOW',
+        `Hours: ${input.signalEvidence.windowHours}`,
+        '',
+      );
     }
 
     lines.push(
-      'Feasibility read:',
+      'FEASIBILITY READ',
       (s.overdueCount ?? 0) > 0 || (s.dueSoonLowProgressCount ?? 0) > 0
         ? 'Delivery date pressure is material: overdue work and/or low progress on near-term deadlines will likely pull focus and can slip the overall plan unless scope or dates move.'
         : (s.dueWithin3DaysCount ?? 0) > 0
           ? 'Several deadlines land very soon — execution risk is elevated even if nothing is overdue yet.'
           : (s.dueWithin7DaysCount ?? 0) > 0
             ? 'There is upcoming deadline density — monitor burn-down and dependencies for the next week.'
-            : 'No strong deadline-density signal from this rollup alone; still review GitHub + terminal noise below.',
+            : 'No strong deadline-density signal from this rollup alone; still review GitHub + terminal noise above.',
+      '',
+      'NEXT ACTIONS',
+      '1. Confirm owners on overdue and ≤3d tasks.',
+      '2. Pair terminal fingerprints with tasks (CLI task id) where possible.',
+      '3. If GitHub is linked, sanity-check open PR/issue counts vs team capacity.',
+      '',
+      'CONFIDENCE: HIGH (deterministic template from the same JSON the LLM receives).',
       '',
       'Set OPENAI_API_KEY on the API for Trace Analyst to produce a fuller narrative (inference only; no training).',
     );
@@ -296,7 +317,15 @@ export class ProjectImpactAnalyzerService {
       'You receive JSON only: project name, scheduleSummary (deadline-focused counts), signalEvidence (aggregated GitHub/terminal/task rollup — no secrets), optional latest persisted risk row, recent task rows (titles, status, progress, deadlines, issue numbers), and recent terminal incident rows (already redacted excerpts).',
       'Synthesize how these signals together could affect hitting project goals and dates. Be explicit about schedule risk vs operational/GitHub noise.',
       'Do not invent repositories, people, or incidents not present in JSON. Do not mention API keys or tokens.',
-      'Output plain text, no markdown headings. 5–10 short paragraphs or bullet blocks; stay under 2500 words.',
+      'Output plain text only (no markdown # headings). Use these section titles on their own lines, in order:',
+      'EXECUTIVE READ — 2–3 sentences.',
+      'SCHEDULE AND DEADLINES — paragraph using scheduleSummary and overdue-looking tasks.',
+      'COLLABORATION AND GITHUB — paragraph from signalEvidence.github and task issue numbers where relevant.',
+      'TERMINAL AND ENGINEERING FRICTION — paragraph from incidents and terminal aggregates.',
+      'RISK CROSS-CHECK — compare narrative to latestRisk (if present); say if persisted risk aligns or diverges.',
+      'NEXT ACTIONS — numbered 1.–4. PM moves grounded in the JSON.',
+      'CONFIDENCE — one line: CONFIDENCE: HIGH | CONFIDENCE: MEDIUM | CONFIDENCE: LOW (use LOW if incidents or tasks lists are empty and signalEvidence is sparse).',
+      'Stay under 2500 words total.',
     ].join(' ');
     const user = JSON.stringify(input);
     const controller = new AbortController();
@@ -311,7 +340,7 @@ export class ProjectImpactAnalyzerService {
         body: JSON.stringify({
           model,
           temperature: 0.25,
-          max_tokens: 900,
+          max_tokens: 1100,
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: user },

@@ -11,6 +11,7 @@ import { OrganizationUuidParamGuard } from '../organizations/organization-uuid-p
 import { ProjectImpactAnalyzerService } from '../ai/project-impact-analyzer.service';
 import { InsightFeedbackController } from './insight-feedback.controller';
 import { InsightFeedbackService } from './insight-feedback.service';
+import { OrganizationInsightFeedbackController } from './organization-insight-feedback.controller';
 import { ProjectInsightsController } from './project-insights.controller';
 import { ProjectRiskController } from './project-risk.controller';
 import { ProjectRiskService } from './project-risk.service';
@@ -31,6 +32,7 @@ import { TasksService } from './tasks.service';
     ProjectRiskController,
     ProjectInsightsController,
     InsightFeedbackController,
+    OrganizationInsightFeedbackController,
   ],
   providers: [
     ProjectsService,
