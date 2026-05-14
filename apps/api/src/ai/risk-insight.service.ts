@@ -74,7 +74,7 @@ export class RiskInsightService {
       'Signals considered:',
       bullets,
       '',
-      'Next: review overdue and due-soon tasks, check terminal friction by task and by CLI token owner, and align on GitHub activity if the repo is linked.',
+      'Next: review overdue and imminent (≤3d) tasks, tasks due soon with low progress, check terminal friction by task and by CLI token owner, and align on GitHub activity if the repo is linked.',
     ]
       .join('\n')
       .slice(0, 8000);

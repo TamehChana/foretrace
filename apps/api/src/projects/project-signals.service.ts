@@ -45,7 +45,14 @@ export type ProjectSignalPayload = {
   tasks: {
     activeCount: number;
     overdueCount: number;
+    /** Active tasks with deadline in the next 7 days (includes the next 3 days). */
     dueWithin7DaysCount: number;
+    /** Active tasks with deadline in the next 3 days (subset of `dueWithin7DaysCount`). */
+    dueWithin3DaysCount: number;
+    /** Active tasks with deadline between 3 and 7 days from now (for risk bucketing). */
+    dueBetween4And7DaysCount: number;
+    /** Active tasks due within 7 days with progress still below 35%. */
+    dueSoonLowProgressCount: number;
   };
   /** Task-scoped terminal when CLI sends `taskId`. */
   tasksWithTerminalFriction?: ProjectSignalTaskTerminalFriction[];
@@ -108,6 +115,7 @@ export class ProjectSignalsService {
 
       const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
       const now = new Date();
+      const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
       const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
       const connection = await tx.gitHubConnection.findUnique({
@@ -173,6 +181,28 @@ export class ProjectSignalsService {
         where: {
           ...activeTaskWhere,
           deadline: { gte: now, lte: in7Days },
+        },
+      });
+
+      const dueWithin3DaysCount = await tx.task.count({
+        where: {
+          ...activeTaskWhere,
+          deadline: { gte: now, lte: in3Days },
+        },
+      });
+
+      const dueBetween4And7DaysCount = await tx.task.count({
+        where: {
+          ...activeTaskWhere,
+          deadline: { gt: in3Days, lte: in7Days },
+        },
+      });
+
+      const dueSoonLowProgressCount = await tx.task.count({
+        where: {
+          ...activeTaskWhere,
+          deadline: { gte: now, lte: in7Days },
+          progress: { lt: 35 },
         },
       });
 
@@ -385,6 +415,9 @@ export class ProjectSignalsService {
           activeCount,
           overdueCount,
           dueWithin7DaysCount,
+          dueWithin3DaysCount,
+          dueBetween4And7DaysCount,
+          dueSoonLowProgressCount,
         },
         tasksWithTerminalFriction,
         terminalByMintedTokenUser,

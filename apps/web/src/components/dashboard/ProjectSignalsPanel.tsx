@@ -34,6 +34,9 @@ type SignalPayload = {
     activeCount: number;
     overdueCount: number;
     dueWithin7DaysCount: number;
+    dueWithin3DaysCount?: number;
+    dueBetween4And7DaysCount?: number;
+    dueSoonLowProgressCount?: number;
   };
   tasksWithTerminalFriction?: Array<{
     taskId: string;
@@ -300,6 +303,18 @@ export function ProjectSignalsPanel(props: {
             <dt className="text-zinc-500">Due in 7d (active)</dt>
             <dd className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
               {state.snapshot.payload.tasks.dueWithin7DaysCount}
+            </dd>
+          </div>
+          <div className="rounded-lg bg-zinc-50 px-2 py-1.5 dark:bg-zinc-900/80">
+            <dt className="text-zinc-500">Due in ≤3d (active)</dt>
+            <dd className="font-semibold tabular-nums text-amber-800 dark:text-amber-200">
+              {state.snapshot.payload.tasks.dueWithin3DaysCount ?? 0}
+            </dd>
+          </div>
+          <div className="rounded-lg bg-zinc-50 px-2 py-1.5 dark:bg-zinc-900/80">
+            <dt className="text-zinc-500">Due in 7d, &lt;35% progress</dt>
+            <dd className="font-semibold tabular-nums text-amber-900 dark:text-amber-200">
+              {state.snapshot.payload.tasks.dueSoonLowProgressCount ?? 0}
             </dd>
           </div>
           <div className="rounded-lg bg-zinc-50 px-2 py-1.5 dark:bg-zinc-900/80">

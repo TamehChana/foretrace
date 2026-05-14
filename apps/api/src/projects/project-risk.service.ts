@@ -177,12 +177,30 @@ export class ProjectRiskService {
       });
     }
 
-    const dueSoon = payload.tasks.dueWithin7DaysCount;
-    if (dueSoon > 0) {
-      score += Math.min(dueSoon * 4, 20);
+    const imminent = payload.tasks.dueWithin3DaysCount ?? 0;
+    if (imminent > 0) {
+      score += Math.min(imminent * 5, 15);
+      reasons.push({
+        code: 'TASKS_DUE_IMMINENT',
+        detail: `${imminent} active task(s) have a deadline within the next 3 days.`,
+      });
+    }
+
+    const progressGap = payload.tasks.dueSoonLowProgressCount ?? 0;
+    if (progressGap > 0) {
+      score += Math.min(progressGap * 4, 16);
+      reasons.push({
+        code: 'TASK_DEADLINE_PROGRESS_GAP',
+        detail: `${progressGap} active task(s) are due within 7 days and still below 35% progress.`,
+      });
+    }
+
+    const dueSoon4to7 = payload.tasks.dueBetween4And7DaysCount ?? 0;
+    if (dueSoon4to7 > 0) {
+      score += Math.min(dueSoon4to7 * 4, 20);
       reasons.push({
         code: 'TASKS_DUE_SOON',
-        detail: `${dueSoon} active task(s) have a deadline within 7 days.`,
+        detail: `${dueSoon4to7} active task(s) have a deadline between 4 and 7 days from now.`,
       });
     }
 
