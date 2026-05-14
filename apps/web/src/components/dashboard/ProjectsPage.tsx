@@ -730,7 +730,12 @@ export function ProjectsPage() {
         return;
       }
       bumpData();
-      if (d.updated) {
+      if (d.updated && d.note === 'github_state_open') {
+        showToast(
+          'GitHub reports this issue/PR as open — Foretrace set progress to 0% and status to in progress. If GitHub is actually closed, check the linked repo, Issue #, and PAT access.',
+          'success',
+        );
+      } else if (d.updated) {
         showToast('Task updated from GitHub', 'success');
       } else if (d.note === 'already_in_sync') {
         showToast('Already matches GitHub', 'success');
@@ -739,8 +744,6 @@ export function ProjectsPage() {
           'GitHub shows a closed PR that was not merged — progress was left unchanged.',
           'success',
         );
-      } else if (d.note === 'github_state_open') {
-        showToast('GitHub issue is open — set to in progress at 0%.', 'success');
       } else {
         showToast('Checked GitHub', 'success');
       }
