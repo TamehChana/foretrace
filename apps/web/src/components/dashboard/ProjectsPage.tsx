@@ -338,6 +338,7 @@ export function ProjectsPage() {
           ...prev,
           [taskId]: { status: 'ok', rows },
         }));
+        bumpData();
       } catch (err: unknown) {
         setGithubActivityByTask((prev) => ({
           ...prev,
@@ -349,7 +350,7 @@ export function ProjectsPage() {
         }));
       }
     },
-    [organizationId],
+    [organizationId, bumpData],
   );
 
   const fetchGithubCheckStatusForTask = useCallback(
