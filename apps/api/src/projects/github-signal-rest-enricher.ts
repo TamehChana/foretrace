@@ -272,4 +272,89 @@ export class GithubSignalRestEnricher {
       };
     }
   }
+
+  /**
+   * Reads `GET /repos/{owner}/{repo}/issues/{n}` (GitHub exposes PRs here too).
+   * Used to align Foretrace task progress when webhooks were missed.
+   */
+  async fetchRepoIssueOrPullView(
+    repositoryFullName: string,
+    githubPatCiphertext: string | null,
+    issueNumber: number,
+  ): Promise<
+    | {
+        ok: true;
+        state: 'open' | 'closed';
+        isPullRequest: boolean;
+        merged: boolean;
+      }
+    | {
+        ok: false;
+        detail:
+          | 'missing_pat'
+          | 'decrypt_failed'
+          | 'invalid_repo'
+          | 'not_found'
+          | 'forbidden'
+          | 'bad_response';
+      }
+  > {
+    if (!githubPatCiphertext || issueNumber < 1) {
+      return { ok: false, detail: 'missing_pat' };
+    }
+    const token = decryptFromStorage(githubPatCiphertext);
+    if (!token) {
+      return { ok: false, detail: 'decrypt_failed' };
+    }
+    const parts = repositoryFullName.trim().toLowerCase().split('/');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      return { ok: false, detail: 'invalid_repo' };
+    }
+    const [owner, repo] = parts;
+    const headers = {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    try {
+      const issueRes = await fetch(
+        `${GITHUB_API}/repos/${owner}/${repo}/issues/${issueNumber}`,
+        { headers },
+      );
+      if (issueRes.status === 404) {
+        return { ok: false, detail: 'not_found' };
+      }
+      if (!issueRes.ok) {
+        return {
+          ok: false,
+          detail:
+            issueRes.status === 401 || issueRes.status === 403
+              ? 'forbidden'
+              : 'bad_response',
+        };
+      }
+      const json = (await issueRes.json()) as {
+        state?: unknown;
+        pull_request?: { merged_at?: unknown } | null;
+      };
+      const s = json.state;
+      if (s !== 'open' && s !== 'closed') {
+        return { ok: false, detail: 'bad_response' };
+      }
+      const pr = json.pull_request;
+      const isPullRequest =
+        pr !== null && pr !== undefined && typeof pr === 'object';
+      let merged = false;
+      if (isPullRequest) {
+        const m = (pr as { merged_at?: unknown }).merged_at;
+        merged = typeof m === 'string' && m.length > 0;
+      }
+      return { ok: true, state: s, isPullRequest, merged };
+    } catch (e: unknown) {
+      this.log.warn(
+        `GitHub issue view fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return { ok: false, detail: 'bad_response' };
+    }
+  }
 }

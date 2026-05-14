@@ -676,6 +676,79 @@ export function ProjectsPage() {
     }
   };
 
+  const reconcileGithubTaskProgress = async (
+    projectId: string,
+    taskId: string,
+  ) => {
+    if (!organizationId) {
+      return;
+    }
+    setPatchingTaskId(taskId);
+    try {
+      const res = await apiFetch(
+        `/organizations/${organizationId}/projects/${projectId}/tasks/${taskId}/github/reconcile`,
+        { method: 'POST' },
+      );
+      if (!res.ok) {
+        showToast(await readApiErrorMessage(res), 'error');
+        return;
+      }
+      const json = (await res.json()) as { data?: unknown };
+      const d = json.data as
+        | {
+            ok: true;
+            updated: boolean;
+            note?:
+              | null
+              | 'already_in_sync'
+              | 'github_pr_closed_without_merge'
+              | 'github_state_open';
+          }
+        | { ok: false; reason: string }
+        | undefined;
+      if (!d) {
+        showToast('Unexpected response', 'error');
+        return;
+      }
+      if (!d.ok) {
+        const messages: Record<string, string> = {
+          no_github_connection: 'Link a GitHub repository to this project first.',
+          missing_github_pat:
+            'Add a GitHub PAT on the project GitHub connection to read issue state, or redeliver the webhook from GitHub.',
+          github_not_found:
+            'GitHub had no issue/PR with that number in this repo. Check Issue #.',
+          github_forbidden: 'GitHub rejected the token (scope or access).',
+          github_bad_response: 'Could not read issue state from GitHub.',
+          no_github_issue_number: 'Set Issue # on this task before syncing.',
+        };
+        showToast(messages[d.reason] ?? d.reason, 'error');
+        return;
+      }
+      bumpData();
+      if (d.updated) {
+        showToast('Task updated from GitHub', 'success');
+      } else if (d.note === 'already_in_sync') {
+        showToast('Already matches GitHub', 'success');
+      } else if (d.note === 'github_pr_closed_without_merge') {
+        showToast(
+          'GitHub shows a closed PR that was not merged — progress was left unchanged.',
+          'success',
+        );
+      } else if (d.note === 'github_state_open') {
+        showToast('GitHub issue is open — set to in progress at 0%.', 'success');
+      } else {
+        showToast('Checked GitHub', 'success');
+      }
+    } catch (err: unknown) {
+      showToast(
+        err instanceof Error ? err.message : 'Request failed',
+        'error',
+      );
+    } finally {
+      setPatchingTaskId(null);
+    }
+  };
+
   const deleteTask = async (projectId: string, taskId: string) => {
     if (!organizationId) {
       return;
@@ -1683,6 +1756,24 @@ export function ProjectsPage() {
                                                             }}
                                                             className="w-full min-w-0 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
                                                           />
+                                                          {exec &&
+                                                          t.githubIssueNumber !=
+                                                            null ? (
+                                                            <button
+                                                              type="button"
+                                                              disabled={busy}
+                                                              onClick={() => {
+                                                                void reconcileGithubTaskProgress(
+                                                                  p.id,
+                                                                  t.id,
+                                                                );
+                                                              }}
+                                                              className="mt-1 text-left text-[10px] font-semibold text-accent-700 underline hover:text-accent-900 disabled:opacity-50 dark:text-accent-400 dark:hover:text-accent-300"
+                                                            >
+                                                              Sync progress from
+                                                              GitHub
+                                                            </button>
+                                                          ) : null}
                                                         </div>
                                                         <div className="flex min-w-[7rem] flex-col gap-0.5">
                                                           <label

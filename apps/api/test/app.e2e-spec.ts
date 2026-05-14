@@ -111,6 +111,14 @@ describe('AppController (e2e)', () => {
       .expect(401);
   });
 
+  it('POST .../tasks/:taskId/github/reconcile without session returns 401', () => {
+    return request(httpServer())
+      .post(
+        `/organizations/${sampleOrgUuid}/projects/${sampleOrgUuid}/tasks/${sampleOrgUuid}/github/reconcile`,
+      )
+      .expect(401);
+  });
+
   it('GET .../github/activity rejects invalid task UUID with 400', () => {
     return request(httpServer())
       .get(

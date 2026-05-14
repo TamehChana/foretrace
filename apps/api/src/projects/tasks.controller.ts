@@ -136,6 +136,33 @@ export class TasksController {
     return { data };
   }
 
+  @Post(':taskId/github/reconcile')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(
+    OrganizationUuidParamGuard,
+    ProjectUuidParamGuard,
+    TaskUuidParamGuard,
+    AuthenticatedGuard,
+    RolesGuard,
+  )
+  @Roles(Role.ADMIN, Role.PM, Role.DEVELOPER)
+  async githubReconcileIssueProgress(
+    @Param('organizationId') organizationId: string,
+    @Param('projectId') projectId: string,
+    @Param('taskId') taskId: string,
+    @Req() req: Request,
+  ): Promise<{
+    data: Awaited<ReturnType<TasksService['reconcileGithubIssueProgress']>>;
+  }> {
+    const data = await this.tasksService.reconcileGithubIssueProgress(
+      taskId,
+      projectId,
+      organizationId,
+      req.user!.id,
+    );
+    return { data };
+  }
+
   @Get(':taskId')
   @UseGuards(
     OrganizationUuidParamGuard,

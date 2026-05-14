@@ -18,6 +18,7 @@ describe('TasksService', () => {
       const service = new TasksService(
         prisma as never,
         projectsService as never,
+        {} as never,
       );
 
       await expect(
@@ -45,6 +46,7 @@ describe('TasksService', () => {
       const service = new TasksService(
         prisma as never,
         projectsService as never,
+        {} as never,
       );
 
       await expect(

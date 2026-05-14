@@ -513,4 +513,145 @@ export class TasksService {
       note,
     };
   }
+
+  /**
+   * One-shot: read linked GitHub issue/PR via REST and align `progress` / `status`
+   * (for when the issue was already closed before webhooks or linking were set up).
+   */
+  async reconcileGithubIssueProgress(
+    taskId: string,
+    projectId: string,
+    organizationId: string,
+    actorUserId: string,
+  ): Promise<
+    | {
+        ok: true;
+        updated: boolean;
+        progress: number;
+        status: TaskStatus;
+        note:
+          | null
+          | 'already_in_sync'
+          | 'github_pr_closed_without_merge'
+          | 'github_state_open';
+      }
+    | {
+        ok: false;
+        reason:
+          | 'no_github_connection'
+          | 'missing_github_pat'
+          | 'github_not_found'
+          | 'github_forbidden'
+          | 'github_bad_response'
+          | 'no_github_issue_number';
+      }
+  > {
+    const task = await this.getTask(taskId, projectId, organizationId, actorUserId);
+    if (task.githubIssueNumber == null || task.githubIssueNumber < 1) {
+      return { ok: false, reason: 'no_github_issue_number' };
+    }
+
+    const membership = await this.prisma.membership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: actorUserId,
+          organizationId,
+        },
+      },
+      select: { role: true },
+    });
+    if (!membership) {
+      throw new ForbiddenException(
+        'You are not a member of this organization.',
+      );
+    }
+    if (membership.role === Role.DEVELOPER) {
+      const canUpdateStatusOrProgress =
+        task.assigneeId === actorUserId ||
+        (task.assigneeId === null && task.createdById === actorUserId);
+      if (!canUpdateStatusOrProgress) {
+        throw new ForbiddenException(
+          'You may only sync GitHub state for tasks assigned to you, or tasks you created while unassigned.',
+        );
+      }
+    }
+
+    const conn = await this.prisma.gitHubConnection.findUnique({
+      where: { projectId },
+      select: {
+        repositoryFullName: true,
+        githubPatCiphertext: true,
+      },
+    });
+    if (!conn) {
+      return { ok: false, reason: 'no_github_connection' };
+    }
+
+    const view = await this.githubSignalRest.fetchRepoIssueOrPullView(
+      conn.repositoryFullName,
+      conn.githubPatCiphertext,
+      task.githubIssueNumber,
+    );
+    if (!view.ok) {
+      if (view.detail === 'missing_pat' || view.detail === 'decrypt_failed') {
+        return { ok: false, reason: 'missing_github_pat' };
+      }
+      if (view.detail === 'not_found') {
+        return { ok: false, reason: 'github_not_found' };
+      }
+      if (view.detail === 'forbidden') {
+        return { ok: false, reason: 'github_forbidden' };
+      }
+      return { ok: false, reason: 'github_bad_response' };
+    }
+
+    let nextProgress: number;
+    let nextStatus: TaskStatus;
+    let note:
+      | null
+      | 'already_in_sync'
+      | 'github_pr_closed_without_merge'
+      | 'github_state_open' = null;
+
+    if (view.state === 'open') {
+      nextProgress = 0;
+      nextStatus = TaskStatus.IN_PROGRESS;
+      note = 'github_state_open';
+    } else if (view.isPullRequest && !view.merged) {
+      return {
+        ok: true,
+        updated: false,
+        progress: task.progress,
+        status: task.status as TaskStatus,
+        note: 'github_pr_closed_without_merge',
+      };
+    } else {
+      nextProgress = 100;
+      nextStatus = TaskStatus.DONE;
+    }
+
+    if (task.progress === nextProgress && task.status === nextStatus) {
+      return {
+        ok: true,
+        updated: false,
+        progress: task.progress,
+        status: task.status as TaskStatus,
+        note: 'already_in_sync',
+      };
+    }
+
+    const updated = await this.prisma.task.update({
+      where: { id: taskId },
+      data: { progress: nextProgress, status: nextStatus },
+      select: { progress: true, status: true },
+    });
+
+    return {
+      ok: true,
+      updated: true,
+      progress: updated.progress,
+      status: updated.status,
+      note,
+    };
+  }
 }
