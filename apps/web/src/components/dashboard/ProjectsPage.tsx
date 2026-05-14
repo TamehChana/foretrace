@@ -1426,7 +1426,26 @@ export function ProjectsPage() {
                                                           issue #. The name is who
                                                           GitHub reported for that
                                                           event — not proof it was the
-                                                          Foretrace assignee.
+                                                          Foretrace assignee. When
+                                                          Foretrace applies an{' '}
+                                                          <span className="font-mono">
+                                                            issues:closed
+                                                          </span>{' '}
+                                                          or merged-PR event for this
+                                                          Issue #, it sets progress to
+                                                          100% and status Done. If the
+                                                          log shows that but this task
+                                                          did not update, refresh the
+                                                          page, confirm Issue # matches
+                                                          GitHub, or use{' '}
+                                                          <strong>
+                                                            Sync progress from GitHub
+                                                          </strong>{' '}
+                                                          (needs PAT +{' '}
+                                                          <span className="font-mono">
+                                                            FORETRACE_APP_SECRET
+                                                          </span>
+                                                          ).
                                                         </p>
                                                       </div>
                                                     );

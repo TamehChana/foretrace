@@ -280,22 +280,28 @@ export class GithubWebhookService {
       'lastPushAt' | 'openPullRequestCount' | 'openIssueCount'
     > = {};
 
+    const normalizedAction =
+      typeof action === 'string' ? action.trim().toLowerCase() : '';
+
     if (eventType === 'push') {
       empty.lastPushAt = now;
     }
 
-    if (eventType === 'pull_request' && action) {
-      if (action === 'opened' || action === 'reopened') {
+    if (eventType === 'pull_request' && normalizedAction) {
+      if (normalizedAction === 'opened' || normalizedAction === 'reopened') {
         empty.openPullRequestCount = { increment: 1 };
-      } else if (action === 'closed') {
+      } else if (normalizedAction === 'closed') {
         empty.openPullRequestCount = { decrement: 1 };
       }
     }
 
-    if (eventType === 'issues' && action) {
-      if (action === 'opened' || action === 'reopened') {
+    if (eventType === 'issues' && normalizedAction) {
+      if (normalizedAction === 'opened' || normalizedAction === 'reopened') {
         empty.openIssueCount = { increment: 1 };
-      } else if (action === 'closed' || action === 'deleted') {
+      } else if (
+        normalizedAction === 'closed' ||
+        normalizedAction === 'deleted'
+      ) {
         empty.openIssueCount = { decrement: 1 };
       }
     }
