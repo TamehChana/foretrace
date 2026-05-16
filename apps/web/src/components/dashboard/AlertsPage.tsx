@@ -28,15 +28,61 @@ type AlertRow = {
 function riskAlertPayloadExtras(payload: unknown): {
   verdict?: string;
   preview?: string;
+  level?: string;
+  score?: number;
+  reasonDetails: { code: string; detail: string }[];
+  schedule?: {
+    overdueCount: number;
+    dueWithin3DaysCount: number;
+    dueSoonLowProgressCount: number;
+  };
 } {
   if (!payload || typeof payload !== 'object') {
-    return {};
+    return { reasonDetails: [] };
   }
   const p = payload as Record<string, unknown>;
+  const reasonDetails: { code: string; detail: string }[] = [];
+  if (Array.isArray(p.reasons)) {
+    for (const item of p.reasons) {
+      if (!item || typeof item !== 'object') {
+        continue;
+      }
+      const o = item as Record<string, unknown>;
+      if (typeof o.code === 'string' && typeof o.detail === 'string') {
+        reasonDetails.push({ code: o.code, detail: o.detail });
+      }
+    }
+  }
+  let schedule:
+    | {
+        overdueCount: number;
+        dueWithin3DaysCount: number;
+        dueSoonLowProgressCount: number;
+      }
+    | undefined;
+  if (p.schedule && typeof p.schedule === 'object') {
+    const s = p.schedule as Record<string, unknown>;
+    schedule = {
+      overdueCount:
+        typeof s.overdueCount === 'number' ? Math.trunc(s.overdueCount) : 0,
+      dueWithin3DaysCount:
+        typeof s.dueWithin3DaysCount === 'number'
+          ? Math.trunc(s.dueWithin3DaysCount)
+          : 0,
+      dueSoonLowProgressCount:
+        typeof s.dueSoonLowProgressCount === 'number'
+          ? Math.trunc(s.dueSoonLowProgressCount)
+          : 0,
+    };
+  }
   return {
     verdict: typeof p.verdict === 'string' ? p.verdict : undefined,
     preview:
       typeof p.aiSummaryPreview === 'string' ? p.aiSummaryPreview : undefined,
+    level: typeof p.level === 'string' ? p.level : undefined,
+    score: typeof p.score === 'number' ? p.score : undefined,
+    reasonDetails,
+    schedule,
   };
 }
 
@@ -152,7 +198,7 @@ export function AlertsPage() {
       <PageHeader
         eyebrow="Delivery signals"
         title="Alerts"
-        description="Risk-driven notifications when a PM or admin runs Evaluate and delivery risk is at least Medium and has worsened (or is first seen at that level). New alerts include an AI verdict line and a short summary when available."
+        description="Risk-driven notifications when delivery risk is at least Medium and worsens: higher level, a big score jump, or overdue tasks newly detected. Created on Evaluate and when auto-refresh updates risk. Includes schedule context, reason lines, and Trace Analyst preview when available."
         meta={
           <Link
             to="/"
@@ -213,8 +259,9 @@ export function AlertsPage() {
                 {unreadOnly ? 'No unread alerts' : 'Inbox is quiet'}
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-                Run Evaluate on a project from the Projects page when risk is
-                elevated; matching events create rows here.
+                Run Evaluate on a project, or wait for auto-refresh after task
+                changes, when risk is elevated. Alerts appear when risk is at
+                least Medium and worsens (including new overdue tasks).
               </p>
             </div>
           ) : state.status === 'ok' ? (
@@ -232,6 +279,42 @@ export function AlertsPage() {
                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                       {row.summary}
                     </p>
+                    {extras.level ? (
+                      <p className="mt-1 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                        {extras.level}
+                        {typeof extras.score === 'number'
+                          ? ` · score ${extras.score}`
+                          : ''}
+                      </p>
+                    ) : null}
+                    {extras.schedule &&
+                    (extras.schedule.overdueCount > 0 ||
+                      extras.schedule.dueSoonLowProgressCount > 0) ? (
+                      <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-200">
+                        {extras.schedule.overdueCount > 0
+                          ? `${extras.schedule.overdueCount} overdue`
+                          : null}
+                        {extras.schedule.overdueCount > 0 &&
+                        extras.schedule.dueSoonLowProgressCount > 0
+                          ? ' · '
+                          : null}
+                        {extras.schedule.dueSoonLowProgressCount > 0
+                          ? `${extras.schedule.dueSoonLowProgressCount} due soon (low progress)`
+                          : null}
+                      </p>
+                    ) : null}
+                    {extras.reasonDetails.length > 0 ? (
+                      <ul className="mt-2 space-y-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+                        {extras.reasonDetails.slice(0, 4).map((r) => (
+                          <li key={r.code}>
+                            <span className="font-mono text-[10px] text-zinc-500">
+                              {r.code}
+                            </span>
+                            <span className="ml-1">{r.detail}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     {extras.verdict ? (
                       <p className="mt-1.5">
                         <span className="inline-block rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200">
@@ -249,10 +332,10 @@ export function AlertsPage() {
                       {row.readAt ? ` · Read ${formatWhen(row.readAt)}` : ''}
                     </p>
                     <Link
-                      to={`/projects?org=${encodeURIComponent(organizationId!)}`}
+                      to={`/projects?org=${encodeURIComponent(organizationId!)}&project=${encodeURIComponent(row.projectId)}`}
                       className="mt-2 inline-block text-[11px] font-semibold text-accent-700 hover:underline dark:text-accent-400"
                     >
-                      Open projects
+                      Open project
                     </Link>
                   </div>
                   {!row.readAt ? (

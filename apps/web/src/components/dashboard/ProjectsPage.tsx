@@ -280,6 +280,7 @@ export function ProjectsPage() {
   const showToast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawOrgParam = searchParams.get('org');
+  const rawProjectParam = searchParams.get('project');
 
   const [dataBump, setDataBump] = useState(0);
   const bumpData = useCallback(() => {
@@ -337,6 +338,18 @@ export function ProjectsPage() {
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(
     null,
   );
+
+  useEffect(() => {
+    if (projectsState.status !== 'ok' || !organizationId) {
+      return;
+    }
+    if (
+      rawProjectParam &&
+      projectsState.projects.some((p) => p.id === rawProjectParam)
+    ) {
+      setExpandedProjectId(rawProjectParam);
+    }
+  }, [projectsState, rawProjectParam, organizationId]);
 
   const tasksState = useOrgTasks(
     organizationId,

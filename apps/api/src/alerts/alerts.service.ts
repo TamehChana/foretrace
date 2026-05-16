@@ -4,6 +4,7 @@ import { AlertKind, RiskLevel, Role, type Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
+import type { RiskReasonRow } from '../projects/risk-reason.types';
 
 const RANK: Record<RiskLevel, number> = {
   LOW: 0,
@@ -13,6 +14,80 @@ const RANK: Record<RiskLevel, number> = {
 };
 
 const MEDIUM_RANK = RANK[RiskLevel.MEDIUM];
+
+const SCORE_JUMP_AT_SAME_LEVEL = 12;
+
+export type RiskEvaluationAlertInput = {
+  previousLevel: RiskLevel | null;
+  previousScore: number | null;
+  previousReasonCodes: string[];
+  nextLevel: RiskLevel;
+  score: number;
+  reasonCodes: string[];
+  reasons: RiskReasonRow[];
+  schedule?: {
+    overdueCount: number;
+    dueWithin3DaysCount: number;
+    dueSoonLowProgressCount: number;
+  };
+};
+
+/** When to create an in-app (and email) risk alert. */
+export function shouldEmitRiskEvaluationAlert(
+  input: RiskEvaluationAlertInput,
+): boolean {
+  const nextR = RANK[input.nextLevel];
+  if (nextR < MEDIUM_RANK) {
+    return false;
+  }
+  const prevR =
+    input.previousLevel !== null ? RANK[input.previousLevel] : null;
+  if (prevR === null) {
+    return true;
+  }
+  if (nextR > prevR) {
+    return true;
+  }
+  if (
+    input.previousScore !== null &&
+    input.score >= input.previousScore + SCORE_JUMP_AT_SAME_LEVEL
+  ) {
+    return true;
+  }
+  const nowOverdue = input.reasonCodes.includes('TASKS_OVERDUE');
+  const wasOverdue = input.previousReasonCodes.includes('TASKS_OVERDUE');
+  if (nowOverdue && !wasOverdue) {
+    return true;
+  }
+  return false;
+}
+
+function schedulePhrase(
+  schedule: RiskEvaluationAlertInput['schedule'],
+): string {
+  if (!schedule) {
+    return '';
+  }
+  const parts: string[] = [];
+  if (schedule.overdueCount > 0) {
+    parts.push(
+      `${schedule.overdueCount} overdue task${schedule.overdueCount === 1 ? '' : 's'}`,
+    );
+  }
+  if (schedule.dueSoonLowProgressCount > 0) {
+    parts.push(
+      `${schedule.dueSoonLowProgressCount} due soon with low progress`,
+    );
+  } else if (schedule.dueWithin3DaysCount > 0) {
+    parts.push(
+      `${schedule.dueWithin3DaysCount} due within 3 day${schedule.dueWithin3DaysCount === 1 ? '' : 's'}`,
+    );
+  }
+  if (parts.length === 0) {
+    return '';
+  }
+  return ` Schedule: ${parts.join('; ')}.`;
+}
 
 /** First-line `VERDICT: TOKEN` from heuristic or OpenAI risk summaries. */
 export function parseRiskVerdictFromAiSummary(
@@ -116,30 +191,32 @@ export class AlertsService {
     organizationId: string;
     projectId: string;
     projectName: string;
-    previousLevel: RiskLevel | null;
-    nextLevel: RiskLevel;
-    score: number;
     evaluationId: string;
     evaluationRunId?: string;
-    reasonCodes: string[];
     /** Full risk narrative (includes `VERDICT:` line when present). */
     aiSummary?: string | null;
-  }): Promise<void> {
-    const nextR = RANK[input.nextLevel];
-    if (nextR < MEDIUM_RANK) {
-      return;
-    }
-    const prevR =
-      input.previousLevel !== null ? RANK[input.previousLevel] : null;
-    if (prevR !== null && nextR <= prevR) {
+  } & RiskEvaluationAlertInput): Promise<void> {
+    if (
+      !shouldEmitRiskEvaluationAlert({
+        previousLevel: input.previousLevel,
+        previousScore: input.previousScore,
+        previousReasonCodes: input.previousReasonCodes,
+        nextLevel: input.nextLevel,
+        score: input.score,
+        reasonCodes: input.reasonCodes,
+        reasons: input.reasons,
+        schedule: input.schedule,
+      })
+    ) {
       return;
     }
 
     const verdict = parseRiskVerdictFromAiSummary(input.aiSummary);
     const preview = aiSummaryBodyPreview(input.aiSummary);
     const verdictPhrase = verdict ? ` AI verdict: ${verdict}.` : '';
+    const scheduleText = schedulePhrase(input.schedule);
 
-    const summary = `Delivery risk for “${input.projectName}” is ${input.nextLevel} (score ${input.score}).${verdictPhrase}`;
+    const summary = `Delivery risk for “${input.projectName}” is ${input.nextLevel} (score ${input.score}).${scheduleText}${verdictPhrase}`;
 
     const payload: Prisma.InputJsonValue = {
       kind: 'RISK_EVALUATION',
@@ -151,6 +228,8 @@ export class AlertsService {
       level: input.nextLevel,
       score: input.score,
       reasonCodes: input.reasonCodes,
+      reasons: input.reasons.slice(0, 8),
+      ...(input.schedule ? { schedule: input.schedule } : {}),
       ...(verdict ? { verdict } : {}),
       ...(preview ? { aiSummaryPreview: preview } : {}),
     };
@@ -181,6 +260,7 @@ export class AlertsService {
       nextLevel: RiskLevel;
       score: number;
       reasonCodes: string[];
+      reasons: RiskReasonRow[];
     },
     summary: string,
     verdict: string | null,
@@ -210,6 +290,9 @@ export class AlertsService {
       lines.push(`Verdict: ${verdict}`);
     }
     lines.push(`Reason codes: ${input.reasonCodes.join(', ') || '—'}`);
+    for (const r of input.reasons.slice(0, 6)) {
+      lines.push(`• ${r.code}: ${r.detail}`);
+    }
     if (preview) {
       lines.push('', 'Summary:', preview);
     }

@@ -58,11 +58,39 @@ export class ProjectRiskService {
     );
   }
 
+  private reasonCodesFromJson(raw: unknown): string[] {
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    const codes: string[] = [];
+    for (const item of raw) {
+      if (item && typeof item === 'object' && typeof (item as { code?: unknown }).code === 'string') {
+        codes.push((item as { code: string }).code);
+      }
+    }
+    return codes;
+  }
+
+  private scheduleFromPayload(payload: ProjectSignalPayload) {
+    return {
+      overdueCount: payload.tasks.overdueCount,
+      dueWithin3DaysCount: payload.tasks.dueWithin3DaysCount ?? 0,
+      dueSoonLowProgressCount: payload.tasks.dueSoonLowProgressCount ?? 0,
+    };
+  }
+
   private async refreshRulesFromSignals(
     projectId: string,
     organizationId: string,
   ) {
     await this.projectsService.getProjectInOrg(projectId, organizationId);
+
+    const previous = await this.prisma.projectRiskEvaluation.findUnique({
+      where: { projectId },
+      select: { id: true, level: true, score: true, reasons: true },
+    });
+    const previousReasonCodes = this.reasonCodesFromJson(previous?.reasons);
+
     const snapshot = await this.signals.refreshSnapshot(
       projectId,
       organizationId,
@@ -94,7 +122,7 @@ export class ProjectRiskService {
       promptFeedbackHints,
     });
 
-    await this.prisma.projectRiskEvaluation.upsert({
+    const row = await this.prisma.projectRiskEvaluation.upsert({
       where: { projectId },
       create: {
         organizationId,
@@ -113,6 +141,22 @@ export class ProjectRiskService {
         mlPrediction: mlPrisma,
         evaluatedAt: new Date(),
       },
+    });
+
+    await this.alerts.maybeEmitRiskEvaluationAlert({
+      organizationId,
+      projectId,
+      projectName: project?.name ?? 'Project',
+      previousLevel: previous?.level ?? null,
+      previousScore: previous?.score ?? null,
+      previousReasonCodes,
+      nextLevel: row.level,
+      score: row.score,
+      reasonCodes: reasons.map((r) => r.code),
+      reasons,
+      schedule: this.scheduleFromPayload(payload),
+      evaluationId: row.id,
+      aiSummary,
     });
   }
 
@@ -170,8 +214,9 @@ export class ProjectRiskService {
 
     const previous = await this.prisma.projectRiskEvaluation.findUnique({
       where: { projectId },
-      select: { level: true },
+      select: { id: true, level: true, score: true, reasons: true },
     });
+    const previousReasonCodes = this.reasonCodesFromJson(previous?.reasons);
 
     const project = await this.prisma.project.findFirst({
       where: { id: projectId, organizationId },
@@ -243,11 +288,15 @@ export class ProjectRiskService {
       projectId,
       projectName: project?.name ?? 'Project',
       previousLevel: previous?.level ?? null,
+      previousScore: previous?.score ?? null,
+      previousReasonCodes,
       nextLevel: row.level,
       score: row.score,
       evaluationId: row.id,
       evaluationRunId: run.id,
       reasonCodes: reasons.map((r) => r.code),
+      reasons,
+      schedule: this.scheduleFromPayload(payload),
       aiSummary,
     });
 
