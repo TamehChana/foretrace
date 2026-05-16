@@ -429,9 +429,10 @@ export function ProjectRiskPanel(props: {
             Rule-based score from the 24h signal rollup (tasks, terminal, GitHub
             churn), plus an optional narrative (heuristic or OpenAI when
             configured). Evaluating refreshes signals first, then persists this
-            row. Use <span className="font-semibold">Trace Analyst</span> for a
-            separate narrative read (tasks + incidents + rollup); it refreshes the
-            snapshot but does not persist — inference only, not model training.
+            row. Task status, progress, and deadline changes auto-refresh the score
+            within ~30s. Use <span className="font-semibold">Trace Analyst</span>{' '}
+            for a separate narrative read (tasks + incidents + rollup); it refreshes
+            the snapshot but does not persist — inference only, not model training.
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">

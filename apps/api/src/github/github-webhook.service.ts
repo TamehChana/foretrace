@@ -7,6 +7,7 @@ import {
 import { Prisma, TaskStatus } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { ProjectRiskService } from '../projects/project-risk.service';
 import { ProjectSignalsService } from '../projects/project-signals.service';
 import {
   collectIssueReferencesFromGithubWebhook,
@@ -71,6 +72,7 @@ export class GithubWebhookService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projectSignals: ProjectSignalsService,
+    private readonly projectRisk: ProjectRiskService,
   ) {}
 
   async ingest(input: GithubIngestInput): Promise<void> {
@@ -249,7 +251,7 @@ export class GithubWebhookService {
         }
       });
 
-      this.projectSignals.scheduleRefreshSnapshot(
+      this.projectRisk.scheduleRulesRefresh(
         connection.projectId,
         connection.project.organizationId,
       );

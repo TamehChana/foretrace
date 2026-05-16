@@ -6,6 +6,7 @@ import {
   compactProjectSignalEvidenceForAi,
   type ProjectSignalPayload,
 } from '../projects/project-signals.service';
+import { isDeadlineOverdueUtc } from '../projects/task-deadline.util';
 import { ProjectsService } from '../projects/projects.service';
 import { ProjectSignalsService } from '../projects/project-signals.service';
 
@@ -202,10 +203,10 @@ export class ProjectImpactAnalyzerService {
     }
 
     const overdueTasks = input.taskPack.filter((t) => {
-      if (!t.deadline || t.status === 'DONE') {
+      if (!t.deadline || t.status === 'DONE' || t.status === 'CANCELLED') {
         return false;
       }
-      return new Date(t.deadline).getTime() < Date.now();
+      return isDeadlineOverdueUtc(new Date(t.deadline));
     });
     if (overdueTasks.length > 0) {
       lines.push(

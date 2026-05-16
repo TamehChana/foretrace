@@ -6,6 +6,7 @@ import { ProjectsService } from './projects.service';
 import type { GithubRestEnrichment } from './github-signal-rest-enricher';
 import { GithubSignalRestEnricher } from './github-signal-rest-enricher';
 export type { GithubRestEnrichment } from './github-signal-rest-enricher';
+import { countTaskScheduleBuckets } from './task-deadline.util';
 
 export type ProjectSignalTaskTerminalFriction = {
   taskId: string;
@@ -115,8 +116,6 @@ export class ProjectSignalsService {
 
       const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
       const now = new Date();
-      const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-      const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
       const connection = await tx.gitHubConnection.findUnique({
         where: { projectId },
@@ -166,45 +165,18 @@ export class ProjectSignalsService {
         status: { notIn: ['DONE', 'CANCELLED'] },
       };
 
-      const activeCount = await tx.task.count({
+      const activeTasks = await tx.task.findMany({
         where: activeTaskWhere,
+        select: { deadline: true, progress: true },
       });
-
-      const overdueCount = await tx.task.count({
-        where: {
-          ...activeTaskWhere,
-          deadline: { lt: now },
-        },
-      });
-
-      const dueWithin7DaysCount = await tx.task.count({
-        where: {
-          ...activeTaskWhere,
-          deadline: { gte: now, lte: in7Days },
-        },
-      });
-
-      const dueWithin3DaysCount = await tx.task.count({
-        where: {
-          ...activeTaskWhere,
-          deadline: { gte: now, lte: in3Days },
-        },
-      });
-
-      const dueBetween4And7DaysCount = await tx.task.count({
-        where: {
-          ...activeTaskWhere,
-          deadline: { gt: in3Days, lte: in7Days },
-        },
-      });
-
-      const dueSoonLowProgressCount = await tx.task.count({
-        where: {
-          ...activeTaskWhere,
-          deadline: { gte: now, lte: in7Days },
-          progress: { lt: 35 },
-        },
-      });
+      const {
+        activeCount,
+        overdueCount,
+        dueWithin7DaysCount,
+        dueWithin3DaysCount,
+        dueBetween4And7DaysCount,
+        dueSoonLowProgressCount,
+      } = countTaskScheduleBuckets(activeTasks, now);
 
       type FrictionAgg = {
         incidentTouches: number;

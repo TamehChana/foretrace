@@ -48,6 +48,6 @@ import { TasksService } from './tasks.service';
     ProjectUuidParamGuard,
     TaskUuidParamGuard,
   ],
-  exports: [ProjectsService, ProjectSignalsService],
+  exports: [ProjectsService, ProjectSignalsService, ProjectRiskService],
 })
 export class ProjectsModule {}

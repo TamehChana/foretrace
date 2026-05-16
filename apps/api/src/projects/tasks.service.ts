@@ -8,6 +8,7 @@ import { Prisma, Role, TaskPriority, TaskStatus } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { GithubSignalRestEnricher } from './github-signal-rest-enricher';
+import { ProjectRiskService } from './project-risk.service';
 import { ProjectsService } from './projects.service';
 import type { CreateTaskDto } from './dto/create-task.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
@@ -18,7 +19,15 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly projectsService: ProjectsService,
     private readonly githubSignalRest: GithubSignalRestEnricher,
+    private readonly projectRisk: ProjectRiskService,
   ) {}
+
+  private scheduleDeliverySignalsRefresh(
+    projectId: string,
+    organizationId: string,
+  ): void {
+    this.projectRisk.scheduleRulesRefresh(projectId, organizationId);
+  }
 
   private async assertAssigneeInOrg(
     assigneeId: string,
@@ -191,7 +200,7 @@ export class TasksService {
       await this.assertAssigneeInOrg(dto.assigneeId, organizationId);
     }
 
-    return this.prisma.task.create({
+    const created = await this.prisma.task.create({
       data: {
         projectId,
         title: dto.title,
@@ -232,6 +241,8 @@ export class TasksService {
         updatedAt: true,
       },
     });
+    this.scheduleDeliverySignalsRefresh(projectId, organizationId);
+    return created;
   }
 
   async updateTask(
@@ -347,7 +358,10 @@ export class TasksService {
       throw new BadRequestException('No updates provided');
     }
 
-    return this.prisma.task.update({
+    const affectsDeliverySignals =
+      requestedStatus || requestedProgress || requestedDeadline;
+
+    const updated = await this.prisma.task.update({
       where: { id: taskId },
       data,
       select: {
@@ -372,6 +386,10 @@ export class TasksService {
         updatedAt: true,
       },
     });
+    if (affectsDeliverySignals) {
+      this.scheduleDeliverySignalsRefresh(projectId, organizationId);
+    }
+    return updated;
   }
 
   /**
@@ -415,6 +433,7 @@ export class TasksService {
     await this.prisma.task.delete({
       where: { id: taskId },
     });
+    this.scheduleDeliverySignalsRefresh(projectId, organizationId);
   }
 
   async listTaskGithubActivity(

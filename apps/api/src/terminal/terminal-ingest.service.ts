@@ -17,6 +17,7 @@ export interface CliTokenContext {
   tokenId: string;
   organizationId: string;
   projectId: string;
+  tokenMintedByUserId: string;
 }
 
 /** Max fingerprints processed per batch to cap DB churn. */
@@ -69,6 +70,7 @@ export class TerminalIngestService {
         lineCount: dto.lines.length,
         metadata: {
           lines: redactedLines,
+          mintedByUserId: ctx.tokenMintedByUserId,
           ...(dto.client ? { client: dto.client } : {}),
         },
       },

@@ -13,6 +13,8 @@ declare global {
         tokenId: string;
         organizationId: string;
         projectId: string;
+        /** User who minted the CLI token (proxy for “who sent this batch”). */
+        tokenMintedByUserId: string;
       };
     }
   }

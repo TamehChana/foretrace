@@ -38,7 +38,14 @@ describe('GithubWebhookService', () => {
     const projectSignals = {
       scheduleRefreshSnapshot: jest.fn(),
     };
-    return new GithubWebhookService(prisma as never, projectSignals as never);
+    const projectRisk = {
+      scheduleRulesRefresh: jest.fn(),
+    };
+    return new GithubWebhookService(
+      prisma as never,
+      projectSignals as never,
+      projectRisk as never,
+    );
   }
 
   it('sets lastGithubLinkedUserId when a GitHub user link exists', async () => {

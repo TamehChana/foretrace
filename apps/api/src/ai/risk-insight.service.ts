@@ -96,8 +96,28 @@ export class RiskInsightService {
 
   private heuristic(ctx: RiskInsightContext): string {
     const verdict = this.heuristicVerdict(ctx);
+    const reasonPriority = (code: string): number => {
+      if (code === 'TASKS_OVERDUE') {
+        return 0;
+      }
+      if (code.startsWith('TASK')) {
+        return 1;
+      }
+      if (code.startsWith('TERMINAL') || code === 'TASK_SCOPED_TERMINAL') {
+        return 2;
+      }
+      if (code.startsWith('GITHUB')) {
+        return 3;
+      }
+      return 4;
+    };
     const top = ctx.reasons
       .filter((r) => r.code !== 'BASELINE')
+      .sort(
+        (a, b) =>
+          reasonPriority(a.code) - reasonPriority(b.code) ||
+          a.detail.localeCompare(b.detail),
+      )
       .slice(0, 4);
     const bullets =
       top.length > 0

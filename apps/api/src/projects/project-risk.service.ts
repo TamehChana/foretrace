@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { AlertsService } from '../alerts/alerts.service';
@@ -16,8 +16,14 @@ import { computeRiskFromPayload } from './risk-score.engine';
 
 export type { RiskReasonRow } from './risk-reason.types';
 
+/** Debounced rules-only risk refresh after task/signal changes (no evaluation history row). */
+const RULES_REFRESH_COOLDOWN_MS = 30_000;
+
 @Injectable()
 export class ProjectRiskService {
+  private readonly log = new Logger(ProjectRiskService.name);
+  private readonly lastRulesRefreshAtMs = new Map<string, number>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly projectsService: ProjectsService,
@@ -27,6 +33,80 @@ export class ProjectRiskService {
     private readonly riskInsight: RiskInsightService,
     private readonly riskMl: RiskMlService,
   ) {}
+
+  /**
+   * Refreshes the signal snapshot and upserts rule-based risk + heuristic narrative.
+   * Skips evaluation history and alerts — use `evaluateAndPersist` for a full PM run.
+   */
+  scheduleRulesRefresh(projectId: string, organizationId: string): void {
+    const now = Date.now();
+    const last = this.lastRulesRefreshAtMs.get(projectId) ?? 0;
+    if (now - last < RULES_REFRESH_COOLDOWN_MS) {
+      return;
+    }
+    this.lastRulesRefreshAtMs.set(projectId, now);
+    void this.refreshRulesFromSignals(projectId, organizationId).catch(
+      (err: unknown) => {
+        this.log.warn(
+          `Background risk rules refresh failed for project ${projectId}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      },
+    );
+  }
+
+  private async refreshRulesFromSignals(
+    projectId: string,
+    organizationId: string,
+  ) {
+    await this.projectsService.getProjectInOrg(projectId, organizationId);
+    const snapshot = await this.signals.refreshSnapshot(
+      projectId,
+      organizationId,
+    );
+    const payload = snapshot.payload as unknown as ProjectSignalPayload;
+    const { level, score, reasons } = computeRiskFromPayload(payload);
+    const mlPrediction = this.riskMl.predict(payload);
+    const mlPrisma: Prisma.InputJsonValue | typeof Prisma.DbNull =
+      mlPrediction === null || mlPrediction === undefined
+        ? Prisma.DbNull
+        : (mlPrediction as Prisma.InputJsonValue);
+
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, organizationId },
+      select: { name: true },
+    });
+
+    const aiSummary = await this.riskInsight.summarize({
+      projectName: project?.name ?? 'Project',
+      level,
+      score,
+      reasons,
+      signalEvidence: compactProjectSignalEvidenceForAi(payload),
+    });
+
+    await this.prisma.projectRiskEvaluation.upsert({
+      where: { projectId },
+      create: {
+        organizationId,
+        projectId,
+        level,
+        score,
+        reasons,
+        aiSummary,
+        mlPrediction: mlPrisma,
+      },
+      update: {
+        level,
+        score,
+        reasons,
+        aiSummary,
+        mlPrediction: mlPrisma,
+        evaluatedAt: new Date(),
+      },
+    });
+  }
 
   async getEvaluation(projectId: string, organizationId: string) {
     await this.projectsService.getProjectInOrg(projectId, organizationId);

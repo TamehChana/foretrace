@@ -19,6 +19,7 @@ describe('TasksService', () => {
         prisma as never,
         projectsService as never,
         {} as never,
+        { scheduleRulesRefresh: jest.fn() } as never,
       );
 
       await expect(
@@ -47,6 +48,7 @@ describe('TasksService', () => {
         prisma as never,
         projectsService as never,
         {} as never,
+        { scheduleRulesRefresh: jest.fn() } as never,
       );
 
       await expect(

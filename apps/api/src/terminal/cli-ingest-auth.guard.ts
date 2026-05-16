@@ -38,6 +38,7 @@ export class CliIngestAuthGuard implements CanActivate {
         organizationId: true,
         projectId: true,
         revokedAt: true,
+        createdById: true,
       },
     });
     if (!row || row.revokedAt !== null) {
@@ -67,6 +68,7 @@ export class CliIngestAuthGuard implements CanActivate {
       tokenId: row.id,
       organizationId: row.organizationId,
       projectId: row.projectId,
+      tokenMintedByUserId: row.createdById,
     };
 
     return true;

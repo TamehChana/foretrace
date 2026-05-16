@@ -107,18 +107,18 @@ function formatTaskDateTime(iso: string | null): string {
   }
 }
 
-/** Calendar-day difference: local start-of-day vs deadline date (matches date-picker semantics). */
+/** UTC calendar-day difference (matches API signals + `dateInputToDeadlineIso`). */
 function deadlineCalendarDiffDays(deadlineIso: string): number | null {
   try {
     const d = new Date(deadlineIso);
     if (Number.isNaN(d.getTime())) {
       return null;
     }
-    const startOf = (x: Date) =>
-      new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const utcDayStart = (x: Date) =>
+      Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate());
     const now = new Date();
     return Math.round(
-      (startOf(d) - startOf(now)) / (24 * 60 * 60 * 1000),
+      (utcDayStart(d) - utcDayStart(now)) / (24 * 60 * 60 * 1000),
     );
   } catch {
     return null;
@@ -127,7 +127,17 @@ function deadlineCalendarDiffDays(deadlineIso: string): number | null {
 
 type DeadlineUrgency = 'none' | 'later' | 'week' | 'soon' | 'today' | 'overdue';
 
-function deadlineUrgency(deadlineIso: string | null): DeadlineUrgency {
+function taskDeadlineCountdownApplies(status: string): boolean {
+  return status !== 'DONE' && status !== 'CANCELLED';
+}
+
+function deadlineUrgency(
+  deadlineIso: string | null,
+  status?: string,
+): DeadlineUrgency {
+  if (status && !taskDeadlineCountdownApplies(status)) {
+    return 'none';
+  }
   if (!deadlineIso) {
     return 'none';
   }
@@ -150,7 +160,13 @@ function deadlineUrgency(deadlineIso: string | null): DeadlineUrgency {
   return 'later';
 }
 
-function formatDeadlineCountdown(deadlineIso: string | null): string | null {
+function formatDeadlineCountdown(
+  deadlineIso: string | null,
+  status?: string,
+): string | null {
+  if (status && !taskDeadlineCountdownApplies(status)) {
+    return null;
+  }
   if (!deadlineIso) {
     return null;
   }
@@ -1635,15 +1651,17 @@ export function ProjectsPage() {
                                                           <span>{` · ${new Date(t.deadline).toLocaleDateString()}`}</span>
                                                           {formatDeadlineCountdown(
                                                             t.deadline,
+                                                            t.status,
                                                           ) ? (
                                                             <span
                                                               className={`font-semibold ${deadlineCountdownClass(
                                                                 deadlineUrgency(
                                                                   t.deadline,
+                                                                  t.status,
                                                                 ),
                                                               )}`}
                                                             >
-                                                              {` · ${formatDeadlineCountdown(t.deadline)}`}
+                                                              {` · ${formatDeadlineCountdown(t.deadline, t.status)}`}
                                                             </span>
                                                           ) : null}
                                                         </>
@@ -1911,11 +1929,13 @@ export function ProjectsPage() {
                                                           {t.deadline &&
                                                           formatDeadlineCountdown(
                                                             t.deadline,
+                                                            t.status,
                                                           ) ? (
                                                             <p
                                                               className={`mt-0.5 text-[10px] font-semibold ${deadlineCountdownClass(
                                                                 deadlineUrgency(
                                                                   t.deadline,
+                                                                  t.status,
                                                                 ),
                                                               )}`}
                                                               data-countdown-tick={
@@ -1925,6 +1945,7 @@ export function ProjectsPage() {
                                                               {
                                                                 formatDeadlineCountdown(
                                                                   t.deadline,
+                                                                  t.status,
                                                                 )
                                                               }
                                                             </p>
