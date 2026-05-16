@@ -1,0 +1,26 @@
+# Refreshes Foretrace project signal snapshots on a schedule (optional).
+# Repository secrets: FORETRACE_API_URL, FORETRACE_CRON_SECRET (same as API env).
+name: foretrace-snapshots
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST refresh-project-snapshots
+        env:
+          FORETRACE_API_URL: ${{ secrets.FORETRACE_API_URL }}
+          FORETRACE_CRON_SECRET: ${{ secrets.FORETRACE_CRON_SECRET }}
+        run: |
+          if [ -z "$FORETRACE_API_URL" ] || [ -z "$FORETRACE_CRON_SECRET" ]; then
+            echo "Skipping: set FORETRACE_API_URL and FORETRACE_CRON_SECRET repository secrets."
+            exit 0
+          fi
+          curl -fsS -X POST \
+            "${FORETRACE_API_URL%/}/internal/cron/refresh-project-snapshots?limit=100" \
+            -H "X-Foretrace-Cron-Secret: ${FORETRACE_CRON_SECRET}" \
+            -H "Accept: application/json"

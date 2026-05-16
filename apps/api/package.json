@@ -25,7 +25,8 @@
     "backfill:task-github-linked-user": "node ../../scripts/backfill-task-last-github-linked-user.mjs",
     "terminal:ingest": "node ../../packages/cli/dist/cli.js ingest",
     "vercel-build": "node -e \"process.exit(0)\"",
-    "ml:train": "tsx src/ml/scripts/generate-risk-ml-weights.ts"
+    "ml:train": "tsx src/ml/scripts/generate-risk-ml-weights.ts",
+    "ml:train:history": "tsx src/ml/scripts/train-risk-ml-from-history.ts"
   },
   "dependencies": {
     "@foretrace/shared": "*",

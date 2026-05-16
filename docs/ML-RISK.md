@@ -19,6 +19,12 @@ This document describes the **first shipped machine-learning slice**: a **multin
 npm run ml:train -w @foretrace/api
 ```
 
+After you have run **Evaluate** on real projects (stores `signalPayload` on history rows):
+
+```bash
+npm run ml:train:history -w @foretrace/api
+```
+
 ## Runtime
 
 - Set **`FORETRACE_ML_RISK_ENABLED=1`** (or `true` / `yes`) on the API to attach `mlPrediction` when a project is evaluated.

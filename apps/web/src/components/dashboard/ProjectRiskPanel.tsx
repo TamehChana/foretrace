@@ -46,6 +46,39 @@ type MlRiskPrediction = {
   deadlinePressureIndex: number;
 };
 
+type TraceAnalystReadiness = {
+  openAiConfigured: boolean;
+  openAiRiskModel: string;
+  openAiImpactModel: string;
+  mlRiskEnabled: boolean;
+  githubLinked: boolean;
+  snapshotComputedAt: string | null;
+  snapshotWindowHours: number | null;
+  schedule: {
+    activeCount: number;
+    overdueCount: number;
+    dueWithin7DaysCount: number;
+    dueWithin3DaysCount: number;
+    dueSoonLowProgressCount: number;
+  } | null;
+  riskEvaluatedAt: string | null;
+  riskLevel: string | null;
+  riskScore: number | null;
+  riskStaleVsSnapshot: boolean;
+  recentTerminalBatchesInWindow: number | null;
+  githubWebhookEventsInWindow: number | null;
+  readinessScore: number;
+  readinessHints: string[];
+};
+
+type ImpactHistoryRow = {
+  id: string;
+  analysis: string;
+  usedOpenAi: boolean;
+  snapshotComputedAt: string;
+  createdAt: string;
+};
+
 function parseMlRiskPrediction(raw: unknown): MlRiskPrediction | null {
   if (!raw || typeof raw !== 'object') {
     return null;
@@ -243,6 +276,77 @@ export function ProjectRiskPanel(props: {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState<
     'RISK_SUMMARY' | 'PROJECT_IMPACT_ANALYSIS' | null
   >(null);
+  const [readinessState, setReadinessState] = useState<
+    | { status: 'idle' | 'loading' }
+    | { status: 'ok'; data: TraceAnalystReadiness }
+    | { status: 'error'; message: string }
+  >({ status: 'idle' });
+  const [impactHistoryState, setImpactHistoryState] = useState<
+    | { status: 'idle' | 'loading' }
+    | { status: 'ok'; rows: ImpactHistoryRow[] }
+    | { status: 'error'; message: string }
+  >({ status: 'idle' });
+
+  const loadReadiness = useCallback(async () => {
+    setReadinessState({ status: 'loading' });
+    const res = await apiFetch(
+      `/organizations/${organizationId}/projects/${projectId}/insights/readiness`,
+    );
+    const raw: unknown = await res.json().catch(() => null);
+    if (!res.ok) {
+      setReadinessState({
+        status: 'error',
+        message: formatApiErrorResponse(raw, res.status),
+      });
+      return;
+    }
+    const body = raw as { data?: TraceAnalystReadiness };
+    if (!body.data || typeof body.data.readinessScore !== 'number') {
+      setReadinessState({ status: 'error', message: 'Invalid readiness response' });
+      return;
+    }
+    setReadinessState({ status: 'ok', data: body.data });
+  }, [organizationId, projectId]);
+
+  const loadImpactHistory = useCallback(async () => {
+    setImpactHistoryState({ status: 'loading' });
+    const res = await apiFetch(
+      `/organizations/${organizationId}/projects/${projectId}/insights/history?limit=5`,
+    );
+    const raw: unknown = await res.json().catch(() => null);
+    if (!res.ok) {
+      setImpactHistoryState({
+        status: 'error',
+        message: formatApiErrorResponse(raw, res.status),
+      });
+      return;
+    }
+    const body = raw as { data?: unknown };
+    const arr = Array.isArray(body.data) ? body.data : [];
+    const rows: ImpactHistoryRow[] = [];
+    for (const item of arr) {
+      if (!item || typeof item !== 'object') {
+        continue;
+      }
+      const o = item as Record<string, unknown>;
+      if (
+        typeof o.id === 'string' &&
+        typeof o.analysis === 'string' &&
+        typeof o.usedOpenAi === 'boolean' &&
+        typeof o.snapshotComputedAt === 'string' &&
+        typeof o.createdAt === 'string'
+      ) {
+        rows.push({
+          id: o.id,
+          analysis: o.analysis,
+          usedOpenAi: o.usedOpenAi,
+          snapshotComputedAt: o.snapshotComputedAt,
+          createdAt: o.createdAt,
+        });
+      }
+    }
+    setImpactHistoryState({ status: 'ok', rows });
+  }, [organizationId, projectId]);
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
@@ -315,7 +419,9 @@ export function ProjectRiskPanel(props: {
   useEffect(() => {
     void load();
     void loadHistory();
-  }, [load, loadHistory, refreshKey]);
+    void loadReadiness();
+    void loadImpactHistory();
+  }, [load, loadHistory, loadReadiness, loadImpactHistory, refreshKey]);
 
   useEffect(() => {
     setImpactState({ status: 'idle' });
@@ -335,7 +441,8 @@ export function ProjectRiskPanel(props: {
     onEvaluated?.();
     await load();
     await loadHistory();
-  }, [organizationId, projectId, load, loadHistory, showToast, onEvaluated]);
+    void loadReadiness();
+  }, [organizationId, projectId, load, loadHistory, loadReadiness, showToast, onEvaluated]);
 
   const analyzeImpact = useCallback(async () => {
     setImpactState({ status: 'loading' });
@@ -382,7 +489,9 @@ export function ProjectRiskPanel(props: {
       'success',
     );
     onEvaluated?.();
-  }, [organizationId, projectId, showToast, onEvaluated]);
+    void loadReadiness();
+    void loadImpactHistory();
+  }, [organizationId, projectId, showToast, onEvaluated, loadReadiness, loadImpactHistory]);
 
   const submitInsightFeedback = useCallback(
     async (
@@ -430,9 +539,8 @@ export function ProjectRiskPanel(props: {
             churn), plus an optional narrative (heuristic or OpenAI when
             configured). Evaluating refreshes signals first, then persists this
             row. Task status, progress, and deadline changes auto-refresh the score
-            within ~30s. Use <span className="font-semibold">Trace Analyst</span>{' '}
-            for a separate narrative read (tasks + incidents + rollup); it refreshes
-            the snapshot but does not persist — inference only, not model training.
+            within ~30s. <span className="font-semibold">Trace Analyst</span> runs a
+            deeper read (tasks, GitHub activity, terminal) and saves history.
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
@@ -463,6 +571,52 @@ export function ProjectRiskPanel(props: {
           ) : null}
         </div>
       </div>
+
+      {readinessState.status === 'ok' ? (
+        <div className="mt-3 rounded-lg border border-sky-200/80 bg-sky-50/50 px-3 py-2 dark:border-sky-900/50 dark:bg-sky-950/20">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-200">
+              Trace Analyst readiness
+            </h4>
+            <span className="text-[10px] font-semibold tabular-nums text-sky-800 dark:text-sky-200">
+              {readinessState.data.readinessScore}/100
+            </span>
+          </div>
+          <ul className="mt-1.5 space-y-0.5 text-[11px] text-sky-950/90 dark:text-sky-100/90">
+            <li>
+              OpenAI:{' '}
+              {readinessState.data.openAiConfigured
+                ? `on (${readinessState.data.openAiImpactModel})`
+                : 'off — heuristic only'}
+            </li>
+            <li>
+              ML risk: {readinessState.data.mlRiskEnabled ? 'on' : 'off'} · GitHub:{' '}
+              {readinessState.data.githubLinked ? 'linked' : 'not linked'}
+            </li>
+            {readinessState.data.schedule ? (
+              <li>
+                Schedule: {readinessState.data.schedule.overdueCount} overdue ·{' '}
+                {readinessState.data.schedule.dueWithin7DaysCount} due ≤7d
+              </li>
+            ) : null}
+            {readinessState.data.snapshotComputedAt ? (
+              <li>
+                Snapshot: {formatWhen(readinessState.data.snapshotComputedAt)}
+                {readinessState.data.riskStaleVsSnapshot
+                  ? ' · risk evaluation stale — click Evaluate'
+                  : null}
+              </li>
+            ) : null}
+            {readinessState.data.readinessHints.map((h) => (
+              <li key={h} className="text-amber-900 dark:text-amber-200">
+                → {h}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : readinessState.status === 'loading' ? (
+        <Skeleton className="mt-3 h-16 w-full" />
+      ) : null}
 
       {impactState.status === 'ok' ? (
         <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2 dark:border-violet-900/60 dark:bg-violet-950/30">
@@ -510,6 +664,30 @@ export function ProjectRiskPanel(props: {
         <p className="mt-3 text-[12px] text-rose-600 dark:text-rose-400">
           {impactState.message}
         </p>
+      ) : null}
+
+      {impactHistoryState.status === 'ok' && impactHistoryState.rows.length > 0 ? (
+        <details className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900/50">
+          <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400">
+            Saved Trace Analyst reads ({impactHistoryState.rows.length})
+          </summary>
+          <ul className="mt-2 space-y-2">
+            {impactHistoryState.rows.map((row) => (
+              <li
+                key={row.id}
+                className="rounded border border-zinc-200 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-950"
+              >
+                <p className="text-[10px] text-zinc-500">
+                  {row.usedOpenAi ? 'OpenAI' : 'Heuristic'} · {formatWhen(row.createdAt)}
+                </p>
+                <p className="mt-1 line-clamp-3 text-[11px] leading-snug text-zinc-800 dark:text-zinc-200">
+                  {row.analysis.slice(0, 400)}
+                  {row.analysis.length > 400 ? '…' : ''}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
 
       {state.status === 'loading' || state.status === 'idle' ? (

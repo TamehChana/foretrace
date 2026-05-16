@@ -90,6 +90,7 @@ model Organization {
   projectSignalSnapshots   ProjectSignalSnapshot[]
   projectRiskEvaluations   ProjectRiskEvaluation[]
   riskEvaluationRuns       RiskEvaluationRun[]
+  impactAnalysisRuns       ProjectImpactAnalysisRun[]
   alerts                   Alert[]
   auditLogs                AuditLog[]
   insightFeedbacks         InsightFeedback[]
@@ -127,9 +128,10 @@ model Project {
   terminalIncidents    TerminalIncident[]
   signalSnapshot       ProjectSignalSnapshot?
   riskEvaluation       ProjectRiskEvaluation?
-  riskEvaluationRuns   RiskEvaluationRun[]
-  alerts               Alert[]
-  insightFeedbacks     InsightFeedback[]
+  riskEvaluationRuns        RiskEvaluationRun[]
+  impactAnalysisRuns        ProjectImpactAnalysisRun[]
+  alerts                    Alert[]
+  insightFeedbacks          InsightFeedback[]
 
   @@index([organizationId])
 }
@@ -364,6 +366,8 @@ model RiskEvaluationRun {
   reasons        Json
   aiSummary      String?   @db.Text
   mlPrediction   Json?
+  /// Snapshot payload used for this evaluation (for ML retrain / audit).
+  signalPayload  Json?
   evaluatedAt    DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -371,6 +375,23 @@ model RiskEvaluationRun {
 
   @@index([projectId, evaluatedAt(sort: Desc)])
   @@index([organizationId, evaluatedAt(sort: Desc)])
+}
+
+/// Persisted Trace Analyst reads from POST …/insights/analyze.
+model ProjectImpactAnalysisRun {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @db.Uuid
+  projectId          String   @db.Uuid
+  analysis           String   @db.Text
+  usedOpenAi         Boolean
+  snapshotComputedAt DateTime
+  createdAt          DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([organizationId, createdAt(sort: Desc)])
 }
 
 /// In-app notification (v0: risk elevation / worsening).

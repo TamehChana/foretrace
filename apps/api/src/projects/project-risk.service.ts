@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { InsightFeedbackKind, Prisma } from '@prisma/client';
 
 import { AlertsService } from '../alerts/alerts.service';
 import { RiskInsightService } from '../ai/risk-insight.service';
+import { TraceAnalystContextService } from '../ai/trace-analyst-context.service';
 import { AuditService } from '../audit/audit.service';
 import { RiskMlService } from '../ml/risk-ml.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -32,6 +33,7 @@ export class ProjectRiskService {
     private readonly audit: AuditService,
     private readonly riskInsight: RiskInsightService,
     private readonly riskMl: RiskMlService,
+    private readonly traceAnalyst: TraceAnalystContextService,
   ) {}
 
   /**
@@ -78,12 +80,18 @@ export class ProjectRiskService {
       select: { name: true },
     });
 
+    const promptFeedbackHints = await this.traceAnalyst.promptFeedbackHints(
+      projectId,
+      InsightFeedbackKind.RISK_SUMMARY,
+    );
+
     const aiSummary = await this.riskInsight.summarize({
       projectName: project?.name ?? 'Project',
       level,
       score,
       reasons,
       signalEvidence: compactProjectSignalEvidenceForAi(payload),
+      promptFeedbackHints,
     });
 
     await this.prisma.projectRiskEvaluation.upsert({
@@ -170,13 +178,22 @@ export class ProjectRiskService {
       select: { name: true },
     });
 
+    const promptFeedbackHints = await this.traceAnalyst.promptFeedbackHints(
+      projectId,
+      InsightFeedbackKind.RISK_SUMMARY,
+    );
+
     const aiSummary = await this.riskInsight.summarize({
       projectName: project?.name ?? 'Project',
       level,
       score,
       reasons,
       signalEvidence: compactProjectSignalEvidenceForAi(payload),
+      promptFeedbackHints,
     });
+
+    const signalPayloadJson: Prisma.InputJsonValue =
+      payload as unknown as Prisma.InputJsonValue;
 
     const run = await this.prisma.riskEvaluationRun.create({
       data: {
@@ -187,6 +204,7 @@ export class ProjectRiskService {
         reasons,
         aiSummary,
         mlPrediction: mlPrisma,
+        signalPayload: signalPayloadJson,
       },
       select: {
         id: true,

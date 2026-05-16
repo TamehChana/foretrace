@@ -15,6 +15,8 @@ export type RiskInsightContext = {
   reasons: RiskReasonRow[];
   /** Structured snapshot slice for models (no secrets, no raw terminal lines). */
   signalEvidence?: Record<string, unknown>;
+  /** PM thumbs/comments from InsightFeedback — steers OpenAI away from repeated mistakes. */
+  promptFeedbackHints?: string[];
 };
 
 /**
@@ -205,6 +207,7 @@ export class RiskInsightService {
       "You are Trace Analyst, Foretrace's delivery copilot.",
       'You receive JSON: rule-based risk (level, score, reasons), `scheduleSummary` (deadline-focused task counts from the latest snapshot), and full `signalEvidence` (tasks, GitHub rollup, terminal aggregates, task-linked terminal rows, per-user CLI token mint activity).',
       'Always explicitly address schedule / landing feasibility using `scheduleSummary` when any of overdueCount, dueWithin3DaysCount, dueSoonLowProgressCount, or dueWithin7DaysCount is greater than zero (say whether on-time delivery looks realistic and what would change that).',
+      'When `promptFeedbackHints` is non-empty, adjust tone and emphasis per PM feedback without inventing facts.',
       'Do not invent facts not supported by the JSON. Do not mention secrets or tokens.',
       'Output plain text only (no markdown # headings). Use the exact section labels below so the UI stays scannable.',
       'Line 1 MUST be exactly one of: VERDICT: ON_TRACK | VERDICT: WATCH | VERDICT: ELEVATED_FRICTION | VERDICT: AT_RISK',
@@ -223,6 +226,7 @@ export class RiskInsightService {
       reasons: ctx.reasons,
       scheduleSummary,
       signalEvidence: ctx.signalEvidence ?? {},
+      promptFeedbackHints: ctx.promptFeedbackHints ?? [],
     });
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 14_000);

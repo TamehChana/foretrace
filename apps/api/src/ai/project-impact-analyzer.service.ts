@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InsightFeedbackKind } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -9,11 +10,21 @@ import {
 import { isDeadlineOverdueUtc } from '../projects/task-deadline.util';
 import { ProjectsService } from '../projects/projects.service';
 import { ProjectSignalsService } from '../projects/project-signals.service';
+import { TraceAnalystContextService } from './trace-analyst-context.service';
 
 export type ProjectImpactAnalyzeResult = {
   analysis: string;
   usedOpenAi: boolean;
   snapshotComputedAt: string;
+  persistedRunId: string;
+};
+
+export type ProjectImpactHistoryRow = {
+  id: string;
+  analysis: string;
+  usedOpenAi: boolean;
+  snapshotComputedAt: string;
+  createdAt: string;
 };
 
 function scheduleSummaryFromPayload(
@@ -39,7 +50,36 @@ export class ProjectImpactAnalyzerService {
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
     private readonly signals: ProjectSignalsService,
+    private readonly traceAnalyst: TraceAnalystContextService,
   ) {}
+
+  async listHistory(
+    projectId: string,
+    organizationId: string,
+    limit = 10,
+  ): Promise<ProjectImpactHistoryRow[]> {
+    await this.projects.getProjectInOrg(projectId, organizationId);
+    const take = Math.min(Math.max(limit, 1), 30);
+    const rows = await this.prisma.projectImpactAnalysisRun.findMany({
+      where: { projectId, organizationId },
+      select: {
+        id: true,
+        analysis: true,
+        usedOpenAi: true,
+        snapshotComputedAt: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      analysis: r.analysis,
+      usedOpenAi: r.usedOpenAi,
+      snapshotComputedAt: r.snapshotComputedAt.toISOString(),
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
 
   async analyze(
     projectId: string,
@@ -87,10 +127,30 @@ export class ProjectImpactAnalyzerService {
         excerpt: true,
         lastSeenAt: true,
         occurrenceCount: true,
+        taskId: true,
       },
       orderBy: { lastSeenAt: 'desc' },
-      take: 14,
+      take: 20,
     });
+
+    const githubActivities = await this.prisma.taskGitHubActivity.findMany({
+      where: { task: { projectId } },
+      select: {
+        occurredAt: true,
+        eventType: true,
+        action: true,
+        summary: true,
+        actorLogin: true,
+        task: { select: { title: true, githubIssueNumber: true } },
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: 18,
+    });
+
+    const promptFeedbackHints = await this.traceAnalyst.promptFeedbackHints(
+      projectId,
+      InsightFeedbackKind.PROJECT_IMPACT_ANALYSIS,
+    );
 
     const taskPack = tasks.map((t) => ({
       title: t.title,
@@ -107,9 +167,20 @@ export class ProjectImpactAnalyzerService {
         i.excerpt.length > 360 ? `${i.excerpt.slice(0, 360)}…` : i.excerpt,
       lastSeenAt: i.lastSeenAt.toISOString(),
       occurrenceCount: i.occurrenceCount,
+      taskId: i.taskId,
     }));
 
-    const llm = await this.tryOpenAi({
+    const githubActivityPack = githubActivities.map((a) => ({
+      at: a.occurredAt.toISOString(),
+      eventType: a.eventType,
+      action: a.action,
+      actorLogin: a.actorLogin,
+      summary: a.summary,
+      taskTitle: a.task.title,
+      githubIssueNumber: a.task.githubIssueNumber,
+    }));
+
+    const llmInput = {
       projectName: name,
       scheduleSummary,
       signalEvidence: evidence,
@@ -123,26 +194,42 @@ export class ProjectImpactAnalyzerService {
         : null,
       recentTasks: taskPack,
       recentTerminalIncidents: incidentPack,
-    });
-    if (llm) {
-      return {
-        analysis: llm,
-        usedOpenAi: true,
-        snapshotComputedAt: snapshot.computedAt.toISOString(),
-      };
-    }
+      recentGithubActivity: githubActivityPack,
+      promptFeedbackHints,
+    };
 
-    return {
-      analysis: this.heuristic({
+    const llm = await this.tryOpenAi(llmInput);
+    const analysis =
+      llm ??
+      this.heuristic({
         projectName: name,
         scheduleSummary,
         signalEvidence: evidence,
         latestRisk: risk,
         taskPack,
         incidentPack,
-      }),
-      usedOpenAi: false,
-      snapshotComputedAt: snapshot.computedAt.toISOString(),
+        githubActivityPack,
+      });
+
+    const usedOpenAi = Boolean(llm);
+    const snapshotComputedAt = snapshot.computedAt;
+
+    const persisted = await this.prisma.projectImpactAnalysisRun.create({
+      data: {
+        organizationId,
+        projectId,
+        analysis,
+        usedOpenAi,
+        snapshotComputedAt,
+      },
+      select: { id: true },
+    });
+
+    return {
+      analysis,
+      usedOpenAi,
+      snapshotComputedAt: snapshotComputedAt.toISOString(),
+      persistedRunId: persisted.id,
     };
   }
 
@@ -169,6 +256,15 @@ export class ProjectImpactAnalyzerService {
       excerpt: string;
       lastSeenAt: string;
       occurrenceCount: number;
+    }>;
+    githubActivityPack: Array<{
+      at: string;
+      eventType: string;
+      action: string | null;
+      actorLogin: string | null;
+      summary: string;
+      taskTitle: string;
+      githubIssueNumber: number | null;
     }>;
   }): string {
     const s = input.scheduleSummary;
@@ -221,10 +317,20 @@ export class ProjectImpactAnalyzerService {
 
     if (input.incidentPack.length > 0) {
       lines.push('TERMINAL INCIDENTS (redacted excerpts, newest first)');
-      for (const i of input.incidentPack.slice(0, 5)) {
+      for (const i of input.incidentPack.slice(0, 6)) {
         lines.push(
           `• [${i.category}] ${i.fingerprintShort} (×${i.occurrenceCount}) @ ${i.lastSeenAt}`,
           `  ${i.excerpt.replace(/\s+/g, ' ').trim()}`,
+        );
+      }
+      lines.push('');
+    }
+
+    if (input.githubActivityPack.length > 0) {
+      lines.push('GITHUB ACTIVITY (task-linked, newest first)');
+      for (const a of input.githubActivityPack.slice(0, 6)) {
+        lines.push(
+          `• ${a.at} — ${a.taskTitle}${a.githubIssueNumber != null ? ` (#${a.githubIssueNumber})` : ''}: ${a.summary}`,
         );
       }
       lines.push('');
@@ -278,44 +384,21 @@ export class ProjectImpactAnalyzerService {
     return lines.join('\n').slice(0, 12_000);
   }
 
-  private openAiKey(): string | null {
-    const k =
+  private async tryOpenAi(input: Record<string, unknown>): Promise<string | null> {
+    if (!this.traceAnalyst.openAiConfigured()) {
+      return null;
+    }
+    const key =
       this.config.get<string>('OPENAI_API_KEY')?.trim() ??
       process.env.OPENAI_API_KEY?.trim();
-    return k && k.length > 0 ? k : null;
-  }
-
-  private openAiModel(): string {
-    return (
-      this.config.get<string>('OPENAI_IMPACT_MODEL')?.trim() ??
-      process.env.OPENAI_IMPACT_MODEL?.trim() ??
-      this.config.get<string>('OPENAI_RISK_MODEL')?.trim() ??
-      process.env.OPENAI_RISK_MODEL?.trim() ??
-      'gpt-4o-mini'
-    );
-  }
-
-  private async tryOpenAi(input: {
-    projectName: string;
-    scheduleSummary: Record<string, number | null>;
-    signalEvidence: Record<string, unknown>;
-    latestRisk: {
-      level: string;
-      score: number;
-      reasons: unknown;
-      evaluatedAt: string;
-    } | null;
-    recentTasks: unknown[];
-    recentTerminalIncidents: unknown[];
-  }): Promise<string | null> {
-    const key = this.openAiKey();
     if (!key) {
       return null;
     }
-    const model = this.openAiModel();
+    const model = this.traceAnalyst.openAiImpactModel();
     const system = [
       "You are Trace Analyst, Foretrace's delivery copilot.",
-      'You receive JSON only: project name, scheduleSummary (deadline-focused counts), signalEvidence (aggregated GitHub/terminal/task rollup — no secrets), optional latest persisted risk row, recent task rows (titles, status, progress, deadlines, issue numbers), and recent terminal incident rows (already redacted excerpts).',
+      'You receive JSON only: project name, scheduleSummary (deadline-focused counts), signalEvidence (aggregated GitHub/terminal/task rollup — no secrets), optional latest persisted risk row, recent task rows, recent terminal incident rows (redacted), recentGithubActivity (task-linked webhook summaries), and promptFeedbackHints (PM tuning — do not invent facts).',
+      'When promptFeedbackHints is non-empty, adjust emphasis per PM feedback.',
       'Synthesize how these signals together could affect hitting project goals and dates. Be explicit about schedule risk vs operational/GitHub noise.',
       'Do not invent repositories, people, or incidents not present in JSON. Do not mention API keys or tokens.',
       'Output plain text only (no markdown # headings). Use these section titles on their own lines, in order:',

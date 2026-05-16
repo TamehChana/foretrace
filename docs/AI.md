@@ -11,7 +11,8 @@
 - Trace Analyst outputs use **fixed section headings** (e.g. VERDICT, EXECUTIVE READ, EVIDENCE, SCHEDULE, NEXT ACTIONS, CONFIDENCE on risk; parallel sections on the on-demand read) so the UI stays scannable.
 
 - **Risk ML (v1):** optional **multinomial + binary logistic** heads over normalized snapshot features; see [`docs/ML-RISK.md`](./ML-RISK.md).
-- **`POST …/projects/:projectId/insights/analyze`** (Delivery risk panel → **Trace Analyst** button) calls **`ProjectImpactAnalyzerService`**: it refreshes the signal snapshot, attaches recent tasks and redacted terminal incident excerpts plus `scheduleSummary`, then either calls OpenAI (same `OPENAI_API_KEY`; model from `OPENAI_IMPACT_MODEL` or `OPENAI_RISK_MODEL`) or returns a **longer heuristic** text. The result is **not persisted** (on-demand inference only).
+- **`POST …/projects/:projectId/insights/analyze`** (Delivery risk panel → **Trace Analyst** button) calls **`ProjectImpactAnalyzerService`**: it refreshes the signal snapshot, attaches recent tasks, task-linked GitHub activity, redacted terminal incidents, PM `promptFeedbackHints`, and `scheduleSummary`, then either calls OpenAI or returns a **longer heuristic** text. Results are **persisted** in `ProjectImpactAnalysisRun` (see `GET …/insights/history`).
+- **`GET …/projects/:projectId/insights/readiness`** returns Trace Analyst readiness (OpenAI on/off, snapshot age, overdue counts, hints). Shown in the Delivery risk panel.
 
 - **`POST …/projects/:projectId/insight-feedback`** stores **thumbs** (`RISK_SUMMARY` vs `PROJECT_IMPACT_ANALYSIS`, optional `comment`, `helpful` boolean) for future evaluation of narratives — not used for live scoring yet.
 
@@ -46,5 +47,6 @@ This is intentionally small and synchronous so “Evaluate” stays predictable;
 | `OPENAI_RISK_MODEL` | Optional; defaults to `gpt-4o-mini`. |
 | `OPENAI_IMPACT_MODEL` | Optional; model for impact analysis; defaults to `OPENAI_RISK_MODEL` then `gpt-4o-mini`. |
 | `FORETRACE_CRON_SECRET` | Optional; enables `POST /internal/cron/refresh-project-snapshots` when sent as `X-Foretrace-Cron-Secret`. |
+| `FORETRACE_AI_USE_FEEDBACK_HINTS` | Optional; when not `0`/`false`, recent PM insight feedback is included in OpenAI prompts. |
 
 See also [`.env.example`](../.env.example) for mail and app secrets.
