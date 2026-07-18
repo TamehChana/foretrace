@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronRight,
+  ClipboardCopy,
   ExternalLink,
   FolderKanban,
   Plus,
@@ -1161,12 +1162,39 @@ export function ProjectsPage() {
                               aria-hidden
                             />
                           )}
-                          <span className="truncate font-medium text-zinc-900 dark:text-zinc-50">
-                            {p.name}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium text-zinc-900 dark:text-zinc-50">
+                              {p.name}
+                            </span>
+                            <span
+                              className="mt-0.5 block truncate font-mono text-[10px] text-zinc-500 dark:text-zinc-400"
+                              title={`Project ID: ${p.id}`}
+                            >
+                              ID {p.id}
+                            </span>
                           </span>
                           <span className="shrink-0 text-xs tabular-nums text-zinc-500">
                             {p.taskCount} task{p.taskCount === 1 ? '' : 's'}
                           </span>
+                        </button>
+                        <button
+                          type="button"
+                          title="Copy project ID"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void navigator.clipboard
+                              .writeText(p.id)
+                              .then(() => {
+                                showToast('Project ID copied', 'success');
+                              })
+                              .catch(() => {
+                                showToast('Could not copy to clipboard', 'error');
+                              });
+                          }}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        >
+                          <ClipboardCopy size={14} strokeWidth={2} aria-hidden />
+                          ID
                         </button>
                         {canManageProjects ? (
                           <button
