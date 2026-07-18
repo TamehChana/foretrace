@@ -570,10 +570,10 @@ export FORETRACE_PROJECT_ID="paste-project-uuid"
             </li>
             <li>
               Run <strong className="text-zinc-800 dark:text-zinc-200">Foretrace: Send test batch</strong> to verify the API, then{' '}
-              <strong>Foretrace: Start terminal capture</strong> (or rely on auto-start). On{' '}
-              <strong className="text-zinc-800 dark:text-zinc-200">stable VS Code</strong> you may need to launch with{' '}
-              <Code>--enable-proposed-api foretrace.foretrace-vscode</Code>; if capture is unavailable, use <strong>Send editor selection</strong> or the CLI in
-              section 6.
+              <strong>Foretrace: Start terminal capture</strong> (or rely on auto-start). In <strong>Cursor</strong>, live streaming is often blocked — use{' '}
+              <strong>Foretrace: Open capture terminal (Cursor-safe)</strong> and work in that terminal; the extension uploads new lines from{' '}
+              <Code>~/.foretrace/capture.log</Code> about every 3 minutes. On stable VS Code you may instead launch with{' '}
+              <Code>--enable-proposed-api foretrace.foretrace-vscode</Code> for live capture.
             </li>
           </ol>
         </WorkflowStep>

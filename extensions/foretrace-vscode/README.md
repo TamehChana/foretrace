@@ -63,7 +63,15 @@ If capture still cannot start, use **Foretrace: Send editor selection** (or CLI 
 
 ### Cursor
 
-Cursor may still block or differ on proposed APIs; if **Start terminal capture** fails there, use **VS Code** with the flag above, or use **editor selection** / **CLI**.
+Cursor often **blocks** the proposed `terminalDataWriteEvent` API for third-party extensions (you may see a Runtime Status error about `enabledApiProposals`). That is expected.
+
+**Cursor-safe path (v0.1.11+):**
+
+1. **Foretrace: Start terminal capture** — falls back to file mode (`~/.foretrace/capture.log`) and uploads every `flushIntervalMs`.
+2. **Foretrace: Open capture terminal (Cursor-safe)** — opens a terminal that records all I/O into that log via `script`.
+3. Work in that **Foretrace Capture** terminal. About every 3 minutes, new lines are POSTed to Foretrace.
+
+If live capture fails there, use **Send editor selection** / **Send test batch**, or the CLI (`foretrace run`).
 
 ## Troubleshooting (Cursor)
 

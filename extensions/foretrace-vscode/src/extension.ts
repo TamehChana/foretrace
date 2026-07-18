@@ -1,9 +1,14 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as os from 'os';
+import * as path from 'path';
 
 const SECRET_CLI_TOKEN = 'foretrace.cliToken';
 const MAX_LINES = 320;
 const MAX_LINE_CHARS = 12_288;
+const DEFAULT_FLUSH_MS = 180_000;
+const MIN_FLUSH_MS = 500;
+const MAX_FLUSH_MS = 300_000;
 
 function isWorkspaceTrusted(): boolean {
   const w = vscode.workspace as { isTrusted?: boolean };
@@ -40,10 +45,6 @@ function projectId(): string {
   return getConfig().get<string>('projectId', '').trim().toLowerCase();
 }
 
-const DEFAULT_FLUSH_MS = 180_000;
-const MIN_FLUSH_MS = 500;
-const MAX_FLUSH_MS = 300_000;
-
 function flushIntervalMs(): number {
   const n = getConfig().get<number>('flushIntervalMs', DEFAULT_FLUSH_MS);
   if (typeof n !== 'number' || Number.isNaN(n)) {
@@ -54,6 +55,15 @@ function flushIntervalMs(): number {
 
 function autoStartTerminalCapture(): boolean {
   return getConfig().get<boolean>('autoStartTerminalCapture', false) === true;
+}
+
+/** Local transcript Cursor can write into when live terminal streaming is blocked. */
+function captureLogPath(): string {
+  const configured = getConfig().get<string>('captureLogPath', '').trim();
+  if (configured.length > 0) {
+    return configured;
+  }
+  return path.join(os.homedir(), '.foretrace', 'capture.log');
 }
 
 function workspaceCwd(): string | undefined {
@@ -151,13 +161,29 @@ async function postInChunks(
   }
 }
 
+function ensureCaptureLogFile(filePath: string): void {
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, '', 'utf8');
+  }
+}
+
+type CaptureMode = 'live' | 'file';
+
 class TerminalCaptureSession {
   private buffer = '';
   private capturing = false;
+  private mode: CaptureMode | undefined;
   private disposable: vscode.Disposable | undefined;
   private interval: ReturnType<typeof setInterval> | undefined;
+  private fileOffset = 0;
+  private logPath = '';
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly logLine: (message: string) => void,
+  ) {}
 
   get isCapturing(): boolean {
     return this.capturing;
@@ -173,30 +199,74 @@ class TerminalCaptureSession {
       }
       return true;
     }
-    const w = windowWithTerminalData();
-    if (typeof w.onDidWriteTerminalData !== 'function') {
-      if (!opts?.quiet) {
-        void vscode.window.showWarningMessage(
-          'Foretrace: this editor build does not expose integrated-terminal streaming. Use “Send editor selection” or the CLI.',
-        );
-      }
-      return false;
+
+    const liveOk = this.tryStartLive();
+    if (!liveOk) {
+      this.startFileMode();
     }
-    this.capturing = true;
-    this.buffer = '';
-    this.disposable = w.onDidWriteTerminalData((e: TerminalWriteEvent) => {
-      this.buffer += e.data;
-    });
+
     const intervalMs = flushIntervalMs();
     this.interval = setInterval(() => {
       void this.flush();
     }, intervalMs);
-    if (!opts?.quiet) {
-      void vscode.window.showInformationMessage(
-        `Foretrace: terminal capture started (flush every ${Math.round(intervalMs / 1000)}s)`,
-      );
+    this.capturing = true;
+
+    const secs = Math.round(intervalMs / 1000);
+    if (this.mode === 'live') {
+      this.logLine(`capture started (live), flush every ${intervalMs} ms`);
+      if (!opts?.quiet) {
+        void vscode.window.showInformationMessage(
+          `Foretrace: live terminal capture started (flush every ${secs}s)`,
+        );
+      }
+    } else {
+      this.logLine(`capture started (file), path=${this.logPath}, flush every ${intervalMs} ms`);
+      if (!opts?.quiet) {
+        void vscode.window
+          .showInformationMessage(
+            `Foretrace: Cursor blocks live terminal streaming. Using file capture → ${this.logPath}. Open a Foretrace Capture terminal.`,
+            'Open capture terminal',
+          )
+          .then((choice) => {
+            if (choice === 'Open capture terminal') {
+              void vscode.commands.executeCommand('foretrace.openCaptureTerminal');
+            }
+          });
+      }
     }
     return true;
+  }
+
+  private tryStartLive(): boolean {
+    const w = windowWithTerminalData();
+    if (typeof w.onDidWriteTerminalData !== 'function') {
+      return false;
+    }
+    try {
+      this.buffer = '';
+      this.disposable = w.onDidWriteTerminalData((e: TerminalWriteEvent) => {
+        this.buffer += e.data;
+      });
+      this.mode = 'live';
+      return true;
+    } catch (e) {
+      this.logLine(
+        `live capture unavailable: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      this.disposable = undefined;
+      return false;
+    }
+  }
+
+  private startFileMode(): void {
+    this.mode = 'file';
+    this.logPath = captureLogPath();
+    ensureCaptureLogFile(this.logPath);
+    try {
+      this.fileOffset = fs.statSync(this.logPath).size;
+    } catch {
+      this.fileOffset = 0;
+    }
   }
 
   dispose(): void {
@@ -208,6 +278,7 @@ class TerminalCaptureSession {
     this.disposable?.dispose();
     this.disposable = undefined;
     void this.flush();
+    this.mode = undefined;
   }
 
   stop(): void {
@@ -219,24 +290,75 @@ class TerminalCaptureSession {
     this.dispose();
   }
 
+  private readNewFileChunk(): string {
+    try {
+      const stat = fs.statSync(this.logPath);
+      if (stat.size < this.fileOffset) {
+        // Log rotated / truncated
+        this.fileOffset = 0;
+      }
+      if (stat.size === this.fileOffset) {
+        return '';
+      }
+      const fd = fs.openSync(this.logPath, 'r');
+      try {
+        const len = stat.size - this.fileOffset;
+        const buf = Buffer.alloc(len);
+        fs.readSync(fd, buf, 0, len, this.fileOffset);
+        this.fileOffset = stat.size;
+        return buf.toString('utf8');
+      } finally {
+        fs.closeSync(fd);
+      }
+    } catch (e) {
+      this.logLine(`file read error: ${e instanceof Error ? e.message : String(e)}`);
+      return '';
+    }
+  }
+
   private async flush(): Promise<void> {
-    if (this.buffer.length === 0) {
+    let raw = '';
+    if (this.mode === 'live') {
+      if (this.buffer.length === 0) {
+        return;
+      }
+      raw = this.buffer;
+      this.buffer = '';
+    } else if (this.mode === 'file') {
+      raw = this.readNewFileChunk();
+    } else {
       return;
     }
-    const raw = this.buffer;
-    this.buffer = '';
+
     const lines = linesFromRaw(raw);
     if (lines.length === 0) {
       return;
     }
     try {
       await postInChunks(this.context, lines);
+      this.logLine(`flushed ${lines.length} line(s) (${this.mode})`);
     } catch (e) {
       void vscode.window.showErrorMessage(
         `Foretrace: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
   }
+}
+
+function openCaptureTerminal(): void {
+  const logFile = captureLogPath();
+  ensureCaptureLogFile(logFile);
+  const quoted = logFile.replace(/'/g, `'\\''`);
+  // `script` records all terminal I/O into the capture log (works in Cursor without proposed APIs).
+  const term = vscode.window.createTerminal({
+    name: 'Foretrace Capture',
+    shellPath: '/bin/zsh',
+    shellArgs: [
+      '-lc',
+      `echo "Foretrace: recording this terminal to ${quoted}"; echo "Leave this tab open while you work."; exec script -q -a '${quoted}' /bin/zsh -l`,
+    ],
+  });
+  term.show();
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -263,7 +385,7 @@ function doActivate(context: vscode.ExtensionContext): void {
 
   console.info(`[Foretrace] extension activated v${ver}`);
 
-  const session = new TerminalCaptureSession(context);
+  const session = new TerminalCaptureSession(context, logLine);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('foretrace.setCliToken', async () => {
@@ -367,6 +489,10 @@ function doActivate(context: vscode.ExtensionContext): void {
       session.stop();
     }),
 
+    vscode.commands.registerCommand('foretrace.openCaptureTerminal', () => {
+      openCaptureTerminal();
+    }),
+
     { dispose: () => session.dispose() },
   );
 
@@ -400,9 +526,7 @@ async function maybeAutoStartCapture(
       `autoStartTerminalCapture: started (flush every ${flushIntervalMs()} ms)`,
     );
   } else {
-    logLine(
-      'autoStartTerminalCapture: failed — terminal streaming API unavailable in this editor',
-    );
+    logLine('autoStartTerminalCapture: failed to start');
   }
 }
 

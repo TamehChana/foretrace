@@ -2,7 +2,7 @@
   "name": "foretrace-vscode",
   "displayName": "Foretrace",
   "description": "Stream integrated-terminal output to Foretrace (batched POST …/terminal/batches). MVP VSIX.",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "publisher": "foretrace",
   "private": true,
   "repository": {
@@ -25,6 +25,7 @@
     "onCommand:foretrace.sendEditorSelection",
     "onCommand:foretrace.startTerminalCapture",
     "onCommand:foretrace.stopTerminalCapture",
+    "onCommand:foretrace.openCaptureTerminal",
     "onCommand:foretrace.showLog"
   ],
   "main": "./dist/extension.js",
@@ -49,6 +50,10 @@
       {
         "command": "foretrace.stopTerminalCapture",
         "title": "Foretrace: Stop terminal capture"
+      },
+      {
+        "command": "foretrace.openCaptureTerminal",
+        "title": "Foretrace: Open capture terminal (Cursor-safe)"
       },
       {
         "command": "foretrace.showLog",
@@ -89,6 +94,11 @@
           "type": "boolean",
           "default": false,
           "description": "When true, start terminal capture on activate if apiBaseUrl, organizationId, projectId, and a stored CLI token are already set"
+        },
+        "foretrace.captureLogPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional path for file-based capture (default ~/.foretrace/capture.log). Used in Cursor when live terminal streaming is blocked."
         }
       }
     }
