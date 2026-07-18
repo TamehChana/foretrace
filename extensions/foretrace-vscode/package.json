@@ -2,7 +2,7 @@
   "name": "foretrace-vscode",
   "displayName": "Foretrace",
   "description": "Stream integrated-terminal output to Foretrace (batched POST …/terminal/batches). MVP VSIX.",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "publisher": "foretrace",
   "private": true,
   "repository": {
@@ -75,10 +75,15 @@
         },
         "foretrace.flushIntervalMs": {
           "type": "number",
-          "default": 2000,
+          "default": 180000,
           "minimum": 500,
-          "maximum": 60000,
-          "description": "How often to POST batched terminal lines while capture is running"
+          "maximum": 300000,
+          "description": "How often to POST batched terminal lines while capture is running (default 3 min / 180000 ms; max 5 min / 300000 ms)"
+        },
+        "foretrace.autoStartTerminalCapture": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, start terminal capture on activate if apiBaseUrl, organizationId, projectId, and a stored CLI token are already set"
         }
       }
     }

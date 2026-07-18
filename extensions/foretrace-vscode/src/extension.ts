@@ -40,12 +40,20 @@ function projectId(): string {
   return getConfig().get<string>('projectId', '').trim().toLowerCase();
 }
 
+const DEFAULT_FLUSH_MS = 180_000;
+const MIN_FLUSH_MS = 500;
+const MAX_FLUSH_MS = 300_000;
+
 function flushIntervalMs(): number {
-  const n = getConfig().get<number>('flushIntervalMs', 2000);
+  const n = getConfig().get<number>('flushIntervalMs', DEFAULT_FLUSH_MS);
   if (typeof n !== 'number' || Number.isNaN(n)) {
-    return 2000;
+    return DEFAULT_FLUSH_MS;
   }
-  return Math.min(60_000, Math.max(500, n));
+  return Math.min(MAX_FLUSH_MS, Math.max(MIN_FLUSH_MS, n));
+}
+
+function autoStartTerminalCapture(): boolean {
+  return getConfig().get<boolean>('autoStartTerminalCapture', false) === true;
 }
 
 function workspaceCwd(): string | undefined {
@@ -135,27 +143,44 @@ class TerminalCaptureSession {
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
-  start(): void {
+  get isCapturing(): boolean {
+    return this.capturing;
+  }
+
+  /**
+   * @returns true if capture is running after this call
+   */
+  start(opts?: { quiet?: boolean }): boolean {
     if (this.capturing) {
-      void vscode.window.showInformationMessage('Foretrace: capture already running');
-      return;
+      if (!opts?.quiet) {
+        void vscode.window.showInformationMessage('Foretrace: capture already running');
+      }
+      return true;
     }
     const w = windowWithTerminalData();
     if (typeof w.onDidWriteTerminalData !== 'function') {
-      void vscode.window.showWarningMessage(
-        'Foretrace: this editor build does not expose integrated-terminal streaming. Use “Send editor selection” or the CLI.',
-      );
-      return;
+      if (!opts?.quiet) {
+        void vscode.window.showWarningMessage(
+          'Foretrace: this editor build does not expose integrated-terminal streaming. Use “Send editor selection” or the CLI.',
+        );
+      }
+      return false;
     }
     this.capturing = true;
     this.buffer = '';
     this.disposable = w.onDidWriteTerminalData((e: TerminalWriteEvent) => {
       this.buffer += e.data;
     });
+    const intervalMs = flushIntervalMs();
     this.interval = setInterval(() => {
       void this.flush();
-    }, flushIntervalMs());
-    void vscode.window.showInformationMessage('Foretrace: terminal capture started');
+    }, intervalMs);
+    if (!opts?.quiet) {
+      void vscode.window.showInformationMessage(
+        `Foretrace: terminal capture started (flush every ${Math.round(intervalMs / 1000)}s)`,
+      );
+    }
+    return true;
   }
 
   dispose(): void {
@@ -328,6 +353,41 @@ function doActivate(context: vscode.ExtensionContext): void {
 
     { dispose: () => session.dispose() },
   );
+
+  void maybeAutoStartCapture(context, session, logLine);
+}
+
+async function maybeAutoStartCapture(
+  context: vscode.ExtensionContext,
+  session: TerminalCaptureSession,
+  logLine: (message: string) => void,
+): Promise<void> {
+  if (!autoStartTerminalCapture()) {
+    return;
+  }
+  if (!apiBaseUrl() || !organizationId() || !projectId()) {
+    logLine(
+      'autoStartTerminalCapture: skipped — set apiBaseUrl, organizationId, and projectId first',
+    );
+    return;
+  }
+  const token = await context.secrets.get(SECRET_CLI_TOKEN);
+  if (!token || !token.startsWith('ft_ck_')) {
+    logLine(
+      'autoStartTerminalCapture: skipped — store a CLI token via “Foretrace: Set CLI ingest token”',
+    );
+    return;
+  }
+  const started = session.start({ quiet: true });
+  if (started) {
+    logLine(
+      `autoStartTerminalCapture: started (flush every ${flushIntervalMs()} ms)`,
+    );
+  } else {
+    logLine(
+      'autoStartTerminalCapture: failed — terminal streaming API unavailable in this editor',
+    );
+  }
 }
 
 export function deactivate(): void {
