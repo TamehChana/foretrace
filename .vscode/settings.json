@@ -1,0 +1,7 @@
+{
+  "foretrace.apiBaseUrl": "https://foretrace-api-nwg8.onrender.com",
+  "foretrace.organizationId": "09c058d3-2f88-4623-8ac6-c062d63355b5",
+  "foretrace.projectId": "1747b58e-2fcf-49ba-99c3-31e7c7d7e6bb",
+  "foretrace.flushIntervalMs": 180000,
+  "foretrace.autoStartTerminalCapture": true
+}

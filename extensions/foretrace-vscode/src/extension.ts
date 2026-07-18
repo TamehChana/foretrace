@@ -74,6 +74,20 @@ function linesFromRaw(raw: string): string[] {
     .slice(0, MAX_LINES);
 }
 
+async function resolveCliToken(
+  context: vscode.ExtensionContext,
+): Promise<string | undefined> {
+  const fromSecrets = await context.secrets.get(SECRET_CLI_TOKEN);
+  if (fromSecrets?.startsWith('ft_ck_')) {
+    return fromSecrets.trim();
+  }
+  const fromSettings = getConfig().get<string>('cliToken', '').trim();
+  if (fromSettings.startsWith('ft_ck_')) {
+    return fromSettings;
+  }
+  return undefined;
+}
+
 async function postTerminalBatch(
   context: vscode.ExtensionContext,
   lines: string[],
@@ -93,9 +107,11 @@ async function postTerminalBatch(
   if (!proj) {
     throw new Error('Set foretrace.projectId in Settings');
   }
-  const token = await context.secrets.get(SECRET_CLI_TOKEN);
-  if (!token || !token.startsWith('ft_ck_')) {
-    throw new Error('Run “Foretrace: Set CLI ingest token” and paste a minted ft_ck_ token');
+  const token = await resolveCliToken(context);
+  if (!token) {
+    throw new Error(
+      'Set foretrace.cliToken in Settings, or run “Foretrace: Set CLI ingest token” and paste a minted ft_ck_ token',
+    );
   }
 
   const url = `${base}/organizations/${encodeURIComponent(org)}/projects/${encodeURIComponent(proj)}/terminal/batches`;
@@ -371,10 +387,10 @@ async function maybeAutoStartCapture(
     );
     return;
   }
-  const token = await context.secrets.get(SECRET_CLI_TOKEN);
-  if (!token || !token.startsWith('ft_ck_')) {
+  const token = await resolveCliToken(context);
+  if (!token) {
     logLine(
-      'autoStartTerminalCapture: skipped — store a CLI token via “Foretrace: Set CLI ingest token”',
+      'autoStartTerminalCapture: skipped — set foretrace.cliToken or run “Foretrace: Set CLI ingest token”',
     );
     return;
   }
