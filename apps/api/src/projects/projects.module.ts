@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 
 import { AiModule } from '../ai/ai.module';
 import { AlertsModule } from '../alerts/alerts.module';
@@ -25,7 +26,7 @@ import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
 
 @Module({
-  imports: [AuthModule, AlertsModule, AuditModule, AiModule],
+  imports: [ConfigModule, AuthModule, AlertsModule, AuditModule, AiModule],
   controllers: [
     ProjectsController,
     TasksController,
@@ -48,6 +49,12 @@ import { TasksService } from './tasks.service';
     ProjectUuidParamGuard,
     TaskUuidParamGuard,
   ],
-  exports: [ProjectsService, ProjectSignalsService, ProjectRiskService],
+  exports: [
+    ProjectsService,
+    ProjectSignalsService,
+    ProjectRiskService,
+    ProjectImpactAnalyzerService,
+    RiskMlService,
+  ],
 })
 export class ProjectsModule {}

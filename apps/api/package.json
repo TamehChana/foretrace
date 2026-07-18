@@ -16,6 +16,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "dev": "rm -f tsconfig.build.tsbuildinfo && nest start --watch",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -26,7 +27,9 @@
     "terminal:ingest": "node ../../packages/cli/dist/cli.js ingest",
     "vercel-build": "node -e \"process.exit(0)\"",
     "ml:train": "tsx src/ml/scripts/generate-risk-ml-weights.ts",
-    "ml:train:history": "tsx src/ml/scripts/train-risk-ml-from-history.ts"
+    "ml:train:history": "tsx src/ml/scripts/train-risk-ml-from-history.ts",
+    "ml:metrics": "tsx src/ml/scripts/print-risk-ml-metrics.ts",
+    "seed:defense": "npm run build && node dist/seed/run-defense-demo-seed.js"
   },
   "dependencies": {
     "@foretrace/shared": "*",

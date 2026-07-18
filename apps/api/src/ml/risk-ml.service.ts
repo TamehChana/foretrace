@@ -35,11 +35,22 @@ export class RiskMlService {
 
   constructor(private readonly config: ConfigService) {}
 
+  /**
+   * Pretrained risk-ml weights ship with the API. Enabled by default unless explicitly
+   * disabled (`0` / `false` / `no`). Set `FORETRACE_ML_RISK_ENABLED=1` to force on.
+   */
   enabled(): boolean {
     const raw =
       this.config.get<string>('FORETRACE_ML_RISK_ENABLED')?.trim() ??
       process.env.FORETRACE_ML_RISK_ENABLED?.trim();
-    return raw === '1' || raw === 'true' || raw === 'yes';
+    if (raw === '0' || raw === 'false' || raw === 'no') {
+      return false;
+    }
+    if (raw === '1' || raw === 'true' || raw === 'yes') {
+      return true;
+    }
+    // Unset → on when weights are available (users never train; product ships a model).
+    return this.loadWeights() !== null;
   }
 
   predict(payload: ProjectSignalPayload): RiskMlPredictionJson | null {

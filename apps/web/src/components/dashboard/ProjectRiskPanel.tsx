@@ -753,7 +753,8 @@ export function ProjectRiskPanel(props: {
                 </p>
                 <p className="mt-1 text-[10px] leading-snug text-indigo-900/85 dark:text-indigo-200/80">
                   Rule-based score and level remain authoritative for alerts; ML is an additional signal (see
-                  docs/ML-RISK.md). Enable with FORETRACE_ML_RISK_ENABLED=1 on the API.
+                  docs/ML-RISK.md). Pretrained weights ship with the API (on by default; set
+                  FORETRACE_ML_RISK_ENABLED=0 to disable).
                 </p>
               </div>
             );

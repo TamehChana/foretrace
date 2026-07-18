@@ -37,11 +37,18 @@ export class TraceAnalystContextService {
     private readonly prisma: PrismaService,
   ) {}
 
+  /** Align with RiskMlService: on by default unless explicitly disabled. */
   mlRiskEnabled(): boolean {
     const raw =
       this.config.get<string>('FORETRACE_ML_RISK_ENABLED')?.trim() ??
       process.env.FORETRACE_ML_RISK_ENABLED?.trim();
-    return raw === '1' || raw === 'true' || raw === 'yes';
+    if (raw === '0' || raw === 'false' || raw === 'no') {
+      return false;
+    }
+    if (raw === '1' || raw === 'true' || raw === 'yes') {
+      return true;
+    }
+    return true;
   }
 
   openAiConfigured(): boolean {
