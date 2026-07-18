@@ -38,6 +38,7 @@ import {
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 import { useToast } from '../../providers/ToastProvider';
 import { OrganizationIdCopyRow } from '../ui/OrganizationIdCopyRow';
+import { ProjectIdCopyRow } from '../ui/ProjectIdCopyRow';
 import { UserIdCopyRow } from '../ui/UserIdCopyRow';
 import { PageHeader } from '../ui/PageHeader';
 import { ProjectCliTokensPanel } from './ProjectCliTokensPanel';
@@ -1133,9 +1134,18 @@ export function ProjectsPage() {
                         <button
                           type="button"
                           className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                          onClick={() =>
-                            setExpandedProjectId(open ? null : p.id)
-                          }
+                          onClick={() => {
+                            const next = open ? null : p.id;
+                            setExpandedProjectId(next);
+                            if (organizationId) {
+                              setSearchParams(
+                                next
+                                  ? { org: organizationId, project: next }
+                                  : { org: organizationId },
+                                { replace: true },
+                              );
+                            }
+                          }}
                           aria-expanded={open}
                         >
                           {open ? (
@@ -1180,6 +1190,10 @@ export function ProjectsPage() {
                               {p.description}
                             </p>
                           ) : null}
+                          <ProjectIdCopyRow
+                            projectId={p.id}
+                            className="mt-3 max-w-md"
+                          />
                           <div className="mt-4">
                             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                               Tasks
