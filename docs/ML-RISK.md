@@ -45,6 +45,7 @@ npm run ml:train:history -w @foretrace/api
 
 ## Future work
 
-- Replace synthetic labels with **historical runs + snapshot features** stored at evaluation time.
+- Prefer **`ml:train:history`** once many real Evaluate runs exist (already supported).
 - Calibration (Platt / isotonic) on held-out org data.
 - Separate models per industry or team size.
+- Outcome/slip labels from post-deadline ground truth (not copying rules).

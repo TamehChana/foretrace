@@ -29,3 +29,7 @@ services:
         sync: false
       - key: SESSION_SECRET
         sync: false
+      - key: FORETRACE_ML_RISK_ENABLED
+        value: '1'
+      - key: API_PUBLIC_URL
+        sync: false
