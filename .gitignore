@@ -1,6 +1,7 @@
 node_modules/
 dist/
 *.vsix
+!apps/web/public/downloads/*.vsix
 .turbo/
 coverage/
 *.log

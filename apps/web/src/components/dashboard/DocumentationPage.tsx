@@ -510,9 +510,9 @@ export FORETRACE_PROJECT_ID="paste-project-uuid"
 
         <WorkflowStep step={7} id="step-7" title="Install the VS Code / Cursor extension (optional)">
           <p>
-            Use this when you want to send integrated-terminal or editor output from{' '}
-            <strong className="text-zinc-800 dark:text-zinc-200">Visual Studio Code</strong> or{' '}
-            <strong className="text-zinc-800 dark:text-zinc-200">Cursor</strong> to Foretrace without piping through the CLI on every command.
+            Use this when you want Foretrace to pick up <strong className="text-zinc-800 dark:text-zinc-200">all Cursor / VS Code integrated terminals</strong> and
+            upload buffered output about every <strong className="text-zinc-800 dark:text-zinc-200">3 minutes</strong> (configurable up to 5). No need to build the
+            extension yourself—download the ready-made installer below.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <a
@@ -527,16 +527,17 @@ export FORETRACE_PROJECT_ID="paste-project-uuid"
               File: <Code>{FORETRACE_VSCODE_FILENAME}</Code>
             </span>
           </div>
-          <Note title="If the download returns 404">
+          <Note title="Direct link">
             <p>
-              From the repository root run <Code>npm install --include=dev</Code> then <Code>npm run sync-web-vsix</Code>, then restart the web dev server. Production
-              builds run this automatically before packaging the site.
+              After this site deploys, you can also open{' '}
+              <Code>/downloads/{FORETRACE_VSCODE_FILENAME}</Code> on the same host (for example on production:{' '}
+              <Code>https://foretrace-api.vercel.app/downloads/{FORETRACE_VSCODE_FILENAME}</Code>).
             </p>
           </Note>
           <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">Install in the editor</h3>
           <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-zinc-500">
             <li>
-              Download the <Code>.vsix</Code> using the button above.
+              Click <strong className="text-zinc-800 dark:text-zinc-200">Download extension</strong> above (saves the <Code>.vsix</Code> to your computer).
             </li>
             <li>
               Open <strong className="text-zinc-800 dark:text-zinc-200">Extensions</strong> (<Code>Ctrl+Shift+X</Code> / <Code>Cmd+Shift+X</Code>).
@@ -553,21 +554,26 @@ export FORETRACE_PROJECT_ID="paste-project-uuid"
           <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-zinc-500">
             <li>
               In <strong className="text-zinc-800 dark:text-zinc-200">Settings</strong>, search <strong>Foretrace</strong> and set <Code>foretrace.apiBaseUrl</Code> (API
-              origin, no trailing slash), <Code>foretrace.organizationId</Code>, and <Code>foretrace.projectId</Code> — same values as in sections 2–3 and the CLI
-              variables in section 6.
+              origin, no trailing slash — hosted example <Code>https://foretrace-api-nwg8.onrender.com</Code>), <Code>foretrace.organizationId</Code>, and{' '}
+              <Code>foretrace.projectId</Code> — same values as in sections 2–3 and the CLI variables in section 6.
+            </li>
+            <li>
+              Optional: leave <Code>foretrace.flushIntervalMs</Code> at <Code>180000</Code> (3 minutes), or set <Code>300000</Code> for 5 minutes. Turn on{' '}
+              <Code>foretrace.autoStartTerminalCapture</Code> if you want capture to start whenever the editor opens.
             </li>
             <li>
               Mint a <strong className="text-zinc-800 dark:text-zinc-200">CLI ingest token</strong> in the browser (starts with <Code>ft_ck_</Code>).
             </li>
             <li>
-              Command palette → <strong className="text-zinc-800 dark:text-zinc-200">Foretrace: Set CLI token</strong> — paste the token once (stored in editor secret
-              storage, not in your repo).
+              Command palette → <strong className="text-zinc-800 dark:text-zinc-200">Foretrace: Set CLI ingest token</strong> — paste the token once (stored in editor
+              secret storage, not in your repo).
             </li>
             <li>
-              Run <strong className="text-zinc-800 dark:text-zinc-200">Foretrace: Send test batch</strong> to verify the API. Optional:{' '}
-              <strong>Start terminal capture</strong> — on <strong className="text-zinc-800 dark:text-zinc-200">stable VS Code</strong> you must launch the app with{' '}
-              <Code>--enable-proposed-api foretrace.foretrace-vscode</Code> (see the extension README for a copy-paste command); otherwise use{' '}
-              <strong>Send editor selection</strong> or the CLI in section 6.
+              Run <strong className="text-zinc-800 dark:text-zinc-200">Foretrace: Send test batch</strong> to verify the API, then{' '}
+              <strong>Foretrace: Start terminal capture</strong> (or rely on auto-start). On{' '}
+              <strong className="text-zinc-800 dark:text-zinc-200">stable VS Code</strong> you may need to launch with{' '}
+              <Code>--enable-proposed-api foretrace.foretrace-vscode</Code>; if capture is unavailable, use <strong>Send editor selection</strong> or the CLI in
+              section 6.
             </li>
           </ol>
         </WorkflowStep>
