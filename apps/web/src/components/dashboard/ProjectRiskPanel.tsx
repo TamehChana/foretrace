@@ -16,6 +16,7 @@ type RiskRow = {
   level: RiskLevel;
   score: number;
   reasons: unknown;
+  recommendations?: unknown;
   aiSummary?: string | null;
   mlPrediction?: unknown;
   evaluatedAt: string;
@@ -26,6 +27,7 @@ type RiskHistoryRow = {
   level: RiskLevel;
   score: number;
   reasons: unknown;
+  recommendations?: unknown;
   aiSummary?: string | null;
   mlPrediction?: unknown;
   evaluatedAt: string;
@@ -408,6 +410,7 @@ export function ProjectRiskPanel(props: {
         level,
         score,
         reasons: o.reasons,
+        recommendations: o.recommendations,
         aiSummary: aiSummary ?? undefined,
         mlPrediction: o.mlPrediction,
         evaluatedAt,
@@ -765,6 +768,27 @@ export function ProjectRiskPanel(props: {
               </li>
             ))}
           </ul>
+
+          {parseReasons(state.row.recommendations).length > 0 ? (
+            <div>
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                Recommendations
+              </h4>
+              <ul className="mt-2 space-y-2 text-[12px] text-zinc-700 dark:text-zinc-300">
+                {parseReasons(state.row.recommendations).map((r) => (
+                  <li
+                    key={r.code}
+                    className="rounded-lg border border-emerald-200/80 bg-emerald-50/60 px-2 py-1.5 dark:border-emerald-900/50 dark:bg-emerald-950/30"
+                  >
+                    <span className="font-mono text-[10px] font-semibold uppercase text-emerald-800/80 dark:text-emerald-200/80">
+                      {r.code}
+                    </span>
+                    <p className="mt-0.5 leading-snug">{r.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {typeof state.row.aiSummary === 'string' &&
           state.row.aiSummary.trim().length > 0 ? (

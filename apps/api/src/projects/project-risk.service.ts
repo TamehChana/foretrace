@@ -96,7 +96,8 @@ export class ProjectRiskService {
       organizationId,
     );
     const payload = snapshot.payload as unknown as ProjectSignalPayload;
-    const { level, score, reasons } = computeRiskFromPayload(payload);
+    const { level, score, reasons, recommendations } =
+      computeRiskFromPayload(payload);
     const mlPrediction = this.riskMl.predict(payload);
     const mlPrisma: Prisma.InputJsonValue | typeof Prisma.DbNull =
       mlPrediction === null || mlPrediction === undefined
@@ -130,6 +131,7 @@ export class ProjectRiskService {
         level,
         score,
         reasons,
+        recommendations,
         aiSummary,
         mlPrediction: mlPrisma,
       },
@@ -137,6 +139,7 @@ export class ProjectRiskService {
         level,
         score,
         reasons,
+        recommendations,
         aiSummary,
         mlPrediction: mlPrisma,
         evaluatedAt: new Date(),
@@ -181,6 +184,7 @@ export class ProjectRiskService {
         level: true,
         score: true,
         reasons: true,
+        recommendations: true,
         aiSummary: true,
         mlPrediction: true,
         evaluatedAt: true,
@@ -205,7 +209,8 @@ export class ProjectRiskService {
       organizationId,
     );
     const payload = snapshot.payload as unknown as ProjectSignalPayload;
-    const { level, score, reasons } = computeRiskFromPayload(payload);
+    const { level, score, reasons, recommendations } =
+      computeRiskFromPayload(payload);
     const mlPrediction = this.riskMl.predict(payload);
     const mlPrisma: Prisma.InputJsonValue | typeof Prisma.DbNull =
       mlPrediction === null || mlPrediction === undefined
@@ -247,6 +252,7 @@ export class ProjectRiskService {
         level,
         score,
         reasons,
+        recommendations,
         aiSummary,
         mlPrediction: mlPrisma,
         signalPayload: signalPayloadJson,
@@ -256,6 +262,7 @@ export class ProjectRiskService {
         level: true,
         score: true,
         reasons: true,
+        recommendations: true,
         aiSummary: true,
         mlPrediction: true,
         evaluatedAt: true,
@@ -270,6 +277,7 @@ export class ProjectRiskService {
         level,
         score,
         reasons,
+        recommendations,
         aiSummary,
         mlPrediction: mlPrisma,
       },
@@ -277,6 +285,7 @@ export class ProjectRiskService {
         level,
         score,
         reasons,
+        recommendations,
         aiSummary,
         mlPrediction: mlPrisma,
         evaluatedAt: new Date(),

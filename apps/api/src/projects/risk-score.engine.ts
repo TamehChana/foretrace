@@ -2,7 +2,58 @@ import { RiskLevel } from '@prisma/client';
 
 import type { GithubRestEnrichment } from './github-signal-rest-enricher';
 import type { ProjectSignalPayload } from './project-signals.service';
-import type { RiskReasonRow } from './risk-reason.types';
+import type {
+  RiskReasonRow,
+  RiskRecommendationRow,
+} from './risk-reason.types';
+
+const RECOMMENDATION_BY_REASON: Record<string, RiskRecommendationRow> = {
+  TASKS_OVERDUE: {
+    code: 'ACT_CLEAR_OVERDUE',
+    detail:
+      'Triage overdue tasks today: confirm owners, cut or renegotiate scope, and unblock anything past deadline.',
+  },
+  TASKS_DUE_IMMINENT: {
+    code: 'ACT_IMMINENT_DEADLINES',
+    detail:
+      'Run a short checkpoint on tasks due within 3 days; protect focus time and escalate blockers early.',
+  },
+  TASK_DEADLINE_PROGRESS_GAP: {
+    code: 'ACT_PROGRESS_GAP',
+    detail:
+      'Pair on low-progress near-deadline tasks (<35% with ≤7 days left); remove blockers or reassign.',
+  },
+  TASKS_DUE_SOON: {
+    code: 'ACT_WEEK_DEADLINES',
+    detail:
+      'Confirm owners and mid-week check-ins for tasks due in 4–7 days so they do not become overdue.',
+  },
+  TERMINAL_FRICTION: {
+    code: 'ACT_TERMINAL_FRICTION',
+    detail:
+      'Review recent terminal incidents/fingerprints; fix recurring env/build failures before they compound schedule risk.',
+  },
+  TASK_SCOPED_TERMINAL: {
+    code: 'ACT_TASK_TERMINAL',
+    detail:
+      'Talk to assignees on tasks with terminal friction; clear the failing command path or adjust the task estimate.',
+  },
+  GITHUB_HIGH_CHURN: {
+    code: 'ACT_GITHUB_CHURN',
+    detail:
+      'Check whether high GitHub activity is productive delivery vs thrash; stabilize the default branch and open PR queue.',
+  },
+  GITHUB_COMMIT_STATUS_FAILURE: {
+    code: 'ACT_FIX_CI',
+    detail:
+      'Restore green combined status on the default branch before merging more work.',
+  },
+  BASELINE: {
+    code: 'ACT_MAINTAIN',
+    detail:
+      'No elevated rule signals — keep current cadence and re-evaluate after the next significant signal change.',
+  },
+};
 
 /**
  * Pure rule-based v0 risk engine (same logic as production `ProjectRiskService`).
@@ -12,6 +63,7 @@ export function computeRiskFromPayload(payload: ProjectSignalPayload): {
   level: RiskLevel;
   score: number;
   reasons: RiskReasonRow[];
+  recommendations: RiskRecommendationRow[];
 } {
   const reasons: RiskReasonRow[] = [];
   let score = 0;
@@ -149,5 +201,36 @@ export function computeRiskFromPayload(payload: ProjectSignalPayload): {
     }
   }
 
-  return { level, score, reasons };
+  const recommendations = buildRecommendations(reasons, level);
+  return { level, score, reasons, recommendations };
+}
+
+function buildRecommendations(
+  reasons: RiskReasonRow[],
+  level: RiskLevel,
+): RiskRecommendationRow[] {
+  const out: RiskRecommendationRow[] = [];
+  const seen = new Set<string>();
+
+  for (const reason of reasons) {
+    const rec = RECOMMENDATION_BY_REASON[reason.code];
+    if (!rec || seen.has(rec.code)) {
+      continue;
+    }
+    seen.add(rec.code);
+    out.push(rec);
+  }
+
+  if (level === RiskLevel.HIGH || level === RiskLevel.CRITICAL) {
+    const escalate: RiskRecommendationRow = {
+      code: 'ACT_ESCALATE_PM',
+      detail:
+        'Escalate to the PM/sponsor now: freeze non-critical work, publish a recovery plan, and re-evaluate after intervention.',
+    };
+    if (!seen.has(escalate.code)) {
+      out.push(escalate);
+    }
+  }
+
+  return out.slice(0, 6);
 }

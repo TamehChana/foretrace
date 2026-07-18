@@ -343,6 +343,8 @@ model ProjectRiskEvaluation {
   score          Int
   /// Machine-readable reasons: `[{ "code": "TASKS_OVERDUE", "detail": "…" }]`
   reasons        Json
+  /// Evidence-linked PM actions: `[{ "code": "ACT_CLEAR_OVERDUE", "detail": "…" }]`
+  recommendations Json @default("[]")
   /// Optional human-facing narrative (heuristic and/or LLM). See `docs/AI.md`.
   aiSummary      String?   @db.Text
   /// Optional ML head output (risk level softmax + deadline pressure index). See `docs/ML-RISK.md`.
@@ -364,6 +366,8 @@ model RiskEvaluationRun {
   level          RiskLevel
   score          Int
   reasons        Json
+  /// Evidence-linked PM actions derived from rule reasons (same shape as reasons).
+  recommendations Json @default("[]")
   aiSummary      String?   @db.Text
   mlPrediction   Json?
   /// Snapshot payload used for this evaluation (for ML retrain / audit).
