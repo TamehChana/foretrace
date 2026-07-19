@@ -9,6 +9,7 @@ import {
 import { TraceAnalystContextService } from '../ai/trace-analyst-context.service';
 import { AuditService } from '../audit/audit.service';
 import { RiskMlService } from '../ml/risk-ml.service';
+import { IssueDelayMlService } from '../ml/issue-delay-ml.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   compactProjectSignalEvidenceForAi,
@@ -21,7 +22,7 @@ import { computeRiskFromPayload } from './risk-score.engine';
 export type { RiskReasonRow } from './risk-reason.types';
 
 function toMlSecondOpinion(
-  ml: ReturnType<RiskMlService['predict']>,
+  ml: Awaited<ReturnType<IssueDelayMlService['predictForProject']>> | ReturnType<RiskMlService['predict']>,
 ): RiskMlSecondOpinion | null {
   if (!ml) {
     return null;
@@ -54,8 +55,24 @@ export class ProjectRiskService {
     private readonly audit: AuditService,
     private readonly riskInsight: RiskInsightService,
     private readonly riskMl: RiskMlService,
+    private readonly issueDelayMl: IssueDelayMlService,
     private readonly traceAnalyst: TraceAnalystContextService,
   ) {}
+
+  private async resolveMlPrediction(
+    projectId: string,
+    organizationId: string,
+    payload: ProjectSignalPayload,
+  ) {
+    const delay = await this.issueDelayMl.predictForProject(
+      projectId,
+      organizationId,
+    );
+    if (delay) {
+      return delay;
+    }
+    return this.riskMl.predict(payload);
+  }
 
   /**
    * Refreshes the signal snapshot and upserts rule-based risk + heuristic narrative.
@@ -119,7 +136,11 @@ export class ProjectRiskService {
     const payload = snapshot.payload as unknown as ProjectSignalPayload;
     const { level, score, reasons, recommendations } =
       computeRiskFromPayload(payload);
-    const mlPrediction = this.riskMl.predict(payload);
+    const mlPrediction = await this.resolveMlPrediction(
+      projectId,
+      organizationId,
+      payload,
+    );
     const mlPrisma: Prisma.InputJsonValue | typeof Prisma.DbNull =
       mlPrediction === null || mlPrediction === undefined
         ? Prisma.DbNull
@@ -233,7 +254,11 @@ export class ProjectRiskService {
     const payload = snapshot.payload as unknown as ProjectSignalPayload;
     const { level, score, reasons, recommendations } =
       computeRiskFromPayload(payload);
-    const mlPrediction = this.riskMl.predict(payload);
+    const mlPrediction = await this.resolveMlPrediction(
+      projectId,
+      organizationId,
+      payload,
+    );
     const mlPrisma: Prisma.InputJsonValue | typeof Prisma.DbNull =
       mlPrediction === null || mlPrediction === undefined
         ? Prisma.DbNull

@@ -18,6 +18,11 @@ export type RiskMlPredictionJson = {
   classProbabilities: Record<string, number>;
   /** 0–1: learned index aligned with acute deadline / slip pressure (see `docs/ML-RISK.md`). */
   deadlinePressureIndex: number;
+  /** Mean P(issue delayed) when using issue-delay-v1. */
+  meanDelayProbability?: number;
+  maxDelayProbability?: number;
+  openTasksScored?: number;
+  source?: string;
 };
 
 type WeightsFile = {

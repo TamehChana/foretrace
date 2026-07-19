@@ -40,10 +40,14 @@ Choetkiertikul EMSE 2017 matrices:
 | Label | `delaydays > 0` → delayed |
 | Models | Logistic Regression, Random Forest, XGBoost |
 | Run | `npm run ml:delay:emse -w @foretrace/api` |
+| Portable runtime weights | `src/ml/delay-ml-v1.weights.json` (logistic on portable features) |
+| Export | `python export_portable_delay_model.py` in the experiment folder |
 
-See that folder’s `README.md`. TAWOS is **secondary** (resolution-time / feature engineering only; no `Due_Date` on `Issue`).
+**Runtime:** Evaluate prefers `IssueDelayMlService` (`issue-delay-v1`): scores open tasks with deadlines → mean `delayProbability` → stored in `mlPrediction`. Falls back to legacy `risk-ml-v1` only if no dated open tasks / weights missing.
 
-Production evaluate still uses the rule engine (+ optional shipped logistic second opinion) until Experiment 1 is integrated as `delayProbability`.
+See that folder’s `README.md` / `RESULTS.md`. TAWOS is **secondary** (resolution-time / feature engineering only; no `Due_Date` on `Issue`).
+
+Rule engine remains the official project `level` / `score`.
 
 ---
 

@@ -37,13 +37,23 @@ Predicting the delay of issues with due dates in software projects.
 Empirical Software Engineering, 22(3), 1223–1263.
 ```
 
-## Foretrace integration (later)
+## Foretrace integration
+
+Evaluate prefers **`issue-delay-v1`** (`delay-ml-v1.weights.json`):
 
 ```
-trained delay model
-  → issue-level delayProbability
-  → aggregate open-issue delay pressure
-  → combine with live task / GitHub / terminal rules
-  → project risk level
-  → Trace Analyst explanation
+open tasks with deadlines
+  → portable EMSE-trained logistic features
+  → mean delayProbability
+  → mlPrediction second opinion
+  → rule engine still owns official level/score
+  → Trace Analyst explains
 ```
+
+Export weights after training:
+
+```bash
+python export_portable_delay_model.py
+```
+
+If a project has no open dated tasks, evaluate falls back to the legacy synthetic risk-ml snapshot model.

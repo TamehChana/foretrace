@@ -5,12 +5,14 @@ import { AiModule } from '../ai/ai.module';
 import { AlertsModule } from '../alerts/alerts.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { PrismaModule } from '../prisma/prisma.module';
 
 import { ProjectUuidParamGuard } from '../common/project-uuid-param.guard';
 import { TaskUuidParamGuard } from '../common/task-uuid-param.guard';
 import { OrganizationUuidParamGuard } from '../organizations/organization-uuid-param.guard';
 import { ProjectImpactAnalyzerService } from '../ai/project-impact-analyzer.service';
 import { RiskMlService } from '../ml/risk-ml.service';
+import { IssueDelayMlService } from '../ml/issue-delay-ml.service';
 import { InsightFeedbackController } from './insight-feedback.controller';
 import { InsightFeedbackService } from './insight-feedback.service';
 import { OrganizationInsightFeedbackController } from './organization-insight-feedback.controller';
@@ -26,7 +28,14 @@ import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
 
 @Module({
-  imports: [ConfigModule, AuthModule, AlertsModule, AuditModule, AiModule],
+  imports: [
+    ConfigModule,
+    PrismaModule,
+    AuthModule,
+    AlertsModule,
+    AuditModule,
+    AiModule,
+  ],
   controllers: [
     ProjectsController,
     TasksController,
@@ -42,6 +51,7 @@ import { TasksService } from './tasks.service';
     ProjectSignalsService,
     ProjectRiskService,
     RiskMlService,
+    IssueDelayMlService,
     ProjectImpactAnalyzerService,
     InsightFeedbackService,
     TasksService,

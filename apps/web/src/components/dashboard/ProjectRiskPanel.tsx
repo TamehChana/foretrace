@@ -48,6 +48,8 @@ type MlRiskPrediction = {
   deadlinePressureIndex: number;
   /** Top-class probability 0–1 when available. */
   confidence: number | null;
+  meanDelayProbability: number | null;
+  openTasksScored: number | null;
 };
 
 const RISK_LEVEL_PLAIN: Record<RiskLevel, string> = {
@@ -94,6 +96,20 @@ function describeMlForPm(
   ml: MlRiskPrediction,
   ruleLevel: RiskLevel,
 ): { headline: string; body: string } {
+  const isDelayModel = ml.modelVersion.startsWith('issue-delay');
+  if (isDelayModel && ml.meanDelayProbability !== null) {
+    const pct = Math.round(ml.meanDelayProbability * 100);
+    const n = ml.openTasksScored ?? 0;
+    const headline = `Delay model: ~${pct}% chance open work slips past deadlines`;
+    const body = [
+      n > 0
+        ? `Averaged over ${n} open task(s) with due dates (trained on real Jira delay outcomes, not synthetic labels).`
+        : 'Trained on real Jira delay outcomes (EMSE 2017), not synthetic labels.',
+      mlAgreementPlainEnglish(ruleLevel, ml.predictedLevel),
+      pressurePlainEnglish(ml.deadlinePressureIndex),
+    ].join(' ');
+    return { headline, body };
+  }
   const conf =
     ml.confidence !== null
       ? ` (about ${Math.round(ml.confidence * 100)}% confident)`
@@ -159,11 +175,23 @@ function parseMlRiskPrediction(raw: unknown): MlRiskPrediction | null {
       confidence = Math.max(0, Math.min(1, p));
     }
   }
+  const meanRaw = o.meanDelayProbability;
+  const meanDelayProbability =
+    typeof meanRaw === 'number' && Number.isFinite(meanRaw)
+      ? Math.max(0, Math.min(1, meanRaw))
+      : null;
+  const scoredRaw = o.openTasksScored;
+  const openTasksScored =
+    typeof scoredRaw === 'number' && Number.isFinite(scoredRaw)
+      ? Math.max(0, Math.trunc(scoredRaw))
+      : null;
   return {
     modelVersion,
     predictedLevel,
     deadlinePressureIndex: Math.max(0, Math.min(1, idx)),
     confidence,
+    meanDelayProbability,
+    openTasksScored,
   };
 }
 
