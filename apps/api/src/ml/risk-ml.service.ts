@@ -112,22 +112,32 @@ export class RiskMlService {
     if (this.weights) {
       return this.weights;
     }
-    const path =
+    const configured =
       this.config.get<string>('FORETRACE_ML_RISK_WEIGHTS_PATH')?.trim() ??
-      process.env.FORETRACE_ML_RISK_WEIGHTS_PATH?.trim() ??
-      join(__dirname, 'risk-ml-v1.weights.json');
-    try {
-      const raw = readFileSync(path, 'utf8');
-      this.weights = JSON.parse(raw) as WeightsFile;
-      return this.weights;
-    } catch (e: unknown) {
-      this.log.warn(
-        `Risk ML weights not loaded from ${path}: ${
-          e instanceof Error ? e.message : String(e)
-        }`,
-      );
-      this.weights = null;
-      return null;
+      process.env.FORETRACE_ML_RISK_WEIGHTS_PATH?.trim();
+    const candidates = [
+      configured,
+      join(__dirname, 'risk-ml-v1.weights.json'),
+      join(process.cwd(), 'dist', 'ml', 'risk-ml-v1.weights.json'),
+      join(process.cwd(), 'src', 'ml', 'risk-ml-v1.weights.json'),
+      join(process.cwd(), 'apps', 'api', 'dist', 'ml', 'risk-ml-v1.weights.json'),
+      join(process.cwd(), 'apps', 'api', 'src', 'ml', 'risk-ml-v1.weights.json'),
+    ].filter((p): p is string => typeof p === 'string' && p.length > 0);
+
+    for (const path of candidates) {
+      try {
+        const raw = readFileSync(path, 'utf8');
+        this.weights = JSON.parse(raw) as WeightsFile;
+        this.log.log(`Risk ML weights loaded from ${path}`);
+        return this.weights;
+      } catch {
+        /* try next */
+      }
     }
+    this.log.warn(
+      `Risk ML weights not found (tried ${candidates.length} path(s)); mlPrediction disabled`,
+    );
+    this.weights = null;
+    return null;
   }
 }

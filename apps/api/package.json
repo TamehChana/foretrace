@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "build": "prisma generate && tsc -p tsconfig.build.json && node -e \"const fs=require('fs');const path=require('path');const src=path.join('src','ml');const dst=path.join('dist','ml');fs.mkdirSync(dst,{recursive:true});for(const f of fs.readdirSync(src)){if(f.endsWith('.json'))fs.copyFileSync(path.join(src,f),path.join(dst,f));}console.log('copied ML weights to dist/ml');\"",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
