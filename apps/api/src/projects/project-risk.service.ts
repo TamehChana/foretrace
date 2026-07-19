@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InsightFeedbackKind, Prisma } from '@prisma/client';
 
 import { AlertsService } from '../alerts/alerts.service';
-import { RiskInsightService } from '../ai/risk-insight.service';
+import {
+  RiskInsightService,
+  type RiskMlSecondOpinion,
+} from '../ai/risk-insight.service';
 import { TraceAnalystContextService } from '../ai/trace-analyst-context.service';
 import { AuditService } from '../audit/audit.service';
 import { RiskMlService } from '../ml/risk-ml.service';
@@ -16,6 +19,24 @@ import { ProjectsService } from './projects.service';
 import { computeRiskFromPayload } from './risk-score.engine';
 
 export type { RiskReasonRow } from './risk-reason.types';
+
+function toMlSecondOpinion(
+  ml: ReturnType<RiskMlService['predict']>,
+): RiskMlSecondOpinion | null {
+  if (!ml) {
+    return null;
+  }
+  const probs = ml.classProbabilities;
+  const confRaw = probs?.[ml.predictedLevel];
+  const confidence =
+    typeof confRaw === 'number' && Number.isFinite(confRaw) ? confRaw : null;
+  return {
+    predictedLevel: ml.predictedLevel,
+    deadlinePressureIndex: ml.deadlinePressureIndex,
+    confidence,
+    modelVersion: ml.modelVersion,
+  };
+}
 
 /** Debounced rules-only risk refresh after task/signal changes (no evaluation history row). */
 const RULES_REFRESH_COOLDOWN_MS = 30_000;
@@ -121,6 +142,7 @@ export class ProjectRiskService {
       reasons,
       signalEvidence: compactProjectSignalEvidenceForAi(payload),
       promptFeedbackHints,
+      mlSecondOpinion: toMlSecondOpinion(mlPrediction),
     });
 
     const row = await this.prisma.projectRiskEvaluation.upsert({
@@ -240,6 +262,7 @@ export class ProjectRiskService {
       reasons,
       signalEvidence: compactProjectSignalEvidenceForAi(payload),
       promptFeedbackHints,
+      mlSecondOpinion: toMlSecondOpinion(mlPrediction),
     });
 
     const signalPayloadJson: Prisma.InputJsonValue =

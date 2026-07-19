@@ -8,6 +8,14 @@ import {
 } from '../projects/project-signals.service';
 import type { RiskReasonRow } from '../projects/risk-reason.types';
 
+export type RiskMlSecondOpinion = {
+  predictedLevel: string;
+  deadlinePressureIndex: number;
+  /** Top-class probability when available (0–1). */
+  confidence?: number | null;
+  modelVersion?: string;
+};
+
 export type RiskInsightContext = {
   projectName: string;
   level: RiskLevel;
@@ -17,6 +25,11 @@ export type RiskInsightContext = {
   signalEvidence?: Record<string, unknown>;
   /** PM thumbs/comments from InsightFeedback — steers OpenAI away from repeated mistakes. */
   promptFeedbackHints?: string[];
+  /**
+   * Optional ML second opinion. Never authoritative — Trace Analyst must not change
+   * `level` / `score`; may briefly note agreement or disagreement for the PM.
+   */
+  mlSecondOpinion?: RiskMlSecondOpinion | null;
 };
 
 /**
@@ -134,15 +147,19 @@ export class RiskInsightService {
       !hasEvidence || (ctx.reasons.length === 1 && ctx.reasons[0]?.code === 'BASELINE')
         ? 'CONFIDENCE: MEDIUM (rule summary only; limited snapshot context)'
         : 'CONFIDENCE: HIGH (full signal rollup attached)';
+    const mlLine = this.mlSecondOpinionLine(ctx);
     const lines = [
       `VERDICT: ${verdict}`,
       '',
       'EXECUTIVE READ',
-      `Trace Analyst — delivery risk is ${ctx.level} (score ${ctx.score}/100) for “${ctx.projectName}”.`,
+      `For “${ctx.projectName}”, the rule-based delivery risk is ${ctx.level} (score ${ctx.score}/100). This narrative explains that score from the current signals — it does not set the score.`,
       '',
       'EVIDENCE',
       bullets,
     ];
+    if (mlLine) {
+      lines.push('', 'MODEL SECOND OPINION', mlLine);
+    }
     if (schedule) {
       lines.push('', 'SCHEDULE', schedule);
     } else {
@@ -158,6 +175,32 @@ export class RiskInsightService {
       confidence,
     );
     return lines.join('\n').slice(0, 8000);
+  }
+
+  private mlSecondOpinionLine(ctx: RiskInsightContext): string | null {
+    const ml = ctx.mlSecondOpinion;
+    if (!ml?.predictedLevel) {
+      return null;
+    }
+    const pressure = Number.isFinite(ml.deadlinePressureIndex)
+      ? Math.round(Math.max(0, Math.min(1, ml.deadlinePressureIndex)) * 100)
+      : null;
+    const conf =
+      typeof ml.confidence === 'number' && Number.isFinite(ml.confidence)
+        ? Math.round(Math.max(0, Math.min(1, ml.confidence)) * 100)
+        : null;
+    const agree =
+      ml.predictedLevel === ctx.level
+        ? `agrees with the rule engine (${ctx.level})`
+        : `differs from the rule engine (rules: ${ctx.level}; model: ${ml.predictedLevel}) — treat as a second opinion only`;
+    const bits = [agree];
+    if (conf !== null) {
+      bits.push(`about ${conf}% confident in its own level`);
+    }
+    if (pressure !== null) {
+      bits.push(`deadline pressure about ${pressure}%`);
+    }
+    return `The learned model ${bits.join('; ')}.`;
   }
 
   private buildScheduleSummary(
@@ -204,18 +247,22 @@ export class RiskInsightService {
     }
     const model = this.openAiModel();
     const system = [
-      "You are Trace Analyst, Foretrace's delivery copilot.",
-      'You receive JSON: rule-based risk (level, score, reasons), `scheduleSummary` (deadline-focused task counts from the latest snapshot), and full `signalEvidence` (tasks, GitHub rollup, terminal aggregates, task-linked terminal rows, per-user CLI token mint activity).',
-      'Always explicitly address schedule / landing feasibility using `scheduleSummary` when any of overdueCount, dueWithin3DaysCount, dueSoonLowProgressCount, or dueWithin7DaysCount is greater than zero (say whether on-time delivery looks realistic and what would change that).',
+      "You are Trace Analyst, Foretrace's delivery copilot for busy project managers.",
+      'Write in clear plain English. Avoid jargon, env-var names, and developer slang unless quoting a reason detail.',
+      'You receive JSON: authoritative rule-based risk (level, score, reasons), optional `mlSecondOpinion` (non-authoritative), `scheduleSummary`, and `signalEvidence`.',
+      'CRITICAL: Never change, restate as if deciding, or override `level` or `score`. Those come only from the rule engine. Your job is to explain why that score makes sense from the evidence.',
+      'If `mlSecondOpinion` is present and its predictedLevel differs from `level`, briefly note the disagreement as a second opinion only — do not adopt the ML level as the official risk.',
+      'Always explicitly address schedule / landing feasibility using `scheduleSummary` when any of overdueCount, dueWithin3DaysCount, dueSoonLowProgressCount, or dueWithin7DaysCount is greater than zero.',
       'When `promptFeedbackHints` is non-empty, adjust tone and emphasis per PM feedback without inventing facts.',
       'Do not invent facts not supported by the JSON. Do not mention secrets or tokens.',
       'Output plain text only (no markdown # headings). Use the exact section labels below so the UI stays scannable.',
       'Line 1 MUST be exactly one of: VERDICT: ON_TRACK | VERDICT: WATCH | VERDICT: ELEVATED_FRICTION | VERDICT: AT_RISK',
       'Then use these sections in order, each title on its own line followed by content:',
-      'EXECUTIVE READ — 1–2 sentences tying verdict to the biggest delivery risk.',
+      'EXECUTIVE READ — 1–2 plain sentences for a PM: what delivery situation looks like and why, citing the given level/score.',
       'EVIDENCE — 2–4 short lines; merge `reasons` with concrete numbers from `scheduleSummary` and `signalEvidence` (GitHub / terminal) where relevant.',
+      'MODEL SECOND OPINION — include only when `mlSecondOpinion` is non-null; one short paragraph on agreement/disagreement and deadline pressure; remind that rules remain official.',
       'SCHEDULE — one short paragraph on dates and feasibility (or say "No acute schedule pressure in counts" if counts are all zero).',
-      'NEXT ACTIONS — numbered list 1.–3. of PM moves grounded in the JSON (task deadlines, terminal friction by task, GitHub churn).',
+      'NEXT ACTIONS — numbered list 1.–3. of practical PM moves grounded in the JSON.',
       'CONFIDENCE — one line: CONFIDENCE: HIGH | CONFIDENCE: MEDIUM | CONFIDENCE: LOW based on how complete `signalEvidence` is (empty or sparse JSON → LOW or MEDIUM).',
     ].join(' ');
     const scheduleSummary = this.buildScheduleSummary(ctx.signalEvidence);
@@ -227,6 +274,8 @@ export class RiskInsightService {
       scheduleSummary,
       signalEvidence: ctx.signalEvidence ?? {},
       promptFeedbackHints: ctx.promptFeedbackHints ?? [],
+      mlSecondOpinion: ctx.mlSecondOpinion ?? null,
+      note: 'level and score are authoritative from the rule engine; explain them, do not replace them.',
     });
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 14_000);

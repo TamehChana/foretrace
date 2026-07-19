@@ -211,6 +211,34 @@ function formatWhen(iso: string): string {
   }
 }
 
+/** Soften machine-oriented Trace Analyst section labels for PM reading. Storage format unchanged. */
+function formatTraceAnalystForDisplay(raw: string): string {
+  return raw
+    .replace(/^VERDICT:\s*ON_TRACK\b/im, 'Outlook: On track')
+    .replace(/^VERDICT:\s*WATCH\b/im, 'Outlook: Watch closely')
+    .replace(
+      /^VERDICT:\s*ELEVATED_FRICTION\b/im,
+      'Outlook: Elevated delivery friction',
+    )
+    .replace(/^VERDICT:\s*AT_RISK\b/im, 'Outlook: At risk of slipping delivery')
+    .replace(/^EXECUTIVE READ\s*$/gim, 'In plain terms')
+    .replace(/^EVIDENCE\s*$/gim, 'What the signals show')
+    .replace(/^MODEL SECOND OPINION\s*$/gim, 'Model second opinion')
+    .replace(/^SCHEDULE\s*$/gim, 'Schedule')
+    .replace(/^SCHEDULE AND DEADLINES\s*$/gim, 'Schedule and deadlines')
+    .replace(/^SCHEDULE ROLLUP\s*$/gim, 'Schedule snapshot')
+    .replace(/^COLLABORATION AND GITHUB\s*$/gim, 'Collaboration and GitHub')
+    .replace(
+      /^TERMINAL AND ENGINEERING FRICTION\s*$/gim,
+      'Engineering friction (terminal)',
+    )
+    .replace(/^RISK CROSS-CHECK\s*$/gim, 'Risk cross-check')
+    .replace(/^LATEST SAVED RISK\s*$/gim, 'Latest saved risk')
+    .replace(/^NEXT ACTIONS\s*$/gim, 'Suggested next steps')
+    .replace(/^FEASIBILITY READ\s*$/gim, 'Feasibility')
+    .replace(/^CONFIDENCE:\s*/gim, 'Evidence completeness: ');
+}
+
 type HistoryPanelState =
   | { status: 'idle' | 'loading' }
   | { status: 'ok'; rows: RiskHistoryRow[] }
@@ -706,8 +734,12 @@ export function ProjectRiskPanel(props: {
               {formatWhen(impactState.snapshotComputedAt)}
             </span>
           </div>
+          <p className="mt-1 text-[10px] leading-snug text-violet-900/80 dark:text-violet-200/75">
+            Explains delivery signals for this project — does not set the official risk
+            score.
+          </p>
           <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans text-[12px] leading-relaxed text-violet-950 dark:text-violet-100">
-            {impactState.analysis}
+            {formatTraceAnalystForDisplay(impactState.analysis)}
           </pre>
           <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-violet-200/80 pt-2 dark:border-violet-800/60">
             <span className="text-[10px] text-violet-800 dark:text-violet-200">
@@ -758,7 +790,7 @@ export function ProjectRiskPanel(props: {
                   {row.usedOpenAi ? 'OpenAI' : 'Heuristic'} · {formatWhen(row.createdAt)}
                 </p>
                 <p className="mt-1 line-clamp-3 text-[11px] leading-snug text-zinc-800 dark:text-zinc-200">
-                  {row.analysis.slice(0, 400)}
+                  {formatTraceAnalystForDisplay(row.analysis).slice(0, 400)}
                   {row.analysis.length > 400 ? '…' : ''}
                 </p>
               </li>
@@ -863,10 +895,14 @@ export function ProjectRiskPanel(props: {
           state.row.aiSummary.trim().length > 0 ? (
             <div className="rounded-lg border border-zinc-200 bg-zinc-50/90 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900/70">
               <h4 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-                Trace Analyst — risk
+                Why this risk (Trace Analyst)
               </h4>
+              <p className="mt-1 text-[10px] leading-snug text-zinc-500">
+                Explains the rule-based score from current signals — Trace Analyst does
+                not change the score.
+              </p>
               <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-sans text-[12px] leading-relaxed text-zinc-800 dark:text-zinc-200">
-                {state.row.aiSummary.trim()}
+                {formatTraceAnalystForDisplay(state.row.aiSummary.trim())}
               </pre>
             </div>
           ) : null}

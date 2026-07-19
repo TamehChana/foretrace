@@ -103,7 +103,13 @@ export class ProjectImpactAnalyzerService {
 
     const risk = await this.prisma.projectRiskEvaluation.findUnique({
       where: { projectId },
-      select: { level: true, score: true, reasons: true, evaluatedAt: true },
+      select: {
+        level: true,
+        score: true,
+        reasons: true,
+        evaluatedAt: true,
+        mlPrediction: true,
+      },
     });
 
     const tasks = await this.prisma.task.findMany({
@@ -180,6 +186,13 @@ export class ProjectImpactAnalyzerService {
       githubIssueNumber: a.task.githubIssueNumber,
     }));
 
+    const mlPrediction =
+      risk?.mlPrediction &&
+      typeof risk.mlPrediction === 'object' &&
+      !Array.isArray(risk.mlPrediction)
+        ? (risk.mlPrediction as Record<string, unknown>)
+        : null;
+
     const llmInput = {
       projectName: name,
       scheduleSummary,
@@ -190,6 +203,15 @@ export class ProjectImpactAnalyzerService {
             score: risk.score,
             reasons: risk.reasons,
             evaluatedAt: risk.evaluatedAt.toISOString(),
+          }
+        : null,
+      mlSecondOpinion: mlPrediction
+        ? {
+            predictedLevel: mlPrediction.predictedLevel ?? null,
+            deadlinePressureIndex: mlPrediction.deadlinePressureIndex ?? null,
+            classProbabilities: mlPrediction.classProbabilities ?? null,
+            modelVersion: mlPrediction.modelVersion ?? null,
+            note: 'Non-authoritative. Rule level/score on latestRisk remain official.',
           }
         : null,
       recentTasks: taskPack,
@@ -269,10 +291,10 @@ export class ProjectImpactAnalyzerService {
   }): string {
     const s = input.scheduleSummary;
     const lines: string[] = [
-      'TRACE ANALYST (heuristic)',
+      'TRACE ANALYST',
       '',
       'EXECUTIVE READ',
-      `Project “${input.projectName}” — synthesized from the latest signal snapshot, persisted risk row (if any), recent tasks, and terminal incident excerpts.`,
+      `Plain-language read for “${input.projectName}” from the latest signal snapshot, saved risk (if any), recent tasks, and terminal incident excerpts. This explains delivery pressure — it does not set the risk score.`,
       '',
       'SCHEDULE ROLLUP',
       `• Active tasks: ${s.activeCount ?? 0}`,
@@ -286,7 +308,7 @@ export class ProjectImpactAnalyzerService {
     if (input.latestRisk) {
       lines.push(
         'LATEST SAVED RISK',
-        `${input.latestRisk.level} (score ${input.latestRisk.score}), from ${input.latestRisk.evaluatedAt.toISOString()}.`,
+        `Official (rule engine): ${input.latestRisk.level} (score ${input.latestRisk.score}), from ${input.latestRisk.evaluatedAt.toISOString()}.`,
         '(Run “Evaluate” on the risk panel to refresh before relying on it.)',
         '',
       );
@@ -396,18 +418,20 @@ export class ProjectImpactAnalyzerService {
     }
     const model = this.traceAnalyst.openAiImpactModel();
     const system = [
-      "You are Trace Analyst, Foretrace's delivery copilot.",
-      'You receive JSON only: project name, scheduleSummary (deadline-focused counts), signalEvidence (aggregated GitHub/terminal/task rollup — no secrets), optional latest persisted risk row, recent task rows, recent terminal incident rows (redacted), recentGithubActivity (task-linked webhook summaries), and promptFeedbackHints (PM tuning — do not invent facts).',
-      'When promptFeedbackHints is non-empty, adjust emphasis per PM feedback.',
-      'Synthesize how these signals together could affect hitting project goals and dates. Be explicit about schedule risk vs operational/GitHub noise.',
+      "You are Trace Analyst, Foretrace's delivery copilot for project managers.",
+      'Write in clear plain English. Avoid developer jargon, env-var names, and API terminology.',
+      'You receive JSON only: project name, scheduleSummary, signalEvidence, optional latestRisk (authoritative rule score), optional mlSecondOpinion (non-authoritative), recent tasks/incidents/GitHub, and promptFeedbackHints.',
+      'Never invent or change the official risk level/score. If latestRisk is present, treat it as authoritative and explain it. If mlSecondOpinion differs, note it only as a second opinion.',
+      'When promptFeedbackHints is non-empty, adjust emphasis per PM feedback without inventing facts.',
+      'Synthesize how these signals affect hitting project goals and dates. Be explicit about schedule risk vs GitHub/terminal noise.',
       'Do not invent repositories, people, or incidents not present in JSON. Do not mention API keys or tokens.',
       'Output plain text only (no markdown # headings). Use these section titles on their own lines, in order:',
-      'EXECUTIVE READ — 2–3 sentences.',
+      'EXECUTIVE READ — 2–3 plain sentences a PM can act on.',
       'SCHEDULE AND DEADLINES — paragraph using scheduleSummary and overdue-looking tasks.',
       'COLLABORATION AND GITHUB — paragraph from signalEvidence.github and task issue numbers where relevant.',
       'TERMINAL AND ENGINEERING FRICTION — paragraph from incidents and terminal aggregates.',
-      'RISK CROSS-CHECK — compare narrative to latestRisk (if present); say if persisted risk aligns or diverges.',
-      'NEXT ACTIONS — numbered 1.–4. PM moves grounded in the JSON.',
+      'RISK CROSS-CHECK — compare narrative to latestRisk (if present); mention mlSecondOpinion only as non-authoritative.',
+      'NEXT ACTIONS — numbered 1.–4. practical PM moves grounded in the JSON.',
       'CONFIDENCE — one line: CONFIDENCE: HIGH | CONFIDENCE: MEDIUM | CONFIDENCE: LOW (use LOW if incidents or tasks lists are empty and signalEvidence is sparse).',
       'Stay under 2500 words total.',
     ].join(' ');

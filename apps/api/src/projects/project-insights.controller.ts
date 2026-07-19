@@ -67,7 +67,7 @@ export class ProjectInsightsController {
 
   /**
    * Refreshes the signal snapshot, then returns a Trace Analyst narrative (OpenAI when
-   * configured, otherwise a deterministic summary). Does not persist.
+   * configured, otherwise a deterministic summary) and persists a ProjectImpactAnalysisRun.
    */
   @Post('analyze')
   @HttpCode(HttpStatus.OK)
