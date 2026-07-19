@@ -3,9 +3,9 @@ import { RefreshCw, ShieldAlert, Sparkles, ThumbsDown, ThumbsUp } from 'lucide-r
 import { formatApiErrorResponse } from '../../api-error-message';
 import { apiFetch } from '../../api-fetch';
 import { useToast } from '../../providers/ToastProvider';
+import { Callout, Surface } from '../ui/Surface';
+import { RiskBadge, isRiskLevel, type RiskLevel } from '../ui/RiskBadge';
 import { Skeleton } from '../ui/Skeleton';
-
-type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 type RiskReason = { code: string; detail: string };
 
@@ -32,15 +32,6 @@ type RiskHistoryRow = {
   mlPrediction?: unknown;
   evaluatedAt: string;
 };
-
-function isRiskLevel(v: unknown): v is RiskLevel {
-  return (
-    v === 'LOW' ||
-    v === 'MEDIUM' ||
-    v === 'HIGH' ||
-    v === 'CRITICAL'
-  );
-}
 
 type MlRiskPrediction = {
   modelVersion: string;
@@ -213,21 +204,6 @@ function parseReasons(raw: unknown): RiskReason[] {
   return out;
 }
 
-function levelBadgeClass(level: RiskLevel): string {
-  switch (level) {
-    case 'LOW':
-      return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200';
-    case 'MEDIUM':
-      return 'bg-amber-100 text-amber-950 dark:bg-amber-950/50 dark:text-amber-100';
-    case 'HIGH':
-      return 'bg-orange-200 text-orange-950 dark:bg-orange-950/60 dark:text-orange-100';
-    case 'CRITICAL':
-      return 'bg-rose-200 text-rose-950 dark:bg-rose-950/70 dark:text-rose-50';
-    default:
-      return 'bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100';
-  }
-}
-
 function formatWhen(iso: string): string {
   try {
     return new Date(iso).toLocaleString(undefined, {
@@ -319,11 +295,7 @@ function EvaluationHistorySection(props: {
                       {formatWhen(h.evaluatedAt)}
                     </td>
                     <td className="px-2 py-1">
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${levelBadgeClass(h.level)}`}
-                      >
-                        {h.level}
-                      </span>
+                      <RiskBadge level={h.level} />
                     </td>
                     <td className="tabular-nums px-2 py-1 text-zinc-800 dark:text-zinc-200">
                       {h.score}
@@ -672,26 +644,22 @@ export function ProjectRiskPanel(props: {
   );
 
   return (
-    <div
+    <Surface
       id="project-risk"
-      className="mt-4 scroll-mt-24 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-950/60"
+      className="mt-4 scroll-mt-24 p-4 sm:p-5"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 max-w-2xl">
+          <h3 className="ft-label flex items-center gap-2">
             <ShieldAlert size={14} strokeWidth={2} aria-hidden />
-            Delivery risk (v0)
+            Delivery risk
           </h3>
-          <p className="mt-1 text-[11px] text-zinc-500">
-            Rule-based score from the 24h signal rollup (tasks, terminal, GitHub
-            churn), plus an optional narrative (heuristic or OpenAI when
-            configured). Evaluating refreshes signals first, then persists this
-            row. Task status, progress, and deadline changes auto-refresh the score
-            within ~30s. <span className="font-semibold">Trace Analyst</span> runs a
-            deeper read (tasks, GitHub activity, terminal) and saves history.
+          <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+            Official score from the rule engine. Evaluate refreshes signals first.
+            Trace Analyst explains the same evidence — it does not change the score.
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             type="button"
             title="Refresh signals and run Trace Analyst (OpenAI if configured)"
@@ -699,9 +667,9 @@ export function ProjectRiskPanel(props: {
             onClick={() => {
               void analyzeImpact();
             }}
-            className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-950 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-100 dark:hover:bg-violet-900/70"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-accent-200 bg-accent-50 px-2.5 py-1.5 text-[12px] font-semibold text-accent-950 transition-colors hover:bg-accent-100 disabled:opacity-50 dark:border-accent-800/80 dark:bg-accent-950/40 dark:text-accent-100 dark:hover:bg-accent-900/50"
           >
-            <Sparkles size={12} strokeWidth={2} aria-hidden />
+            <Sparkles size={13} strokeWidth={2} aria-hidden />
             {impactState.status === 'loading' ? 'Analyzing…' : 'Trace Analyst'}
           </button>
           {canManage ? (
@@ -711,9 +679,9 @@ export function ProjectRiskPanel(props: {
               onClick={() => {
                 void evaluate();
               }}
-              className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-900 px-2.5 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-zinc-800 dark:border-zinc-600 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
             >
-              <RefreshCw size={12} strokeWidth={2} aria-hidden />
+              <RefreshCw size={13} strokeWidth={2} aria-hidden />
               Evaluate
             </button>
           ) : null}
@@ -721,21 +689,21 @@ export function ProjectRiskPanel(props: {
       </div>
 
       {readinessState.status === 'ok' ? (
-        <div className="mt-3 rounded-lg border border-sky-200/80 bg-sky-50/50 px-3 py-2 dark:border-sky-900/50 dark:bg-sky-950/20">
+        <Callout tone="accent" className="mt-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-200">
+            <h4 className="ft-label !tracking-[0.08em] text-accent-800 dark:text-accent-200">
               Trace Analyst readiness
             </h4>
-            <span className="text-[10px] font-semibold tabular-nums text-sky-800 dark:text-sky-200">
+            <span className="text-[11px] font-semibold tabular-nums text-accent-800 dark:text-accent-200">
               {readinessState.data.readinessScore}/100
             </span>
           </div>
-          <ul className="mt-1.5 space-y-0.5 text-[11px] text-sky-950/90 dark:text-sky-100/90">
+          <ul className="mt-1.5 space-y-0.5 text-[12px] text-accent-950/90 dark:text-accent-50/90">
             <li>
               OpenAI:{' '}
               {readinessState.data.openAiConfigured
                 ? `on (${readinessState.data.openAiImpactModel})`
-                : 'off — heuristic only'}
+                : 'off — template only'}
             </li>
             <li>
               ML risk: {readinessState.data.mlRiskEnabled ? 'on' : 'off'} · GitHub:{' '}
@@ -761,25 +729,24 @@ export function ProjectRiskPanel(props: {
               </li>
             ))}
           </ul>
-        </div>
+        </Callout>
       ) : readinessState.status === 'loading' ? (
-        <Skeleton className="mt-3 h-16 w-full" />
+        <Skeleton className="mt-4 h-16 w-full" />
       ) : null}
 
       {impactState.status === 'ok' ? (
-        <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2 dark:border-violet-900/60 dark:bg-violet-950/30">
+        <Callout tone="accent" className="mt-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-200">
+            <h4 className="ft-label !tracking-[0.08em] text-accent-800 dark:text-accent-200">
               Trace Analyst read
             </h4>
-            <span className="text-[10px] text-violet-700/90 dark:text-violet-300/90">
-              {impactState.usedOpenAi ? 'OpenAI' : 'Template'} · snapshot{' '}
+            <span className="rounded-md bg-white/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-800 ring-1 ring-accent-600/15 dark:bg-accent-950/50 dark:text-accent-100 dark:ring-accent-400/20">
+              {impactState.usedOpenAi ? 'OpenAI' : 'Template'} ·{' '}
               {formatWhen(impactState.snapshotComputedAt)}
             </span>
           </div>
-          <p className="mt-1 text-[10px] leading-snug text-violet-900/80 dark:text-violet-200/75">
-            Explains delivery signals for this project — does not set the official risk
-            score.
+          <p className="mt-1.5 text-[11px] leading-snug text-accent-900/75 dark:text-accent-100/70">
+            Explains delivery signals — does not set the official risk score.
           </p>
           {!impactState.usedOpenAi && impactState.openAiFallbackReason ? (
             <p
@@ -790,11 +757,11 @@ export function ProjectRiskPanel(props: {
               {impactState.openAiFallbackReason}
             </p>
           ) : null}
-          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans text-[12px] leading-relaxed text-violet-950 dark:text-violet-100">
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans text-[12px] leading-relaxed text-accent-950 dark:text-accent-50">
             {formatTraceAnalystForDisplay(impactState.analysis)}
           </pre>
-          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-violet-200/80 pt-2 dark:border-violet-800/60">
-            <span className="text-[10px] text-violet-800 dark:text-violet-200">
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-accent-200/70 pt-2 dark:border-accent-800/50">
+            <span className="text-[11px] text-accent-900 dark:text-accent-100">
               Was this Trace Analyst read helpful?
             </span>
             <button
@@ -803,7 +770,7 @@ export function ProjectRiskPanel(props: {
               onClick={() => {
                 void submitInsightFeedback('PROJECT_IMPACT_ANALYSIS', true);
               }}
-              className="inline-flex items-center gap-0.5 rounded border border-violet-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-100 dark:hover:bg-violet-900"
+              className="inline-flex items-center gap-0.5 rounded-md border border-accent-300/80 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-accent-950 hover:bg-accent-50 disabled:opacity-50 dark:border-accent-700 dark:bg-accent-950 dark:text-accent-100 dark:hover:bg-accent-900"
             >
               <ThumbsUp size={11} aria-hidden />
               Yes
@@ -814,13 +781,13 @@ export function ProjectRiskPanel(props: {
               onClick={() => {
                 void submitInsightFeedback('PROJECT_IMPACT_ANALYSIS', false);
               }}
-              className="inline-flex items-center gap-0.5 rounded border border-violet-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-100 dark:hover:bg-violet-900"
+              className="inline-flex items-center gap-0.5 rounded-md border border-accent-300/80 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-accent-950 hover:bg-accent-50 disabled:opacity-50 dark:border-accent-700 dark:bg-accent-950 dark:text-accent-100 dark:hover:bg-accent-900"
             >
               <ThumbsDown size={11} aria-hidden />
               No
             </button>
           </div>
-        </div>
+        </Callout>
       ) : impactState.status === 'error' ? (
         <p className="mt-3 text-[12px] text-rose-600 dark:text-rose-400">
           {impactState.message}
@@ -870,11 +837,7 @@ export function ProjectRiskPanel(props: {
       ) : state.status === 'ok' && state.row !== null ? (
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap items-center gap-3">
-            <span
-              className={`rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${levelBadgeClass(state.row.level)}`}
-            >
-              {state.row.level}
-            </span>
+            <RiskBadge level={state.row.level} score={state.row.score} />
             <span className="text-[12px] text-zinc-600 dark:text-zinc-400">
               Score{' '}
               <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
@@ -893,22 +856,22 @@ export function ProjectRiskPanel(props: {
             }
             const copy = describeMlForPm(ml, state.row.level);
             return (
-              <div className="rounded-lg border border-indigo-200/80 bg-indigo-50/50 px-3 py-2 dark:border-indigo-900/50 dark:bg-indigo-950/30">
-                <h4 className="text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-200">
+              <Callout tone="neutral" className="!border-accent-200/70 !bg-accent-50/40 dark:!border-accent-900/40 dark:!bg-accent-950/20">
+                <h4 className="ft-label text-accent-800 dark:text-accent-200">
                   Model second opinion
                 </h4>
-                <p className="mt-1 text-[13px] font-medium text-indigo-950 dark:text-indigo-100">
+                <p className="mt-1 text-[13px] font-medium text-zinc-900 dark:text-zinc-50">
                   {copy.headline}
                 </p>
-                <p className="mt-1 text-[12px] leading-relaxed text-indigo-950/95 dark:text-indigo-100/95">
+                <p className="mt-1 text-[12px] leading-relaxed text-zinc-700 dark:text-zinc-300">
                   {copy.body}
                 </p>
-                <p className="mt-1.5 text-[10px] leading-snug text-indigo-900/75 dark:text-indigo-200/70">
+                <p className="mt-1.5 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">
                   Official score and alerts still come from the rule engine. Model:{' '}
                   {ml.modelVersion} · deadline pressure{' '}
                   {Math.round(ml.deadlinePressureIndex * 100)}%.
                 </p>
-              </div>
+              </Callout>
             );
           })()}
           <ul className="space-y-2 text-[12px] text-zinc-700 dark:text-zinc-300">
@@ -990,6 +953,6 @@ export function ProjectRiskPanel(props: {
           <EvaluationHistorySection historyState={historyState} />
         </div>
       ) : null}
-    </div>
+    </Surface>
   );
 }

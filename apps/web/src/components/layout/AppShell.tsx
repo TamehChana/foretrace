@@ -22,8 +22,8 @@ function ShellBody({ children }: { children: ReactNode }) {
         <div className="relative flex-1 px-3 pb-10 pt-6 sm:px-5 lg:px-10 lg:pt-10">
           <div className="mx-auto max-w-[1200px]">{children}</div>
         </div>
-        <footer className="relative border-t border-zinc-200/70 px-5 py-4 text-center text-[11px] text-zinc-400 dark:border-zinc-800/80 dark:text-zinc-600">
-          Foretrace rolls up saved 24h signal snapshots on Overview; open a project for full detail and actions.
+        <footer className="relative border-t border-zinc-200/70 px-5 py-3.5 text-center text-[11px] text-zinc-400 dark:border-zinc-800/80 dark:text-zinc-600">
+          Foretrace · Signals → risk → explanation → alert → action
         </footer>
       </div>
     </div>

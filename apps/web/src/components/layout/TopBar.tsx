@@ -59,19 +59,13 @@ export function TopBar() {
         <span>{page}</span>
       </div>
 
-      <div className="relative hidden min-w-0 flex-1 md:block md:max-w-md md:px-2 lg:max-w-lg">
-        <button
-          type="button"
-          disabled
-          title="Command palette after authentication"
-          className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl border border-zinc-200/90 bg-zinc-50/90 py-2 pl-3 pr-3 text-left text-sm text-zinc-400 shadow-inner dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-500"
-        >
-          <Search size={17} className="shrink-0 opacity-70" aria-hidden />
-          <span className="truncate">Search projects, tasks, people…</span>
-          <kbd className="ml-auto hidden shrink-0 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-semibold tracking-wide text-zinc-400 sm:inline-block dark:border-zinc-700 dark:bg-zinc-800">
-            ⌘K
-          </kbd>
-        </button>
+      <div className="relative hidden min-w-0 flex-1 md:block md:max-w-sm md:px-2 lg:max-w-md">
+        <div className="flex w-full items-center gap-2.5 rounded-xl border border-zinc-200/80 bg-zinc-50/70 px-3 py-2 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
+          <Search size={16} className="shrink-0 opacity-60" aria-hidden />
+          <span className="truncate text-[13px]">
+            Jump to a project from Projects
+          </span>
+        </div>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">

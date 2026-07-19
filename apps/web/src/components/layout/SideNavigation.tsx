@@ -95,16 +95,24 @@ function SidebarChrome({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-4 ft-scrollbar">
         <div className="mb-6 flex items-center justify-between rounded-xl border border-zinc-200/80 bg-zinc-50/80 px-3 py-2 dark:border-zinc-800/80 dark:bg-zinc-900/50">
-          <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Environment</span>
-          <span className="rounded-md bg-emerald-500/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
-            Local
+          <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+            Workspace
+          </span>
+          <span
+            className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${
+              import.meta.env.DEV
+                ? 'bg-zinc-500/10 text-zinc-700 ring-zinc-500/15 dark:text-zinc-300'
+                : 'bg-emerald-500/12 text-emerald-800 ring-emerald-600/15 dark:text-emerald-300'
+            }`}
+          >
+            {import.meta.env.DEV ? 'Local' : 'Live'}
           </span>
         </div>
         {children}
       </div>
       <div className="shrink-0 border-t border-zinc-200/80 p-3 dark:border-zinc-800/80">
         <p className="text-[10px] leading-relaxed text-zinc-400 dark:text-zinc-500">
-          v0.1 · Early access UI. Auth, tasks, and GitHub sync ship next.
+          Delivery risk from tasks, GitHub, and terminal — explained for PMs.
         </p>
       </div>
     </div>

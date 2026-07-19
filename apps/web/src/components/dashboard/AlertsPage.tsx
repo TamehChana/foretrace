@@ -12,6 +12,8 @@ import { useOrganizations } from '../../hooks/use-organizations';
 import { useAuthSession } from '../../providers/AuthSessionProvider';
 import { useToast } from '../../providers/ToastProvider';
 import { PageHeader } from '../ui/PageHeader';
+import { RiskBadge, isRiskLevel } from '../ui/RiskBadge';
+import { Surface } from '../ui/Surface';
 import { Skeleton } from '../ui/Skeleton';
 
 type AlertRow = {
@@ -279,32 +281,39 @@ export function AlertsPage() {
               </p>
             </div>
           ) : state.status === 'ok' ? (
-            <ul className="max-w-3xl divide-y divide-zinc-100 rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-700 dark:bg-zinc-950/50">
+            <ul className="max-w-3xl space-y-3">
               {state.items.map((row) => {
                 const extras = riskAlertPayloadExtras(row.payload);
+                const level =
+                  extras.level && isRiskLevel(extras.level)
+                    ? extras.level
+                    : null;
                 return (
-                <li
-                  key={row.id}
-                  className={`flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start sm:justify-between ${
-                    row.readAt ? 'opacity-70' : ''
-                  }`}
-                >
+                <li key={row.id}>
+                  <Surface
+                    className={`p-4 transition-opacity ${
+                      row.readAt ? 'opacity-70' : ''
+                    }`}
+                  >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {level ? (
+                        <RiskBadge level={level} score={extras.score} />
+                      ) : null}
+                      {!row.readAt ? (
+                        <span className="rounded-md bg-accent-500/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-800 dark:text-accent-200">
+                          Unread
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-sm font-medium leading-snug text-zinc-900 dark:text-zinc-50">
                       {row.summary}
                     </p>
-                    {extras.level ? (
-                      <p className="mt-1 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
-                        {extras.level}
-                        {typeof extras.score === 'number'
-                          ? ` · score ${extras.score}`
-                          : ''}
-                      </p>
-                    ) : null}
                     {extras.schedule &&
                     (extras.schedule.overdueCount > 0 ||
                       extras.schedule.dueSoonLowProgressCount > 0) ? (
-                      <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-200">
+                      <p className="mt-1.5 text-[12px] text-amber-800 dark:text-amber-200">
                         {extras.schedule.overdueCount > 0
                           ? `${extras.schedule.overdueCount} overdue`
                           : null}
@@ -318,23 +327,23 @@ export function AlertsPage() {
                       </p>
                     ) : null}
                     {extras.reasonDetails.length > 0 ? (
-                      <ul className="mt-2 space-y-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+                      <ul className="mt-2 space-y-1 text-[12px] text-zinc-600 dark:text-zinc-400">
                         {extras.reasonDetails.slice(0, 4).map((r) => (
-                          <li key={r.code}>
-                            <span className="font-mono text-[10px] text-zinc-500">
+                          <li key={r.code} className="flex gap-2">
+                            <span className="shrink-0 font-mono text-[10px] font-medium text-zinc-400">
                               {r.code}
                             </span>
-                            <span className="ml-1">{r.detail}</span>
+                            <span>{r.detail}</span>
                           </li>
                         ))}
                       </ul>
                     ) : null}
                     {extras.recommendations.length > 0 ? (
-                      <div className="mt-2">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      <div className="mt-3 rounded-xl border border-emerald-200/70 bg-emerald-50/50 px-3 py-2 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                        <p className="ft-label text-emerald-800 dark:text-emerald-200">
                           Recommended PM actions
                         </p>
-                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[11px] text-zinc-600 dark:text-zinc-400">
+                        <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-[12px] text-emerald-950/90 dark:text-emerald-50/90">
                           {extras.recommendations.slice(0, 4).map((detail) => (
                             <li key={detail}>{detail}</li>
                           ))}
@@ -342,7 +351,7 @@ export function AlertsPage() {
                       </div>
                     ) : null}
                     {extras.verdict ? (
-                      <p className="mt-1.5">
+                      <p className="mt-2">
                         <span className="inline-block rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200">
                           {extras.verdict.replace(/_/g, ' ')}
                         </span>
@@ -353,13 +362,13 @@ export function AlertsPage() {
                         {extras.preview}
                       </p>
                     ) : null}
-                    <p className="mt-1 text-[11px] text-zinc-500">
+                    <p className="mt-2 text-[11px] text-zinc-500">
                       {row.project.name} · {formatWhen(row.createdAt)}
                       {row.readAt ? ` · Read ${formatWhen(row.readAt)}` : ''}
                     </p>
                     <Link
                       to={`/projects?org=${encodeURIComponent(organizationId!)}&project=${encodeURIComponent(row.projectId)}&focus=risk`}
-                      className="mt-2 inline-block text-[11px] font-semibold text-accent-700 hover:underline dark:text-accent-400"
+                      className="mt-2 inline-flex text-[12px] font-semibold text-accent-700 hover:underline dark:text-accent-400"
                     >
                       Open delivery risk
                     </Link>
@@ -371,12 +380,14 @@ export function AlertsPage() {
                       onClick={() => {
                         void markRead(row.id);
                       }}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-900 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-zinc-800 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
                     >
                       <CheckCircle2 size={14} strokeWidth={2} aria-hidden />
                       Mark read
                     </button>
                   ) : null}
+                  </div>
+                  </Surface>
                 </li>
               );
               })}
