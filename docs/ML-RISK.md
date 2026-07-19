@@ -15,11 +15,37 @@ Signals (tasks + GitHub + terminal)
 
 ## What is trained?
 
+### Experiment 1 (primary — real delay labels)
+
+- **Data:** EMSE2017 delayed-issues CSVs (Choetkiertikul et al.)
+- **Label:** objective delay (`delaydays > 0`), not LOW–CRITICAL bands
+- **Code:** `apps/api/ml-experiments/issue-delay/`
+
+### Bootstrap logistic (`risk-ml-v1`, current runtime second opinion)
+
 - **Examples:** synthetic Foretrace-shaped signal snapshots (`randomRiskMlPayload`), optionally mixed with real `RiskEvaluationRun.signalPayload` rows.
-- **Labels:**
-  - **Level:** `computeRiskFromPayload` (same rules as production) for bootstrap.
-  - **Deadline pressure (binary):** heuristic — positive if `overdueCount > 0` OR `dueSoonLowProgressCount > 0` OR `dueWithin3DaysCount ≥ 3`.
+- **Labels:** largely rule-engine mirrors for bootstrap only — **not** the thesis claim for delay prediction.
 - **Features:** 16 bounded numerics from `extractRiskMlFeatures` (no PII). See `apps/api/src/ml/risk-feature-vector.ts`.
+
+## Experiment 1 — Issue delay classification (real labels)
+
+**Do not treat the synthetic `risk-ml-v1` bootstrap as the thesis training story.**
+The primary academic model is delayed-issue classification on the public
+Choetkiertikul EMSE 2017 matrices:
+
+| Item | Value |
+|------|--------|
+| Path | `apps/api/ml-experiments/issue-delay/` |
+| Data | EMSE2017 `*_due.csv` (~62k issues, 8 projects) |
+| Label | `delaydays > 0` → delayed |
+| Models | Logistic Regression, Random Forest, XGBoost |
+| Run | `npm run ml:delay:emse -w @foretrace/api` |
+
+See that folder’s `README.md`. TAWOS is **secondary** (resolution-time / feature engineering only; no `Due_Date` on `Issue`).
+
+Production evaluate still uses the rule engine (+ optional shipped logistic second opinion) until Experiment 1 is integrated as `delayProbability`.
+
+---
 
 ## Weights file
 

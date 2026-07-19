@@ -29,6 +29,7 @@
     "ml:train": "tsx src/ml/scripts/generate-risk-ml-weights.ts",
     "ml:train:history": "tsx src/ml/scripts/train-risk-ml-from-history.ts",
     "ml:metrics": "tsx src/ml/scripts/print-risk-ml-metrics.ts",
+    "ml:delay:emse": "bash -lc 'cd ml-experiments/issue-delay && (test -d .venv || python3 -m venv .venv) && . .venv/bin/activate && pip -q install -r requirements.txt && python download_emse.py --times due && python train_compare.py --time due'",
     "seed:defense": "npm run build && node dist/seed/run-defense-demo-seed.js"
   },
   "dependencies": {

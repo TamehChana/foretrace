@@ -15,3 +15,8 @@ Thumbs.db
 .npm-cache/
 .tmp-temp/
 *.tsbuildinfo
+
+# Offline ML experiment data / venvs (large CSVs; re-download with download_emse.py)
+apps/api/ml-experiments/**/data/
+apps/api/ml-experiments/**/.venv/
+apps/api/ml-experiments/**/artifacts/
