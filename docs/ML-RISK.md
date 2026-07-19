@@ -23,7 +23,9 @@ Signals (tasks + GitHub + terminal)
 
 ## Weights file
 
-- Default path: `apps/api/src/ml/risk-ml-v1.weights.json` (copied to `dist/ml/` on `nest build` via `nest-cli.json` assets).
+- Default path: `apps/api/src/ml/risk-ml-v1.weights.json`
+- API `build` copies `src/ml/*.json` → `dist/ml/` (required on Render; plain `tsc` does not copy JSON).
+- At runtime the service also searches `dist/ml` / `src/ml` fallbacks.
 - Regenerate (admin):
 
 ```bash
