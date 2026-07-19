@@ -283,6 +283,7 @@ export function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawOrgParam = searchParams.get('org');
   const rawProjectParam = searchParams.get('project');
+  const rawFocusParam = searchParams.get('focus');
 
   const [dataBump, setDataBump] = useState(0);
   const bumpData = useCallback(() => {
@@ -352,6 +353,28 @@ export function ProjectsPage() {
       setExpandedProjectId(rawProjectParam);
     }
   }, [projectsState, rawProjectParam, organizationId]);
+
+  /** Deep-link from alerts: expand project and scroll to delivery risk panel. */
+  useEffect(() => {
+    if (rawFocusParam !== 'risk' || !expandedProjectId) {
+      return;
+    }
+    if (projectsState.status !== 'ok') {
+      return;
+    }
+    const id = window.setTimeout(() => {
+      const el = document.getElementById('project-risk');
+      if (!el) {
+        return;
+      }
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.classList.add('ring-2', 'ring-accent-400/60');
+      window.setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-accent-400/60');
+      }, 2200);
+    }, 350);
+    return () => window.clearTimeout(id);
+  }, [rawFocusParam, expandedProjectId, projectsState.status]);
 
   const tasksState = useOrgTasks(
     organizationId,

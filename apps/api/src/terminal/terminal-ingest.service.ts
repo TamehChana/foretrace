@@ -5,6 +5,7 @@ import type { TerminalIngestBatchInput } from '@foretrace/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectSignalsService } from '../projects/project-signals.service';
+import { ProjectRiskService } from '../projects/project-risk.service';
 import {
   classifyTerminalLine,
   isLikelySignalLine,
@@ -28,6 +29,7 @@ export class TerminalIngestService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projectSignals: ProjectSignalsService,
+    private readonly projectRisk: ProjectRiskService,
   ) {}
 
   private fingerprintFor(
@@ -127,6 +129,7 @@ export class TerminalIngestService {
     });
 
     this.projectSignals.scheduleRefreshSnapshot(ctx.projectId, ctx.organizationId);
+    this.projectRisk.scheduleRulesRefresh(ctx.projectId, ctx.organizationId);
 
     return {
       batchId: batch.id,

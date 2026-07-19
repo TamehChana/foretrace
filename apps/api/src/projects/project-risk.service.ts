@@ -75,8 +75,9 @@ export class ProjectRiskService {
   }
 
   /**
-   * Refreshes the signal snapshot and upserts rule-based risk + heuristic narrative.
-   * Skips evaluation history and alerts — use `evaluateAndPersist` for a full PM run.
+   * Debounced rules risk refresh after task/GitHub/terminal signal changes.
+   * May emit Medium+ worsening alerts; does not write evaluation history —
+   * use `evaluateAndPersist` for a full PM Evaluate run.
    */
   scheduleRulesRefresh(projectId: string, organizationId: string): void {
     const now = Date.now();
@@ -200,6 +201,7 @@ export class ProjectRiskService {
       score: row.score,
       reasonCodes: reasons.map((r) => r.code),
       reasons,
+      recommendations,
       schedule: this.scheduleFromPayload(payload),
       evaluationId: row.id,
       aiSummary,
@@ -353,6 +355,7 @@ export class ProjectRiskService {
       evaluationRunId: run.id,
       reasonCodes: reasons.map((r) => r.code),
       reasons,
+      recommendations,
       schedule: this.scheduleFromPayload(payload),
       aiSummary,
     });

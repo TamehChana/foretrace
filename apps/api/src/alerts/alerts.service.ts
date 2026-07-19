@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AlertKind, RiskLevel, Role, type Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
@@ -25,12 +26,16 @@ export type RiskEvaluationAlertInput = {
   score: number;
   reasonCodes: string[];
   reasons: RiskReasonRow[];
+  recommendations?: RiskReasonRow[];
   schedule?: {
     overdueCount: number;
     dueWithin3DaysCount: number;
     dueSoonLowProgressCount: number;
   };
 };
+
+/** Skip duplicate same-level alerts within this window unless level escalates / overdue appears / score jumps. */
+const ALERT_COOLDOWN_MS = 15 * 60 * 1000;
 
 /** When to create an in-app (and email) risk alert. */
 export function shouldEmitRiskEvaluationAlert(
@@ -125,6 +130,7 @@ export class AlertsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly email: EmailService,
+    private readonly config: ConfigService,
   ) {}
 
   async listForOrganization(
@@ -186,6 +192,7 @@ export class AlertsService {
   /**
    * Creates an in-app alert when risk is at least MEDIUM and strictly worse than
    * the previous persisted evaluation (or there was no prior row).
+   * Also applies a short same-project cooldown to avoid inbox spam.
    */
   async maybeEmitRiskEvaluationAlert(input: {
     organizationId: string;
@@ -211,10 +218,41 @@ export class AlertsService {
       return;
     }
 
+    // Cooldown: skip if we just alerted this project at the same level (unless escalating).
+    const prevR =
+      input.previousLevel !== null ? RANK[input.previousLevel] : null;
+    const nextR = RANK[input.nextLevel];
+    const isEscalation = prevR === null || nextR > prevR;
+    const overdueAppeared =
+      input.reasonCodes.includes('TASKS_OVERDUE') &&
+      !input.previousReasonCodes.includes('TASKS_OVERDUE');
+    if (!isEscalation && !overdueAppeared) {
+      const recent = await this.prisma.alert.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          projectId: input.projectId,
+          kind: AlertKind.RISK_EVALUATION,
+          createdAt: { gte: new Date(Date.now() - ALERT_COOLDOWN_MS) },
+        },
+        select: { payload: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (recent?.payload && typeof recent.payload === 'object') {
+        const level = (recent.payload as { level?: unknown }).level;
+        if (level === input.nextLevel) {
+          this.log.debug(
+            `Risk alert cooldown: skip ${input.projectId} ${input.nextLevel}`,
+          );
+          return;
+        }
+      }
+    }
+
     const verdict = parseRiskVerdictFromAiSummary(input.aiSummary);
     const preview = aiSummaryBodyPreview(input.aiSummary);
     const verdictPhrase = verdict ? ` AI verdict: ${verdict}.` : '';
     const scheduleText = schedulePhrase(input.schedule);
+    const recs = (input.recommendations ?? []).slice(0, 5);
 
     const summary = `Delivery risk for “${input.projectName}” is ${input.nextLevel} (score ${input.score}).${scheduleText}${verdictPhrase}`;
 
@@ -229,6 +267,7 @@ export class AlertsService {
       score: input.score,
       reasonCodes: input.reasonCodes,
       reasons: input.reasons.slice(0, 8),
+      ...(recs.length > 0 ? { recommendations: recs } : {}),
       ...(input.schedule ? { schedule: input.schedule } : {}),
       ...(verdict ? { verdict } : {}),
       ...(preview ? { aiSummaryPreview: preview } : {}),
@@ -244,7 +283,7 @@ export class AlertsService {
       },
     });
 
-    void this.sendRiskAlertEmail(input, summary, verdict, preview).catch(
+    void this.sendRiskAlertEmail(input, summary, verdict, preview, recs).catch(
       (err: unknown) => {
         this.log.warn(
           `Risk alert email: ${err instanceof Error ? err.message : String(err)}`,
@@ -253,9 +292,27 @@ export class AlertsService {
     );
   }
 
+  private appBaseUrl(): string | null {
+    const dedicated =
+      this.config.get<string>('FORETRACE_APP_URL')?.trim() ??
+      process.env.FORETRACE_APP_URL?.trim();
+    if (dedicated) {
+      return dedicated.replace(/\/$/, '');
+    }
+    const cors =
+      (
+        this.config.get<string>('CORS_ORIGINS') ?? process.env.CORS_ORIGINS
+      )
+        ?.split(',')
+        .map((s) => s.trim())
+        .find((s) => s.startsWith('http')) ?? null;
+    return cors ? cors.replace(/\/$/, '') : null;
+  }
+
   private async sendRiskAlertEmail(
     input: {
       organizationId: string;
+      projectId: string;
       projectName: string;
       nextLevel: RiskLevel;
       score: number;
@@ -265,6 +322,7 @@ export class AlertsService {
     summary: string,
     verdict: string | null,
     preview: string | null,
+    recommendations: RiskReasonRow[],
   ): Promise<void> {
     if (!this.email.isConfigured()) {
       return;
@@ -280,6 +338,13 @@ export class AlertsService {
     if (to.length === 0) {
       return;
     }
+    const app = this.appBaseUrl();
+    const projectUrl = app
+      ? `${app}/projects?org=${encodeURIComponent(input.organizationId)}&project=${encodeURIComponent(input.projectId)}&focus=risk`
+      : null;
+    const alertsUrl = app
+      ? `${app}/alerts?org=${encodeURIComponent(input.organizationId)}`
+      : null;
     const lines: string[] = [
       summary,
       '',
@@ -293,13 +358,27 @@ export class AlertsService {
     for (const r of input.reasons.slice(0, 6)) {
       lines.push(`• ${r.code}: ${r.detail}`);
     }
+    if (recommendations.length > 0) {
+      lines.push('', 'Recommended PM actions:');
+      for (const r of recommendations.slice(0, 5)) {
+        lines.push(`• ${r.detail}`);
+      }
+    }
     if (preview) {
       lines.push('', 'Summary:', preview);
     }
-    lines.push(
-      '',
-      'Open Foretrace → Alerts to read the full in-app notification.',
-    );
+    lines.push('');
+    if (projectUrl) {
+      lines.push(`Open delivery risk: ${projectUrl}`);
+    }
+    if (alertsUrl) {
+      lines.push(`Alerts inbox: ${alertsUrl}`);
+    }
+    if (!projectUrl && !alertsUrl) {
+      lines.push(
+        'Open Foretrace → Alerts to read the full in-app notification.',
+      );
+    }
     const text = lines.join('\n');
     await this.email.sendMail({
       to,

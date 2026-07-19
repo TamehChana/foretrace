@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 
 import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../email/email.module';
@@ -9,7 +10,7 @@ import { AlertsController } from './alerts.controller';
 import { AlertsService } from './alerts.service';
 
 @Module({
-  imports: [AuthModule, AuditModule, EmailModule],
+  imports: [ConfigModule, AuthModule, AuditModule, EmailModule],
   controllers: [AlertsController],
   providers: [AlertsService, OrganizationUuidParamGuard],
   exports: [AlertsService],

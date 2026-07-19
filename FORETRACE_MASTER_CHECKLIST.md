@@ -211,7 +211,10 @@ Living checklist for the Foretrace Master’s thesis system. Status markers are 
 - [x] Unread filter — `alerts.controller.ts`
 - [x] Email to org `ADMIN` + `PM` when `MAIL_ENABLED` + SMTP — `email.service.ts`, `alerts.service.ts`
 - [x] Web `/alerts` inbox — `AlertsPage.tsx`
-- [/] Dedupe/cooldown: worsening gate only; no explicit duplicate-suppression window in `alerts.service.ts`
+- [x] Deep-link alert → project delivery risk (`&focus=risk`) — inbox + email (`FORETRACE_APP_URL` / `CORS_ORIGINS`)
+- [x] Recommendations in alert payload + inbox UI
+- [x] ~15 min same-level create cooldown (escalation / new overdue still emit) — `ALERT_COOLDOWN_MS`
+- [x] Terminal ingest schedules rules risk refresh (can emit Medium+ alerts) — `terminal-ingest.service.ts`
 - [/] Email opt-in (not on by default) — `.env.example`
 - [ ] Alert digests
 - [ ] Non-risk alert kinds

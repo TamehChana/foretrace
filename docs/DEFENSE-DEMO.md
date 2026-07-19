@@ -84,8 +84,9 @@ Each project includes:
 ### 4. Alerts (notify)
 
 1. Open **Alerts** (`/alerts`).
-2. Show unread risk alerts for Medium+ projects created during seed evaluate.
-3. **Mark read** one alert after discussing recommended PM actions.
+2. Show unread risk alerts for Medium+ projects created during seed evaluate (reasons + recommended PM actions when present).
+3. Click **Open delivery risk** → project expands and scrolls to the risk panel (`focus=risk`).
+4. **Mark read** one alert after discussing recommended PM actions.
 
 ### 5. PM action + re-evaluation (act)
 

@@ -660,7 +660,10 @@ export function ProjectRiskPanel(props: {
   );
 
   return (
-    <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-950/60">
+    <div
+      id="project-risk"
+      className="mt-4 scroll-mt-24 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-950/60"
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">

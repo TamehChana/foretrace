@@ -31,6 +31,7 @@ function riskAlertPayloadExtras(payload: unknown): {
   level?: string;
   score?: number;
   reasonDetails: { code: string; detail: string }[];
+  recommendations: string[];
   schedule?: {
     overdueCount: number;
     dueWithin3DaysCount: number;
@@ -38,7 +39,7 @@ function riskAlertPayloadExtras(payload: unknown): {
   };
 } {
   if (!payload || typeof payload !== 'object') {
-    return { reasonDetails: [] };
+    return { reasonDetails: [], recommendations: [] };
   }
   const p = payload as Record<string, unknown>;
   const reasonDetails: { code: string; detail: string }[] = [];
@@ -50,6 +51,18 @@ function riskAlertPayloadExtras(payload: unknown): {
       const o = item as Record<string, unknown>;
       if (typeof o.code === 'string' && typeof o.detail === 'string') {
         reasonDetails.push({ code: o.code, detail: o.detail });
+      }
+    }
+  }
+  const recommendations: string[] = [];
+  if (Array.isArray(p.recommendations)) {
+    for (const item of p.recommendations) {
+      if (!item || typeof item !== 'object') {
+        continue;
+      }
+      const o = item as Record<string, unknown>;
+      if (typeof o.detail === 'string' && o.detail.trim()) {
+        recommendations.push(o.detail.trim());
       }
     }
   }
@@ -82,6 +95,7 @@ function riskAlertPayloadExtras(payload: unknown): {
     level: typeof p.level === 'string' ? p.level : undefined,
     score: typeof p.score === 'number' ? p.score : undefined,
     reasonDetails,
+    recommendations,
     schedule,
   };
 }
@@ -315,6 +329,18 @@ export function AlertsPage() {
                         ))}
                       </ul>
                     ) : null}
+                    {extras.recommendations.length > 0 ? (
+                      <div className="mt-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                          Recommended PM actions
+                        </p>
+                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[11px] text-zinc-600 dark:text-zinc-400">
+                          {extras.recommendations.slice(0, 4).map((detail) => (
+                            <li key={detail}>{detail}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
                     {extras.verdict ? (
                       <p className="mt-1.5">
                         <span className="inline-block rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200">
@@ -332,10 +358,10 @@ export function AlertsPage() {
                       {row.readAt ? ` · Read ${formatWhen(row.readAt)}` : ''}
                     </p>
                     <Link
-                      to={`/projects?org=${encodeURIComponent(organizationId!)}&project=${encodeURIComponent(row.projectId)}`}
+                      to={`/projects?org=${encodeURIComponent(organizationId!)}&project=${encodeURIComponent(row.projectId)}&focus=risk`}
                       className="mt-2 inline-block text-[11px] font-semibold text-accent-700 hover:underline dark:text-accent-400"
                     >
-                      Open project
+                      Open delivery risk
                     </Link>
                   </div>
                   {!row.readAt ? (
