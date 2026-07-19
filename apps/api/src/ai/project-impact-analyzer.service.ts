@@ -448,7 +448,8 @@ export class ProjectImpactAnalyzerService {
         body: JSON.stringify({
           model,
           temperature: 0.25,
-          max_tokens: 1100,
+          // Newer models (e.g. gpt-5.*) reject `max_tokens`; use max_completion_tokens.
+          max_completion_tokens: 1100,
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: user },
@@ -457,7 +458,10 @@ export class ProjectImpactAnalyzerService {
         signal: controller.signal,
       });
       if (!res.ok) {
-        this.log.warn(`OpenAI project impact HTTP ${res.status}`);
+        const errBody = (await res.text()).slice(0, 240);
+        this.log.warn(
+          `OpenAI project impact HTTP ${res.status}: ${errBody}`,
+        );
         return null;
       }
       const json = (await res.json()) as {
