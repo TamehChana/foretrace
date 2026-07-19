@@ -46,7 +46,65 @@ type MlRiskPrediction = {
   modelVersion: string;
   predictedLevel: RiskLevel;
   deadlinePressureIndex: number;
+  /** Top-class probability 0–1 when available. */
+  confidence: number | null;
 };
+
+const RISK_LEVEL_PLAIN: Record<RiskLevel, string> = {
+  LOW: 'low risk',
+  MEDIUM: 'medium risk',
+  HIGH: 'high risk',
+  CRITICAL: 'critical risk',
+};
+
+const LEVEL_RANK: Record<RiskLevel, number> = {
+  LOW: 0,
+  MEDIUM: 1,
+  HIGH: 2,
+  CRITICAL: 3,
+};
+
+function pressurePlainEnglish(index: number): string {
+  if (index >= 0.75) {
+    return 'The model sees strong deadline / slip pressure — delivery may be running late against the schedule.';
+  }
+  if (index >= 0.45) {
+    return 'The model sees moderate deadline pressure — worth watching near-term due dates.';
+  }
+  if (index >= 0.2) {
+    return 'The model sees light deadline pressure — schedule looks mostly manageable.';
+  }
+  return 'The model sees little deadline pressure from the current signals.';
+}
+
+function mlAgreementPlainEnglish(
+  ruleLevel: RiskLevel,
+  mlLevel: RiskLevel,
+): string {
+  if (ruleLevel === mlLevel) {
+    return `It agrees with the rule engine (${RISK_LEVEL_PLAIN[ruleLevel]}).`;
+  }
+  if (LEVEL_RANK[mlLevel] > LEVEL_RANK[ruleLevel]) {
+    return `It is more concerned than the rule engine (rules: ${RISK_LEVEL_PLAIN[ruleLevel]}; model: ${RISK_LEVEL_PLAIN[mlLevel]}). Use this as a second opinion, not the official score.`;
+  }
+  return `It is less concerned than the rule engine (rules: ${RISK_LEVEL_PLAIN[ruleLevel]}; model: ${RISK_LEVEL_PLAIN[mlLevel]}). The rule engine still drives alerts.`;
+}
+
+function describeMlForPm(
+  ml: MlRiskPrediction,
+  ruleLevel: RiskLevel,
+): { headline: string; body: string } {
+  const conf =
+    ml.confidence !== null
+      ? ` (about ${Math.round(ml.confidence * 100)}% confident)`
+      : '';
+  const headline = `Second opinion: ${RISK_LEVEL_PLAIN[ml.predictedLevel]}${conf}`;
+  const body = [
+    mlAgreementPlainEnglish(ruleLevel, ml.predictedLevel),
+    pressurePlainEnglish(ml.deadlinePressureIndex),
+  ].join(' ');
+  return { headline, body };
+}
 
 type TraceAnalystReadiness = {
   openAiConfigured: boolean;
@@ -93,10 +151,19 @@ function parseMlRiskPrediction(raw: unknown): MlRiskPrediction | null {
   if (!modelVersion || !isRiskLevel(predictedLevel) || typeof idx !== 'number' || !Number.isFinite(idx)) {
     return null;
   }
+  let confidence: number | null = null;
+  const probs = o.classProbabilities;
+  if (probs && typeof probs === 'object') {
+    const p = (probs as Record<string, unknown>)[predictedLevel];
+    if (typeof p === 'number' && Number.isFinite(p)) {
+      confidence = Math.max(0, Math.min(1, p));
+    }
+  }
   return {
     modelVersion,
     predictedLevel,
     deadlinePressureIndex: Math.max(0, Math.min(1, idx)),
+    confidence,
   };
 }
 
@@ -224,11 +291,18 @@ function EvaluationHistorySection(props: {
                     </td>
                     <td className="whitespace-nowrap px-2 py-1 text-zinc-600 dark:text-zinc-400">
                       {ml ? (
-                        <span title={`${ml.modelVersion} · slip index`}>
-                          {ml.predictedLevel}{' '}
-                          <span className="tabular-nums text-zinc-500">
-                            ({Math.round(ml.deadlinePressureIndex * 100)}%)
-                          </span>
+                        <span
+                          title={
+                            describeMlForPm(ml, h.level).body
+                          }
+                        >
+                          {ml.predictedLevel}
+                          {ml.confidence !== null ? (
+                            <span className="tabular-nums text-zinc-500">
+                              {' '}
+                              ({Math.round(ml.confidence * 100)}%)
+                            </span>
+                          ) : null}
                         </span>
                       ) : (
                         '—'
@@ -733,28 +807,22 @@ export function ProjectRiskPanel(props: {
             if (!ml) {
               return null;
             }
+            const copy = describeMlForPm(ml, state.row.level);
             return (
               <div className="rounded-lg border border-indigo-200/80 bg-indigo-50/50 px-3 py-2 dark:border-indigo-900/50 dark:bg-indigo-950/30">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-200">
-                  ML cross-check
+                  Model second opinion
                 </h4>
-                <p className="mt-1 text-[12px] text-indigo-950 dark:text-indigo-100">
-                  Predicted level{' '}
-                  <span className="font-semibold">{ml.predictedLevel}</span>
-                  {' · '}
-                  Deadline pressure index{' '}
-                  <span className="font-semibold tabular-nums">
-                    {(ml.deadlinePressureIndex * 100).toFixed(0)}%
-                  </span>
-                  <span className="text-[10px] font-normal text-indigo-800/80 dark:text-indigo-200/80">
-                    {' '}
-                    ({ml.modelVersion})
-                  </span>
+                <p className="mt-1 text-[13px] font-medium text-indigo-950 dark:text-indigo-100">
+                  {copy.headline}
                 </p>
-                <p className="mt-1 text-[10px] leading-snug text-indigo-900/85 dark:text-indigo-200/80">
-                  Rule-based score and level remain authoritative for alerts; ML is an additional signal (see
-                  docs/ML-RISK.md). Pretrained weights ship with the API (on by default; set
-                  FORETRACE_ML_RISK_ENABLED=0 to disable).
+                <p className="mt-1 text-[12px] leading-relaxed text-indigo-950/95 dark:text-indigo-100/95">
+                  {copy.body}
+                </p>
+                <p className="mt-1.5 text-[10px] leading-snug text-indigo-900/75 dark:text-indigo-200/70">
+                  Official score and alerts still come from the rule engine. Model:{' '}
+                  {ml.modelVersion} · deadline pressure{' '}
+                  {Math.round(ml.deadlinePressureIndex * 100)}%.
                 </p>
               </div>
             );
