@@ -401,6 +401,7 @@ export function ProjectRiskPanel(props: {
         status: 'ok';
         analysis: string;
         usedOpenAi: boolean;
+        openAiFallbackReason: string | null;
         snapshotComputedAt: string;
       }
     | { status: 'error'; message: string }
@@ -594,6 +595,7 @@ export function ProjectRiskPanel(props: {
       data?: {
         analysis?: unknown;
         usedOpenAi?: unknown;
+        openAiFallbackReason?: unknown;
         snapshotComputedAt?: unknown;
       };
     };
@@ -603,6 +605,11 @@ export function ProjectRiskPanel(props: {
         ? d.analysis.trim()
         : null;
     const usedOpenAi = d?.usedOpenAi === true;
+    const openAiFallbackReason =
+      typeof d?.openAiFallbackReason === 'string' &&
+      d.openAiFallbackReason.trim().length > 0
+        ? d.openAiFallbackReason.trim()
+        : null;
     const snapshotComputedAt =
       typeof d?.snapshotComputedAt === 'string' ? d.snapshotComputedAt : '';
     if (!analysis) {
@@ -615,11 +622,16 @@ export function ProjectRiskPanel(props: {
       status: 'ok',
       analysis,
       usedOpenAi,
+      openAiFallbackReason,
       snapshotComputedAt,
     });
     showToast(
-      usedOpenAi ? 'Trace Analyst ready (OpenAI)' : 'Trace Analyst ready',
-      'success',
+      usedOpenAi
+        ? 'Trace Analyst ready (OpenAI)'
+        : openAiFallbackReason
+          ? 'Trace Analyst used template (OpenAI unavailable)'
+          : 'Trace Analyst ready (template)',
+      usedOpenAi ? 'success' : 'info',
     );
     onEvaluated?.();
     void loadReadiness();
@@ -761,7 +773,7 @@ export function ProjectRiskPanel(props: {
               Trace Analyst read
             </h4>
             <span className="text-[10px] text-violet-700/90 dark:text-violet-300/90">
-              {impactState.usedOpenAi ? 'OpenAI' : 'Heuristic'} · snapshot{' '}
+              {impactState.usedOpenAi ? 'OpenAI' : 'Template'} · snapshot{' '}
               {formatWhen(impactState.snapshotComputedAt)}
             </span>
           </div>
@@ -769,6 +781,15 @@ export function ProjectRiskPanel(props: {
             Explains delivery signals for this project — does not set the official risk
             score.
           </p>
+          {!impactState.usedOpenAi && impactState.openAiFallbackReason ? (
+            <p
+              role="status"
+              className="mt-2 rounded-md border border-amber-300/80 bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-950 dark:border-amber-800/70 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              OpenAI unavailable — using the built-in signal template.{' '}
+              {impactState.openAiFallbackReason}
+            </p>
+          ) : null}
           <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans text-[12px] leading-relaxed text-violet-950 dark:text-violet-100">
             {formatTraceAnalystForDisplay(impactState.analysis)}
           </pre>
@@ -818,7 +839,7 @@ export function ProjectRiskPanel(props: {
                 className="rounded border border-zinc-200 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-950"
               >
                 <p className="text-[10px] text-zinc-500">
-                  {row.usedOpenAi ? 'OpenAI' : 'Heuristic'} · {formatWhen(row.createdAt)}
+                  {row.usedOpenAi ? 'OpenAI' : 'Template'} · {formatWhen(row.createdAt)}
                 </p>
                 <p className="mt-1 line-clamp-3 text-[11px] leading-snug text-zinc-800 dark:text-zinc-200">
                   {formatTraceAnalystForDisplay(row.analysis).slice(0, 400)}

@@ -7,6 +7,12 @@ import {
   type ProjectSignalPayload,
 } from '../projects/project-signals.service';
 import type { RiskReasonRow } from '../projects/risk-reason.types';
+import {
+  classifyOpenAiHttpFailure,
+  classifyOpenAiThrownError,
+  openAiNotConfiguredReason,
+  type OpenAiAttemptResult,
+} from './openai-attempt';
 
 export type RiskMlSecondOpinion = {
   predictedLevel: string;
@@ -48,11 +54,12 @@ export class RiskInsightService {
    * Callers should pass the same payload used for risk scoring so Trace Analyst matches rules.
    */
   async summarize(context: RiskInsightContext): Promise<string> {
-    const llm = await this.tryOpenAi(context);
-    if (llm) {
-      return llm;
+    const attempt = await this.tryOpenAi(context);
+    if (attempt.status === 'ok') {
+      return attempt.text;
     }
-    return this.heuristic(context);
+    const base = this.heuristic(context);
+    return `${base}\n\nNOTE: ${attempt.reason}`.slice(0, 8000);
   }
 
   /** Build evidence from a snapshot payload (convenience for callers). */
@@ -240,10 +247,10 @@ export class RiskInsightService {
     );
   }
 
-  private async tryOpenAi(ctx: RiskInsightContext): Promise<string | null> {
+  private async tryOpenAi(ctx: RiskInsightContext): Promise<OpenAiAttemptResult> {
     const key = this.openAiKey();
     if (!key) {
-      return null;
+      return { status: 'skipped', reason: openAiNotConfiguredReason() };
     }
     const model = this.openAiModel();
     const system = [
@@ -301,21 +308,28 @@ export class RiskInsightService {
       if (!res.ok) {
         const errBody = (await res.text()).slice(0, 240);
         this.log.warn(`OpenAI risk narrative HTTP ${res.status}: ${errBody}`);
-        return null;
+        return {
+          status: 'error',
+          reason: classifyOpenAiHttpFailure(res.status, errBody),
+        };
       }
       const json = (await res.json()) as {
         choices?: { message?: { content?: string } }[];
       };
       const text = json.choices?.[0]?.message?.content?.trim();
       if (!text) {
-        return null;
+        return {
+          status: 'error',
+          reason:
+            'OpenAI returned an empty response. Showing the built-in signal template instead.',
+        };
       }
-      return text.slice(0, 8000);
+      return { status: 'ok', text: text.slice(0, 8000) };
     } catch (e: unknown) {
       this.log.warn(
         `OpenAI risk narrative failed: ${e instanceof Error ? e.message : String(e)}`,
       );
-      return null;
+      return { status: 'error', reason: classifyOpenAiThrownError(e) };
     } finally {
       clearTimeout(t);
     }

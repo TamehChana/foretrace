@@ -10,11 +10,19 @@ import {
 import { isDeadlineOverdueUtc } from '../projects/task-deadline.util';
 import { ProjectsService } from '../projects/projects.service';
 import { ProjectSignalsService } from '../projects/project-signals.service';
+import {
+  classifyOpenAiHttpFailure,
+  classifyOpenAiThrownError,
+  openAiNotConfiguredReason,
+  type OpenAiAttemptResult,
+} from './openai-attempt';
 import { TraceAnalystContextService } from './trace-analyst-context.service';
 
 export type ProjectImpactAnalyzeResult = {
   analysis: string;
   usedOpenAi: boolean;
+  /** Present when usedOpenAi is false — why the template was used. */
+  openAiFallbackReason: string | null;
   snapshotComputedAt: string;
   persistedRunId: string;
 };
@@ -220,10 +228,16 @@ export class ProjectImpactAnalyzerService {
       promptFeedbackHints,
     };
 
-    const llm = await this.tryOpenAi(llmInput);
-    const analysis =
-      llm ??
-      this.heuristic({
+    const attempt = await this.tryOpenAi(llmInput);
+    let openAiFallbackReason: string | null = null;
+    let analysis: string;
+    let usedOpenAi = false;
+    if (attempt.status === 'ok') {
+      analysis = attempt.text;
+      usedOpenAi = true;
+    } else {
+      openAiFallbackReason = attempt.reason;
+      analysis = this.heuristic({
         projectName: name,
         scheduleSummary,
         signalEvidence: evidence,
@@ -231,9 +245,10 @@ export class ProjectImpactAnalyzerService {
         taskPack,
         incidentPack,
         githubActivityPack,
+        openAiFallbackReason,
       });
+    }
 
-    const usedOpenAi = Boolean(llm);
     const snapshotComputedAt = snapshot.computedAt;
 
     const persisted = await this.prisma.projectImpactAnalysisRun.create({
@@ -250,6 +265,7 @@ export class ProjectImpactAnalyzerService {
     return {
       analysis,
       usedOpenAi,
+      openAiFallbackReason,
       snapshotComputedAt: snapshotComputedAt.toISOString(),
       persistedRunId: persisted.id,
     };
@@ -288,6 +304,7 @@ export class ProjectImpactAnalyzerService {
       taskTitle: string;
       githubIssueNumber: number | null;
     }>;
+    openAiFallbackReason?: string | null;
   }): string {
     const s = input.scheduleSummary;
     const lines: string[] = [
@@ -400,21 +417,25 @@ export class ProjectImpactAnalyzerService {
       '',
       'CONFIDENCE: HIGH (deterministic template from the same JSON the LLM receives).',
       '',
-      'Set OPENAI_API_KEY on the API for Trace Analyst to produce a fuller narrative (inference only; no training).',
+      input.openAiFallbackReason
+        ? `NOTE: ${input.openAiFallbackReason}`
+        : openAiNotConfiguredReason(),
     );
 
     return lines.join('\n').slice(0, 12_000);
   }
 
-  private async tryOpenAi(input: Record<string, unknown>): Promise<string | null> {
+  private async tryOpenAi(
+    input: Record<string, unknown>,
+  ): Promise<OpenAiAttemptResult> {
     if (!this.traceAnalyst.openAiConfigured()) {
-      return null;
+      return { status: 'skipped', reason: openAiNotConfiguredReason() };
     }
     const key =
       this.config.get<string>('OPENAI_API_KEY')?.trim() ??
       process.env.OPENAI_API_KEY?.trim();
     if (!key) {
-      return null;
+      return { status: 'skipped', reason: openAiNotConfiguredReason() };
     }
     const model = this.traceAnalyst.openAiImpactModel();
     const system = [
@@ -462,21 +483,28 @@ export class ProjectImpactAnalyzerService {
         this.log.warn(
           `OpenAI project impact HTTP ${res.status}: ${errBody}`,
         );
-        return null;
+        return {
+          status: 'error',
+          reason: classifyOpenAiHttpFailure(res.status, errBody),
+        };
       }
       const json = (await res.json()) as {
         choices?: { message?: { content?: string } }[];
       };
       const text = json.choices?.[0]?.message?.content?.trim();
       if (!text) {
-        return null;
+        return {
+          status: 'error',
+          reason:
+            'OpenAI returned an empty response. Showing the built-in signal template instead.',
+        };
       }
-      return text.slice(0, 12_000);
+      return { status: 'ok', text: text.slice(0, 12_000) };
     } catch (e: unknown) {
       this.log.warn(
         `OpenAI project impact failed: ${e instanceof Error ? e.message : String(e)}`,
       );
-      return null;
+      return { status: 'error', reason: classifyOpenAiThrownError(e) };
     } finally {
       clearTimeout(t);
     }
