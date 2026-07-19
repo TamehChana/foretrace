@@ -34,16 +34,21 @@ function loadEnvFile(path) {
 }
 
 const root = resolve(import.meta.dirname, '..');
+// Prefer repo-root .env over apps/api/.env for E2E targeting (local API .env
+// often still points at an old Render hostname).
 const env = {
-  ...loadEnvFile(resolve(root, '.env')),
   ...loadEnvFile(resolve(root, 'apps/api/.env')),
+  ...loadEnvFile(resolve(root, '.env')),
   ...process.env,
 };
 
-const API = (
-  env.FORETRACE_API_URL ||
-  'https://foretrace-api-nwg8.onrender.com'
-).replace(/\/$/, '');
+const DEFAULT_API = 'https://foretrace-api-nwg8.onrender.com';
+const API = (env.FORETRACE_API_URL || DEFAULT_API).replace(/\/$/, '');
+if (API.includes('foretrace-api.onrender.com') && !API.includes('nwg8')) {
+  console.warn(
+    'WARN  FORETRACE_API_URL looks like the old hostname; expected …-nwg8.onrender.com',
+  );
+}
 const email = env.FORETRACE_EMAIL || env.SMOKE_EMAIL;
 const password = env.FORETRACE_PASSWORD || env.SMOKE_PASSWORD;
 const preferProjectId = env.FORETRACE_PROJECT_ID || '';
